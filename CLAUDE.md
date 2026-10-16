@@ -58,9 +58,28 @@ lists them here. They are the gate.
 |---|---|
 | `docs/product/mvp.md` | approved MVP scope: in, out, settled owner calls |
 | `docs/decisions/` | stack and architecture decisions, numbered |
+| [GitHub Project 3](https://github.com/users/movie-clip/projects/3) | the board: status, priority and size of every epic, story and ticket |
+
+## Git and tickets
+
+- **GitHub Issues track the work; story files hold the spec.** An epic, a
+  story and a ticket are each an issue, labelled `type:epic`, `type:story` or
+  `type:ticket`, linked as sub-issues and placed on Project 3. A story issue
+  links to its story file, which is what acceptance is checked against.
+- **Board status:** Backlog → Ready → In progress → In review → Done. An issue
+  reaches Ready only on a human's approval.
+- **GitHub Flow.** `main` is always releasable. Each run that builds gets one
+  branch, `<issue>-<slug>` (for example `12-feed-import`), and one pull request
+  whose body says `Closes #<issue>`.
+- **Agents may commit to the run's branch, push it and open a pull request.**
+  Only the orchestrator does this, through the GitHub MCP server in `.mcp.json`.
+  Specialist lanes never write to git or GitHub; read-only git is fine.
+- **Only a human merges.** No agent merges a pull request, pushes to `main` or
+  force-pushes. `.claude/settings.json` denies those commands.
+- **The repo and the board are public.** Never put a secret, token, email or
+  personal data in an issue, comment, branch name or commit message.
 
 ## Conventions
 
 - User-facing copy is Spanish (`es-ES`), kept out of inline markup in message
   files so another language can be added later.
-- No agent commits. The human commits.
