@@ -1,0 +1,19 @@
+# Secrets — never committed (guardrail: personal data and secrets)
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+
+# Logs
+*.log
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+.claude/*.lock

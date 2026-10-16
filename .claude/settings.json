@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/../.agentic/scripts/hooks/report_artifact_gate.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/../.agentic/scripts/hooks/report_head_gate.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "agentic-core@agentic": true,
+    "mattpocock-skills@claude-plugins-official": true
+  }
+}
