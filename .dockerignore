@@ -2,6 +2,7 @@
 .github
 .claude
 .next
+dist
 node_modules
 .env
 .env.*

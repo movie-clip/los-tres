@@ -3,11 +3,19 @@ import 'server-only';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
-import { getDatabaseUrl } from '@/config/env';
+// Relative on purpose: the CLI is compiled by tsc, which does not rewrite `@/`.
+import { getDatabaseUrl } from '../config/env';
 
-type Db = NodePgDatabase & { $client: Pool };
+/** The Drizzle database over a pg Pool. */
+export type Database = NodePgDatabase & { $client: Pool };
 
-let cached: Db | undefined;
+/**
+ * What a query needs: the database itself or a transaction on it. The importer,
+ * the seed and the matcher take this so each runs inside or outside one.
+ */
+export type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
+
+let cached: Database | undefined;
 
 /**
  * The Drizzle instance over a pg Pool. Created on the first call and cached;
@@ -15,7 +23,7 @@ let cached: Db | undefined;
  * database (TD-5). Nothing here logs the URL, the password or a driver
  * message (TD-13).
  */
-export function getDb(): Db {
+export function getDb(): Database {
   if (!cached) {
     const pool = new Pool({
       connectionString: getDatabaseUrl(),

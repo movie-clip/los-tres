@@ -18,3 +18,12 @@ export function readRequiredEnv(name: string): string {
 export function getDatabaseUrl(): string {
   return readRequiredEnv('DATABASE_URL');
 }
+
+/**
+ * Reads one optional environment variable at call time. Returns the trimmed
+ * value, or `undefined` when it is unset or blank.
+ */
+export function readOptionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
