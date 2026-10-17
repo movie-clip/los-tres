@@ -1,0 +1,8 @@
+id,title,price,url
+P-1,Precio 19.99,19.99,https://shop-p.example/p/1
+P-2,Precio 0.29,0.29,https://shop-p.example/p/2
+P-3,Precio 1 coma 10,"1,10",https://shop-p.example/p/3
+P-4,Precio entero 12,12,https://shop-p.example/p/4
+P-5,Precio 12 coma 5,"12,5",https://shop-p.example/p/5
+P-6,Precio 4.35,4.35,https://shop-p.example/p/6
+P-7,Precio 9999999.99,9999999.99,https://shop-p.example/p/7

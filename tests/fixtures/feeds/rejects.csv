@@ -1,0 +1,9 @@
+id,title,brand,part_number,ean,price,currency,url,description
+R-1,Fila valida,,,,5.00,EUR,https://shop-r.example/p/1,
+,Sin id,,,,5.00,EUR,https://shop-r.example/p/2,
+R-3,,,,,5.00,EUR,https://shop-r.example/p/3,
+R-4,Precio con tres decimales,,,,1.005,EUR,https://shop-r.example/p/4,
+R-5,Moneda distinta,,,,5.00,USD,https://shop-r.example/p/5,
+R-6,EAN con digito de control malo,,,2000000000016,5.00,EUR,https://shop-r.example/p/6,
+R-7,URL con esquema ftp,,,,5.00,EUR,ftp://shop-r.example/p/7,
+R-1,Id repetido en el mismo feed,,,,6.00,EUR,https://shop-r.example/p/1b,

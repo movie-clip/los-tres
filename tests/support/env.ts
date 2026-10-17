@@ -33,15 +33,6 @@ export function testDatabaseUrl(): string {
   return withDatabaseName(url, `${database}_test`);
 }
 
-/** Where the Compose `app` answers: `E2E_BASE_URL`, else `http://127.0.0.1:${APP_PORT}`. */
-export function appBaseUrl(): string {
-  loadEnv();
-  const explicit = process.env.E2E_BASE_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, '');
-  const port = process.env.APP_PORT?.trim() || '3000';
-  return `http://127.0.0.1:${port}`;
-}
-
 /** Where Umami answers: `http://127.0.0.1:${UMAMI_PORT}`. */
 export function umamiBaseUrl(): string {
   loadEnv();

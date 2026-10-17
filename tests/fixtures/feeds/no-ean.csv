@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+E-1,Producto sin EAN,MarcaSin,SIN 1,,5.00,EUR,https://shop-e.example/p/E-1,
+E-2,Producto sin EAN,MarcaSin,SIN 1,,5.50,EUR,https://shop-e.example/p/E-2,

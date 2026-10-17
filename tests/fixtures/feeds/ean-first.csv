@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+A-1,Fixture Alpha Filtro,MarcaUno,PN 100,2000000000046,10.00,EUR,https://shop-a.example/p/A-1,Descripcion alpha
+A-2,Fixture Beta Taladro,MarcaDos,PN 200,2000000000053,20.50,EUR,https://shop-a.example/p/A-2,
