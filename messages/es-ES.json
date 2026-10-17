@@ -11,5 +11,17 @@
     "heading": "Página no encontrada",
     "body": "La página que buscas no existe o ya no está disponible.",
     "backHome": "Volver al inicio"
+  },
+  "Product": {
+    "metaTitle": "{title} | {siteName}",
+    "metaDescription": "Compara el precio de {title} en las tiendas de España y elige la más barata.",
+    "brand": "Marca",
+    "partNumber": "Referencia",
+    "ean": "EAN",
+    "shopCount": "{count, plural, one {# tienda} other {# tiendas}}",
+    "offersHeading": "Dónde comprarlo",
+    "vatIncluded": "Precios con IVA incluido.",
+    "priceUpdatedOn": "Precio actualizado el {date, date, medium}",
+    "imagePlaceholder": "Imagen del producto no disponible"
   }
 }

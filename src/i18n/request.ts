@@ -6,5 +6,6 @@ import { LOCALE } from './locale';
 // locale cookie, which guardrail 5 forbids for public visitors (TD-4).
 export default getRequestConfig(async () => ({
   locale: LOCALE,
+  timeZone: 'Europe/Madrid',
   messages: (await import('../../messages/es-ES.json')).default,
 }));
