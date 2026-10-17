@@ -63,10 +63,10 @@ the owner can change it without a code change.
   day, shown as a chart on the product page. Imports are manual, so a day
   without an import has no point; the chart shows the gap and never invents a
   value.
-- **When a product loses all its offers,** its page stays exactly as it is
-  (text, image, price history, still indexed). Only the offer list changes: it
-  shows "No offers right now" with the last known lowest price and its date.
-  Structured data is omitted while it has no offers.
+- **When a product loses all its offers,** its page stays as it is
+  (text, image, price history, still indexed), with two changes. The offer list
+  shows "No offers right now" with the last known lowest price and its date,
+  and the structured data is omitted while the product has no offers.
 
 ## Matching
 
