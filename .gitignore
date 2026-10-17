@@ -17,3 +17,10 @@ __pycache__/
 .claude/settings.local.json
 .claude/worktrees/
 .claude/*.lock
+
+# Next.js and test output
+.next/
+next-env.d.ts
+*.tsbuildinfo
+playwright-report/
+test-results/

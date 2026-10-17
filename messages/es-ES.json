@@ -1,0 +1,15 @@
+{
+  "Metadata": {
+    "title": "{siteName} | Compara precios de recambios y herramientas",
+    "description": "Compara precios de recambios y consumibles de coche, y de herramientas eléctricas y manuales, en las tiendas de España."
+  },
+  "Home": {
+    "heading": "{siteName}",
+    "tagline": "Compara precios de recambios y herramientas en las tiendas de España."
+  },
+  "NotFound": {
+    "heading": "Página no encontrada",
+    "body": "La página que buscas no existe o ya no está disponible.",
+    "backHome": "Volver al inicio"
+  }
+}

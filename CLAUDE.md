@@ -49,8 +49,37 @@ line here is the owner's call: propose it and stop.
 
 ## Commands
 
-*None yet.* The first slice that adds code adds a lint and a test command and
-lists them here. They are the gate.
+npm and Node 22 (`.nvmrc`). **`npm run gate` is the gate**: every lane and the
+integration check run it. A story is not done until it exits 0.
+
+First run on a fresh clone: `npm ci`, `npm run env:init`,
+`npm run test:e2e:install`. The gate also needs Docker running and a free host
+port for each published service (app, db, Umami); if one is taken, set
+`APP_PORT`, `DB_HOST_PORT` or `UMAMI_PORT` in `.env` to change the host port.
+
+| Purpose | Command | Needs |
+|---|---|---|
+| lint | `npm run lint` (`eslint .`) | nothing |
+| types | `npm run typecheck` (`tsc --noEmit`) | nothing |
+| unit tests | `npm run test:unit` (`vitest run --project unit`) | nothing, no database |
+| integration tests | `npm run test:integration` (`vitest run --project integration`) | `npm run db:up` |
+| unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
+| e2e | `npm run test:e2e` (`playwright test`) | `npm run stack:up`, Playwright browser |
+| **gate** | `npm run gate` | Docker running, `.env`, Playwright browser |
+
+`npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
+in that order. It rebuilds the app image and runs the e2e against the Compose
+stack, so it takes minutes, and it leaves the stack running.
+
+Helpers:
+
+- `npm run env:init`: create `.env` with generated secrets; exits 1 and changes
+  nothing if `.env` already exists. Never commit `.env`.
+- `npm run db:up`: start the `db` service and wait until healthy.
+- `npm run stack:up`: build and start `app`, `db` and `umami`, and wait until healthy.
+- `npm run stack:down`: stop the Compose stack (the database volume is kept).
+- `npm run test:e2e:install`: install the Playwright chromium browser.
+- `npm run dev`: Next.js dev server on the host; `npm run build`: production build.
 
 ## Canonical documentation
 
