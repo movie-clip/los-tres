@@ -1,8 +1,15 @@
-// STUB written by the backend lane so the image can build. Lane 04 overwrites it.
+import { getTranslations } from 'next-intl/server';
+
 import { getSiteName } from '@/config/site';
 
 export const dynamic = 'force-dynamic';
 
-export default function HomePage() {
-  return <h1>{getSiteName()}</h1>;
+export default async function HomePage() {
+  const t = await getTranslations('Home');
+  return (
+    <main className="page">
+      <h1>{t('heading', { siteName: getSiteName() })}</h1>
+      <p>{t('tagline')}</p>
+    </main>
+  );
 }
