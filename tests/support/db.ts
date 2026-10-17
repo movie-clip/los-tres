@@ -14,3 +14,20 @@ export async function assertTestDatabase(): Promise<void> {
     throw new Error('Refusing to run: the connected database is not a _test database');
   }
 }
+
+/**
+ * Empties every table in schema `public` and restarts identities, so each test
+ * starts from the migrated, empty schema. Drizzle's own migrations table lives
+ * in schema `drizzle` and is left alone. Integration files call this in
+ * `beforeEach`.
+ */
+export async function resetDatabase(): Promise<void> {
+  await assertTestDatabase();
+  const db = getDb();
+  const tables = await db.execute<{ tablename: string }>(
+    sql`select tablename from pg_tables where schemaname = 'public' and tablename not like '%drizzle%'`,
+  );
+  if (tables.rows.length === 0) return;
+  const names = tables.rows.map((row) => `"public"."${row.tablename.replace(/"/g, '""')}"`).join(', ');
+  await db.execute(sql.raw(`truncate table ${names} restart identity cascade`));
+}

@@ -11,6 +11,8 @@ services:
     environment:
       SITE_NAME: ${SITE_NAME:?run npm run env:init}
       DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/${DB_NAME:-lostres}
+      # Unset means off: a server that forgets it shows no demo shops.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production

@@ -1,9 +1,9 @@
-import { createServer } from 'node:net';
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/(public)/api/health/route';
 import { closeDb } from '@/db/client';
+
+import { unusedPort } from '../support/net';
 
 const PASSWORD = 'pw-sentinel-9f3';
 
@@ -12,18 +12,6 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   await closeDb();
 });
-
-async function unusedPort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      server.close(() => resolve(port));
-    });
-  });
-}
 
 describe('GET /api/health (C-6)', () => {
   it('answers 200 with the exact ok body against the real test database', async () => {

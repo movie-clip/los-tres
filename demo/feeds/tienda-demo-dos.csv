@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+DOS-100,DEMO Filtro aceite OC1234 (Dos),MarcaDemo,OC-1234,2000000000015,11.49,EUR,https://tienda-demo-dos.example/p/DOS-100,Producto ficticio de demostración: filtro de aceite que no existe ni se vende en ninguna tienda.
+DOS-101,DEMO Juego de llaves fijas 12 piezas,HerramientasDemo,LF-12,2000000000039,29.99,EUR,https://tienda-demo-dos.example/p/DOS-101,Producto ficticio de demostración: juego de llaves fijas que no existe ni se vende en ninguna tienda.

@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+UNO-001,DEMO Filtro de aceite OC 1234,MarcaDemo,OC 1234,2000000000015,12.99,EUR,https://tienda-demo-uno.example/p/UNO-001,Producto ficticio de demostración: filtro de aceite que no existe ni se vende en ninguna tienda.
+UNO-002,DEMO Taladro percutor 650 W,HerramientasDemo,TP-650,2000000000022,49.90,EUR,https://tienda-demo-uno.example/p/UNO-002,Producto ficticio de demostración: taladro percutor que no existe ni se vende en ninguna tienda.

@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+D-1,Mismo EAN sin marca,,,2000000000046,7.00,EUR,https://shop-d.example/p/D-1,
+D-2,Mismo EAN con marca,MarcaDos,,2000000000060,30.00,EUR,https://shop-d.example/p/D-2,

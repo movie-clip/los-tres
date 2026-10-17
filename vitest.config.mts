@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 // This file must not import from tests/: `next build` in the Docker image type
 // checks it, and .dockerignore leaves tests/ out of the build context.
-const root = __dirname;
+const root = import.meta.dirname;
 const alias = {
   '@': path.resolve(root, 'src'),
   'server-only': path.resolve(root, 'tests/support/server-only-stub.ts'),
@@ -26,7 +26,7 @@ export default defineConfig({
           name: 'integration',
           include: ['tests/integration/**/*.test.ts'],
           fileParallelism: false,
-          // Creates ${DB_NAME}_test once.
+          // Drops, recreates and migrates ${DB_NAME}_test once per run.
           globalSetup: ['tests/support/global-setup.ts'],
           // Points DATABASE_URL at ${DB_NAME}_test in every worker, before any test.
           setupFiles: ['tests/support/test-database-env.ts'],

@@ -65,3 +65,42 @@ describe('messages/es-ES.json (C-8)', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('messages/es-ES.json Product namespace (C-14)', () => {
+  it.each([
+    'Product.metaTitle',
+    'Product.metaDescription',
+    'Product.brand',
+    'Product.partNumber',
+    'Product.ean',
+    'Product.shopCount',
+    'Product.offersHeading',
+    'Product.vatIncluded',
+    'Product.priceUpdatedOn',
+    'Product.imagePlaceholder',
+  ])('has a non-empty string at %s', (key) => {
+    const value = lookup(key);
+    expect(typeof value).toBe('string');
+    expect((value as string).trim().length).toBeGreaterThan(0);
+  });
+
+  it('takes the placeholders C-14 fixes', () => {
+    expect(lookup('Product.metaTitle')).toContain('{title}');
+    expect(lookup('Product.metaTitle')).toContain('{siteName}');
+    expect(lookup('Product.metaDescription')).toContain('{title}');
+    expect(lookup('Product.priceUpdatedOn')).toContain('{date, date, medium}');
+  });
+
+  it('writes the shop count as an ICU plural with one and other branches', () => {
+    const message = lookup('Product.shopCount') as string;
+    expect(message).toMatch(/^\{count, plural,/);
+    expect(message).toMatch(/one\s*\{[^}]*#[^}]*\}/);
+    expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
+  });
+
+  it('puts no price and no mention of shipping in the copy', () => {
+    const product = collectStrings((messages as Record<string, unknown>).Product).join(' | ');
+    expect(product).not.toMatch(/\d+[.,]\d{2}\s*€/);
+    expect(product).not.toMatch(/env[ií]o/i);
+  });
+});

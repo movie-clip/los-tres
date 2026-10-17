@@ -1,0 +1,35 @@
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.text {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.list {
+  margin: 0 0 var(--space-2);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.term {
+  min-width: 8rem;
+  color: var(--color-muted);
+}
+
+.value {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

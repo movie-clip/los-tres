@@ -1,0 +1,3 @@
+id,title,brand,part_number,ean,price,currency,url,description
+B-1,Titulo distinto de B,marcauno ,PN-100,200-0000-000046,9.50,EUR,https://shop-b.example/p/B-1,Otra descripcion
+B-2,Otro titulo para beta,,,2000000000053,19.00,EUR,https://shop-b.example/p/B-2,

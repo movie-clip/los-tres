@@ -26,6 +26,7 @@ export default defineConfig([
     '.next/**',
     'out/**',
     'build/**',
+    'dist/**',
     'node_modules/**',
     'next-env.d.ts',
     'playwright-report/**',
@@ -42,6 +43,32 @@ export default defineConfig([
               group: scrapingLibraries,
               message:
                 'Guardrail 2: data enters only through a registered feed. No crawler, headless browser or HTML parser for shop pages.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The CLI is compiled by tsc, which does not rewrite the `@/` alias, so the
+    // server-side directories import each other relatively (TD-17). Flat-config
+    // options do not merge: this block must repeat the scraping-library ban
+    // above or the override silently drops guardrail 2 for these files.
+    files: ['src/{cli,config,db,server}/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: scrapingLibraries,
+              message:
+                'Guardrail 2: data enters only through a registered feed. No crawler, headless browser or HTML parser for shop pages.',
+            },
+            {
+              group: ['@/*'],
+              message:
+                'src/cli, src/config, src/db and src/server import relatively: tsc does not rewrite the @/ alias in the compiled CLI.',
             },
           ],
         },
