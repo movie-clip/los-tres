@@ -46,6 +46,8 @@ line here is the owner's call: propose it and stop.
   queue (0008)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   cookieless Umami; no ads (0009)
+- **Styling:** CSS Modules, co-located `*.module.css`; `globals.css` keeps the
+  variables and reset (0011)
 
 ## Commands
 
@@ -74,8 +76,9 @@ writes it. Compose defaults it to `false` when unset, so a server that omits it
 shows no demo data. A `.env` created before slice B lacks the line and
 `env:init` will not touch it: add `SEED_DEMO_DATA=true` by hand and run
 `docker compose up -d` to recreate `app`. Without it, the gate's e2e setup
-fails with "no approved feed: set SEED_DEMO_DATA=true in .env and run docker
-compose up -d".
+fails with this message, on one line:
+
+> e2e setup: the import found no approved feed. Set SEED_DEMO_DATA=true in .env and run: docker compose up -d
 
 The migrate, seed and import verbs also run inside the app image through
 Compose, against the Compose database: `docker compose run --rm app migrate`,
