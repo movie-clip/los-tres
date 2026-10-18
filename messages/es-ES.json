@@ -22,6 +22,7 @@
     "offersHeading": "Dónde comprarlo",
     "vatIncluded": "Precios con IVA incluido.",
     "priceUpdatedOn": "Precio actualizado el {date, date, medium}",
+    "goToShop": "Ir a la tienda de {shopName}",
     "imagePlaceholder": "Imagen del producto no disponible"
   }
 }

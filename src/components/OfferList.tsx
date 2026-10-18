@@ -8,6 +8,10 @@ export type OfferRow = {
   price: string;
   /** Formatted "price updated on" line. */
   updated: string;
+  /** Relative path /go/<id>, from goPath(). Never a shop URL. */
+  goHref: string;
+  /** Link text, already translated: Product.goToShop with the shop name. */
+  goLabel: string;
 };
 
 export type OfferListProps = {
@@ -18,7 +22,11 @@ export type OfferListProps = {
   offers: OfferRow[];
 };
 
-/** The shops that sell the product. Display strings only; no row links to a shop (D-1 Q4). */
+/**
+ * The shops that sell the product. Display strings only. Each row has one plain
+ * anchor to its /go path: never next/link (it prefetches), never a target, and
+ * no noreferrer, so the redirect can read the source page from the Referer.
+ */
 export function OfferList({ heading, shopCount, vatNote, offers }: OfferListProps) {
   return (
     <section className={styles.offers}>
@@ -34,6 +42,14 @@ export function OfferList({ heading, shopCount, vatNote, offers }: OfferListProp
             <span className={styles.price} data-testid="offer-price">
               {offer.price}
             </span>
+            <a
+              href={offer.goHref}
+              rel="sponsored nofollow"
+              className={styles.go}
+              data-testid="offer-go"
+            >
+              {offer.goLabel}
+            </a>
             <span className={styles.updated} data-testid="offer-updated">
               {offer.updated}
             </span>

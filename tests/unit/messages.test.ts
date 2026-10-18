@@ -77,6 +77,7 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
     'Product.offersHeading',
     'Product.vatIncluded',
     'Product.priceUpdatedOn',
+    'Product.goToShop',
     'Product.imagePlaceholder',
   ])('has a non-empty string at %s', (key) => {
     const value = lookup(key);
@@ -89,6 +90,7 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
     expect(lookup('Product.metaTitle')).toContain('{siteName}');
     expect(lookup('Product.metaDescription')).toContain('{title}');
     expect(lookup('Product.priceUpdatedOn')).toContain('{date, date, medium}');
+    expect(lookup('Product.goToShop')).toContain('{shopName}');
   });
 
   it('writes the shop count as an ICU plural with one and other branches', () => {
