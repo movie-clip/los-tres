@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 
 import { getDb } from '@/db/client';
+import { errorCode } from '@/server/error-code';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,17 +10,6 @@ const CHECK_TIMEOUT_MS = 2000;
 
 function respond(status: 'ok' | 'degraded', db: 'up' | 'down', code: number) {
   return Response.json({ status, db }, { status: code, headers: HEADERS });
-}
-
-/** A Postgres/driver error code (for example ECONNREFUSED), or a fixed word. */
-function errorCode(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code === 'string' && /^[A-Za-z0-9_]{1,32}$/.test(code)) {
-      return code;
-    }
-  }
-  return 'UNKNOWN';
 }
 
 export async function GET(): Promise<Response> {

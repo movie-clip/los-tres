@@ -10,7 +10,7 @@ import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 // this returns integer cents and `Date`, never a formatted amount or date.
 
 export type PublicOffer = {
-  /** offers.id; the /go slice will need it. The page must not render a link. */
+  /** offers.id; the page links to it through /go (goPath), never to a shop URL. */
   offerId: number;
   /** shops.name */
   shopName: string;
