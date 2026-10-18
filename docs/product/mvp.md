@@ -1,9 +1,10 @@
 # Los Tres — MVP scope
 
 Agreed with the owner on 2026-10-16 in a grilling session. It replaces the
-earlier marketplace scope of 2026-10-12, which was deleted. This is the
-approved MVP scope: what is in, what is out, and the owner calls already
-settled. A change to anything here is the owner's call.
+earlier marketplace scope of 2026-10-12, which was deleted. Amended on
+2026-10-18 after the backlog revision, and the owner approved the amendment.
+This is the approved MVP scope: what is in, what is out, and the owner calls
+already settled. A change to anything here is the owner's call.
 
 ## Goal
 
@@ -11,7 +12,7 @@ A **price-comparison site for Spain**, in the family of hotline.ua: a
 catalogue of products, each with a list of shops that sell it and a link to
 buy there. Los Tres never sells anything itself.
 
-The MVP is done when the site is live, at least 3 affiliate feeds are approved,
+The MVP is done when the site is live with its legal pages, at least 3 affiliate feeds are approved,
 at least 10k products are indexed by Google, and it records its first outgoing
 clicks and first commission.
 
@@ -38,7 +39,9 @@ the owner can change it without a code change.
 - **Construction:** **power and hand tools** only, for now.
 - **Categories:** a fixed tree of about 30 categories that the admin defines.
   Each feed category is mapped once by the admin to one of ours. Products from
-  unmapped feed categories wait in an admin queue.
+  unmapped feed categories wait in an admin queue. Products from an unmapped
+  feed category are not public until the admin maps the category (owner
+  ruling, 2026-10-17).
 - **No vehicle fitment.** Auto parts are found by part number, EAN or text. If
   a feed carries fitment text, it is shown as text and nothing more.
 
@@ -57,10 +60,13 @@ the owner can change it without a code change.
 - **Product images are not taken from feeds.** The admin uploads them. Until an
   image is set, the product shows its category's placeholder.
 - **Price history:** one point per day per product, the lowest offer price that
-  day, shown as a chart on the product page.
-- **When a product loses all its offers,** its page stays exactly as it is
-  (text, image, price history, still indexed). Only the offer list changes: it
-  shows "No offers right now" with the last known lowest price and its date.
+  day, shown as a chart on the product page. Imports are manual, so a day
+  without an import has no point; the chart shows the gap and never invents a
+  value.
+- **When a product loses all its offers,** its page stays as it is
+  (text, image, price history, still indexed), with two changes. The offer list
+  shows "No offers right now" with the last known lowest price and its date,
+  and the structured data is omitted while the product has no offers.
 
 ## Matching
 
@@ -103,6 +109,10 @@ manages**, never code. Adding a shop means entering its name, logo, network,
 feed URL and link pattern in the admin area. A product's offer list is built
 only from imported data.
 
+A feed URL may hold an API key. Feed URLs are encrypted at rest before the
+first real feed is added (owner ruling, 2026-10-18); until then the admin area
+shows them masked and nothing logs them.
+
 ## Feed import
 
 - A **separate import command**, `import-feeds`, reads each approved feed (CSV
@@ -133,7 +143,8 @@ only from imported data.
 ## Visibility (guardrail 1)
 
 Only offers from an **admin-approved feed** are public. Products from an
-approved feed publish automatically. The admin can hide any product or offer,
+approved feed publish automatically once their feed category is mapped; until
+then they wait in the admin queue and are not public. The admin can hide any product or offer,
 and a hidden item is never public.
 
 ## Outgoing clicks
@@ -141,7 +152,9 @@ and a hidden item is never public.
 Every "go to shop" link goes through our own `/go/<offer>` redirect. It logs the
 click and sends the visitor to the affiliate URL. The log holds offer, shop,
 product, time and source page only: **no IP, no user agent, no cookie**
-(decision 0009). It is the basis for per-click billing later.
+(decision 0009). It is the basis for per-click billing later. Prefetch and
+HEAD requests, known crawlers and demo offers are not counted. The count is
+best effort; the network's report is the authority for commission.
 
 ## Analytics
 
@@ -161,6 +174,20 @@ Docker Compose (decision 0004). It runs locally first. Once the first slices
 work, the same Compose setup runs on a small EU VPS with a domain, so the
 affiliate networks can review a live site. An autónomo registration (or an
 existing company) is needed only when a network asks for a payee.
+
+While the networks review the site it may show the demo catalogue. Demo
+products are noindex and left out of the sitemap, and clicks on demo offers are
+not counted. Pages that list only demo offers carry a short notice that they
+are a demonstration, and the legal text says so in one line (owner ruling,
+2026-10-18). The demo feeds are disabled when the first real feed is approved.
+No visitor IP address or user agent appears in the proxy, app or container
+logs.
+
+## Legal pages
+
+The site carries a legal notice (aviso legal), a privacy policy and an
+affiliate disclosure, linked from the footer of every page (LSSI-CE). The owner
+supplies the Spanish text. There is still no cookie banner.
 
 ## Out of MVP
 
