@@ -90,27 +90,46 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     await close();
   });
 
-  test('links nowhere in the offers and leaks no shop host, /go link or shipping text', async ({
+  test('gives every offer one sponsored /go link and leaks no shop host or shipping text', async ({
     request,
     browser,
   }) => {
     const response = await request.get(path(DEMO_SHARED.slug));
     const html = await response.text();
 
+    // The shop URL never reaches the page: the link is our own /go path.
     for (const host of DEMO_SHOP_HOSTS) {
       expect(html).not.toContain(host);
     }
-    expect(html).not.toContain('/go');
     expect(html).not.toMatch(/env[ií]o/i);
 
     const { page, close } = await openRawHtml(browser, html);
-    await expect(page.locator('main a')).toHaveCount(0);
-    await expect(page.locator('main [href]')).toHaveCount(0);
-    await expect(page.locator('ol a, ol button')).toHaveCount(0);
+    const rows = page.getByTestId('offer-row');
+    const rowCount = await rows.count();
+    expect(rowCount).toBe(DEMO_SHARED.offers.length);
+
+    for (let index = 0; index < rowCount; index += 1) {
+      const row = rows.nth(index);
+      await expect(row.locator('a')).toHaveCount(1);
+      const link = row.locator('a[data-testid="offer-go"]');
+      await expect(link).toHaveCount(1);
+      expect(await link.getAttribute('href')).toMatch(/^\/go\/\d+$/);
+      const rel = (await link.getAttribute('rel')) ?? '';
+      expect(rel).toContain('sponsored');
+      expect(rel).toContain('nofollow');
+      expect(await link.getAttribute('target')).toBeNull();
+      // The shop name is in the link text, which is its accessible name.
+      expect(await link.textContent()).toContain(DEMO_SHARED.offers[index].shopName);
+    }
+
+    // No other link in the page body, and no button in the offer list.
+    await expect(page.locator('main a')).toHaveCount(rowCount);
+    await expect(page.locator('ol button')).toHaveCount(0);
+    await expectLocalScriptsAndLinks(page);
     await close();
   });
 
-  test('a real browser visit sets no cookie and contacts no other origin', async ({
+  test('a real browser visit sets no cookie, contacts no other origin and requests no /go URL', async ({
     page,
     context,
     baseURL,
@@ -124,6 +143,7 @@ test.describe('product page /producto/<slug> (C-13)', () => {
 
     expect(await context.cookies()).toEqual([]);
     expectNoForeignOrigin(requested, new URL(baseURL as string).origin);
+    expect(requested.filter((url) => new URL(url).pathname.startsWith('/go/'))).toEqual([]);
   });
 
   test('an unknown slug returns 404 with the Spanish not-found page and no cookie', async ({
