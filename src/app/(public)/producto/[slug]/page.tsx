@@ -7,6 +7,7 @@ import { OfferList } from '@/components/OfferList';
 import { ProductDetails, type ProductDetail } from '@/components/ProductDetails';
 import { getSiteName } from '@/config/site';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
+import { goPath } from '@/server/clicks/go-path';
 import { formatEuroCents } from '@/server/money';
 
 export const dynamic = 'force-dynamic';
@@ -59,6 +60,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
           shopName: offer.shopName,
           price: formatEuroCents(offer.priceCents),
           updated: t('priceUpdatedOn', { date: offer.priceUpdatedAt }),
+          goHref: goPath(offer.offerId),
+          goLabel: t('goToShop', { shopName: offer.shopName }),
         }))}
       />
     </main>

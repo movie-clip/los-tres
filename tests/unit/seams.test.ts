@@ -121,3 +121,64 @@ describe('seams (guardrails 1, 2, 4)', () => {
     expect(sql).not.toMatch(/\b(real|double precision|numeric|decimal|money|float\d?)\b/i);
   });
 });
+
+describe('seams (guardrail 5, S1.1 click log)', () => {
+  it('finds the click modules it scans, so the rules below are not vacuous', () => {
+    const files = sources().map(({ file }) => file);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        'src/server/clicks/counting.ts',
+        'src/server/clicks/record.ts',
+        'src/server/clicks/offer-target.ts',
+        'src/app/(public)/go/[offer]/route.ts',
+      ]),
+    );
+    const counting = sources().find(({ file }) => file === 'src/server/clicks/counting.ts');
+    expect(counting?.code).toMatch(/user-agent/i);
+  });
+
+  it('reads the user agent only in src/server/clicks/counting.ts', () => {
+    const found = offenders(/user-agent|userAgent/i, (file) => file === 'src/server/clicks/counting.ts');
+    expect(found).toEqual([]);
+  });
+
+  it('reads no client address header anywhere in src', () => {
+    expect(offenders(/x-forwarded-for|x-real-ip|cf-connecting-ip|true-client-ip/i, () => false)).toEqual([]);
+  });
+
+  it('inserts into clicks only in src/server/clicks/record.ts, and never updates or deletes a click', () => {
+    expect(offenders(/\.insert\(\s*clicks\s*\)/, (file) => file === 'src/server/clicks/record.ts')).toEqual([]);
+    expect(offenders(/\.(update|delete)\(\s*clicks\s*\)/, () => false)).toEqual([]);
+    const record = sources().find(({ file }) => file === 'src/server/clicks/record.ts')?.code ?? '';
+    expect(record).toMatch(/\.insert\(\s*clicks\s*\)/);
+  });
+
+  it('names the shop URL (offers.url) only under src/db/, the importer and offer-target.ts', () => {
+    const found = offenders(
+      /\boffers\.url\b/,
+      (file) =>
+        file.startsWith('src/db/') ||
+        file.startsWith('src/server/importer/') ||
+        file === 'src/server/clicks/offer-target.ts',
+    );
+    expect(found).toEqual([]);
+    const target = sources().find(({ file }) => file === 'src/server/clicks/offer-target.ts')?.code ?? '';
+    expect(target).toMatch(/\boffers\.url\b/);
+  });
+
+  it('does not import next/link in the offer list (it prefetches in production)', () => {
+    const code = sources().find(({ file }) => file === 'src/components/OfferList.tsx')?.code;
+    expect(code).toBeDefined();
+    expect(code).not.toMatch(/next\/link/);
+  });
+
+  it('mentions no cookie in the /go route or the click modules', () => {
+    const found = sources()
+      .filter(
+        ({ file }) => file.startsWith('src/app/(public)/go/') || file.startsWith('src/server/clicks/'),
+      )
+      .filter(({ code }) => /cookie/i.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+});

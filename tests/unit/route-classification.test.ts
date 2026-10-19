@@ -26,6 +26,11 @@ describe('route classification (C-5, TD-6)', () => {
     expect(classifyRoute('(public)/api/health/route.ts')).toBe('public');
   });
 
+  it('keeps the /go redirect route below (public)', () => {
+    expect(routes).toContain('(public)/go/[offer]/route.ts');
+    expect(classifyRoute('(public)/go/[offer]/route.ts')).toBe('public');
+  });
+
   it('detects a route placed outside the two directories', () => {
     expect(classifyRoute('page.tsx')).toBe('unclassified');
     expect(classifyRoute('api/leak/route.ts')).toBe('unclassified');

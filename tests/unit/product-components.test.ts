@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { OfferList } from '@/components/OfferList';
 import { ProductDetails } from '@/components/ProductDetails';
+import { goPath } from '@/server/clicks/go-path';
 
 // The two display components take finished strings only (C-12, C-13). These
 // cover the branches the e2e cannot reach with the demo data.
@@ -60,8 +61,22 @@ describe('ProductDetails', () => {
 
 describe('OfferList', () => {
   const rows = [
-    { key: '2', shopName: 'Tienda B', price: '11,49 €', updated: 'Actualizado hoy' },
-    { key: '1', shopName: 'Tienda A', price: '12,99 €', updated: 'Actualizado hoy' },
+    {
+      key: '2',
+      shopName: 'Tienda B',
+      price: '11,49 €',
+      updated: 'Actualizado hoy',
+      goHref: goPath(2),
+      goLabel: 'Ir a la tienda de Tienda B',
+    },
+    {
+      key: '1',
+      shopName: 'Tienda A',
+      price: '12,99 €',
+      updated: 'Actualizado hoy',
+      goHref: goPath(1),
+      goLabel: 'Ir a la tienda de Tienda A',
+    },
   ];
 
   function list() {
@@ -89,11 +104,22 @@ describe('OfferList', () => {
     expect(html).toContain('>11,49 €<');
   });
 
-  it('renders no link and no button in the offers (no /go slice yet)', () => {
+  it('renders one sponsored anchor per row to its given path and no button', () => {
     const html = list();
-    expect(html).not.toMatch(/<a\b/);
+    const anchors = html.match(/<a\b[^>]*>[^<]*<\/a>/g) ?? [];
+    expect(anchors).toHaveLength(rows.length);
+    anchors.forEach((anchor, index) => {
+      const row = rows[index];
+      expect(anchor).toContain(`href="${row.goHref}"`);
+      expect(anchor).toContain('data-testid="offer-go"');
+      expect(anchor).toMatch(/rel="[^"]*\bsponsored\b[^"]*"/);
+      expect(anchor).toMatch(/rel="[^"]*\bnofollow\b[^"]*"/);
+      expect(anchor).not.toMatch(/\btarget=/);
+      expect(anchor).not.toMatch(/noreferrer|noopener|referrerpolicy/i);
+      expect(anchor).toContain(`>${row.goLabel}</a>`);
+    });
     expect(html).not.toMatch(/<button\b/);
-    expect(html).not.toContain('href=');
+    expect(html.match(/href=/g)).toHaveLength(rows.length);
   });
 
   it('renders an empty list without throwing', () => {

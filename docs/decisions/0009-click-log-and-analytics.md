@@ -33,3 +33,8 @@ consent-management tool.
   need its own fraud decision first.
 - The admin login uses a session cookie for admins only. It is strictly
   necessary, so it needs no consent.
+- The source page is a same-origin site path taken in memory from the Referer
+  header; a query, a fragment or a foreign origin is never stored. Prefetch and
+  HEAD requests, known crawlers (the user agent is read in memory against a
+  short list and never stored or logged) and demo offers are redirected but not
+  counted.

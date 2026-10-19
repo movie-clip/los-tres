@@ -4,3 +4,4 @@
 // never an empty string (TD-42).
 export * from './catalogue';
 export * from './sources';
+export * from './clicks';
