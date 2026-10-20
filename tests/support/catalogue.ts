@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { getDb } from '@/db/client';
-import { feeds, offers, products, shops } from '@/db/schema';
+import { categories, feedCategoryMappings, feeds, offers, products, shops } from '@/db/schema';
 
 import { assertTestDatabase } from './db';
 
@@ -10,6 +10,9 @@ import { assertTestDatabase } from './db';
 // feed approved, nothing hidden, not in review): a test that is about hiding
 // something sets exactly that one flag and asserts on the difference.
 // Feeds are `shop_upload`, so no network row is needed.
+// A product is public only when mapped to a category (S5.1), so `insertProduct`
+// defaults `categoryId` to a shared test category; pass `categoryId: null` to
+// build the unmapped state.
 
 let counter = 0;
 const next = (): number => {
@@ -49,14 +52,51 @@ export async function insertFeed(
   return row.id;
 }
 
+const DEFAULT_CATEGORY_SLUG = 'categoria-de-prueba';
+
+export async function insertCategory(
+  o: { slug?: string; name?: string; parentId?: number | null } = {},
+): Promise<{ id: number; slug: string; name: string }> {
+  await assertTestDatabase();
+  const n = next();
+  const slug = o.slug ?? `categoria-${n}`;
+  const name = o.name ?? `Categoría ${n}`;
+  const [row] = await getDb()
+    .insert(categories)
+    .values({ slug, name, parentId: o.parentId ?? null })
+    .returning({ id: categories.id });
+  return { id: row.id, slug, name };
+}
+
+/** The category `insertProduct` assigns by default; created on first use, found by slug after. */
+export async function defaultCategoryId(): Promise<number> {
+  await assertTestDatabase();
+  const [found] = await getDb()
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.slug, DEFAULT_CATEGORY_SLUG));
+  if (found) return found.id;
+  return (await insertCategory({ slug: DEFAULT_CATEGORY_SLUG, name: 'Categoría de prueba' })).id;
+}
+
+export async function insertCategoryMapping(
+  feedId: number,
+  feedCategory: string,
+  categoryId: number,
+): Promise<void> {
+  await assertTestDatabase();
+  await getDb().insert(feedCategoryMappings).values({ feedId, feedCategory, categoryId });
+}
+
 export async function insertProduct(
   o: Partial<typeof products.$inferInsert> = {},
 ): Promise<{ id: number; slug: string }> {
   await assertTestDatabase();
   const slug = o.slug ?? `producto-${next()}`;
+  const categoryId = o.categoryId === undefined ? await defaultCategoryId() : o.categoryId;
   const [row] = await getDb()
     .insert(products)
-    .values({ title: `Producto ${slug}`, ...o, slug })
+    .values({ title: `Producto ${slug}`, ...o, slug, categoryId })
     .returning({ id: products.id });
   return { id: row.id, slug };
 }
@@ -80,17 +120,48 @@ export async function insertOffer(
 
 /** One approved shop, one approved feed, one product, one visible offer. */
 export async function insertVisibleOffer(
-  o: { slug?: string; priceCents?: number; shopName?: string } = {},
+  o: { slug?: string; priceCents?: number; shopName?: string; categoryId?: number | null } = {},
 ) {
   const shop = await insertShop({ name: o.shopName });
   const feedId = await insertFeed(shop.id);
-  const product = await insertProduct({ slug: o.slug });
+  const product = await insertProduct({ slug: o.slug, categoryId: o.categoryId });
   const offerId = await insertOffer({
     productId: product.id,
     feedId,
     priceCents: o.priceCents ?? 1000,
   });
   return { shop, feedId, product, offerId };
+}
+
+/**
+ * A product with one visible offer per entry of `prices` (cents). Each offer
+ * gets its own approved shop and feed unless `feedId` is given, in which case
+ * every offer uses that one feed (the feed must hold unique external ids, which
+ * the helper's offers do). `categoryId: undefined` takes the default category,
+ * `null` builds the unmapped state.
+ */
+export async function insertListedProduct(o: {
+  slug: string;
+  prices: number[];
+  categoryId?: number | null;
+  title?: string;
+  brand?: string | null;
+  feedId?: number;
+  isHidden?: boolean;
+}): Promise<{ id: number; slug: string; offerIds: number[] }> {
+  const product = await insertProduct({
+    slug: o.slug,
+    categoryId: o.categoryId,
+    ...(o.title === undefined ? {} : { title: o.title }),
+    ...(o.brand === undefined ? {} : { brand: o.brand }),
+    ...(o.isHidden === undefined ? {} : { isHidden: o.isHidden }),
+  });
+  const offerIds: number[] = [];
+  for (const priceCents of o.prices) {
+    const feedId = o.feedId ?? (await insertFeed((await insertShop()).id));
+    offerIds.push(await insertOffer({ productId: product.id, feedId, priceCents }));
+  }
+  return { ...product, offerIds };
 }
 
 /** A registered fixture-served feed: a shop and a feed whose url is a fixture file name. */

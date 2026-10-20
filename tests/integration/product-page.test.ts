@@ -5,6 +5,8 @@ import { importFeeds } from '@/server/importer';
 import { getPublicProductBySlug, type PublicProductPage } from '@/server/catalogue/product-page';
 
 import {
+  insertCategory,
+  insertCategoryMapping,
   insertFeed,
   insertFixtureFeed,
   insertOffer,
@@ -107,7 +109,9 @@ describe('getPublicProductBySlug shape (C-11)', () => {
   });
 
   it('stores empty feed cells as null and the page returns them as null', async () => {
-    await insertFixtureFeed('empty-cells.csv');
+    const { feedId } = await insertFixtureFeed('empty-cells.csv');
+    // The fixture's only filled optional cell is its category, mapped so the page is public.
+    await insertCategoryMapping(feedId, 'Varios', (await insertCategory()).id);
     await importFeeds(getDb(), { deps: fixtureDeps });
 
     const stored = await productBySlug('producto-con-celdas-vacias');

@@ -42,6 +42,7 @@ describe('GET /go/<offer> redirect (S1.1)', () => {
     ['the offer is hidden', { offer: { isHidden: true } }],
     ['the offer is in review', { offer: { inReview: true } }],
     ['the product is hidden', { product: { isHidden: true } }],
+    ['the product is unmapped (no category)', { product: { categoryId: null } }],
   ];
 
   it.each(hidden)('404 and no click when %s', async (_name, setup) => {

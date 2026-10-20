@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import { readHeader, validateRow, type ColumnIndex } from '@/server/importer/validate';
 
-const HEADER = ['id', 'title', 'brand', 'part_number', 'ean', 'price', 'currency', 'url', 'description'];
+const HEADER = [
+  'id',
+  'title',
+  'brand',
+  'part_number',
+  'ean',
+  'price',
+  'currency',
+  'url',
+  'description',
+  'category',
+];
 
 function columns(): ColumnIndex {
   const found = readHeader(HEADER);
@@ -22,6 +33,7 @@ function record(overrides: Partial<Record<(typeof HEADER)[number], string>> = {}
     currency: 'EUR',
     url: 'https://shop.example/p/1',
     description: 'Descripcion',
+    category: 'Recambios > Filtros',
     ...overrides,
   };
   return HEADER.map((name) => base[name]);
@@ -146,5 +158,42 @@ describe('validateRow accepted rows (C-15, TD-42)', () => {
   it('treats a short record as empty cells for the missing columns', () => {
     const result = validateRow(['X-1', 'T', '', '', '', '5.00', 'EUR', 'https://s.example/p'], columns(), 2);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('the optional category column (S5.1, AC 3, AC 7)', () => {
+  const rowOf = (cells: string[], index: ColumnIndex = columns()) => {
+    const result = validateRow(cells, index, 2);
+    if (!result.ok) throw new Error(`expected a valid row, got ${result.reject.code}`);
+    return result.row;
+  };
+
+  it('reads the category cell as given, trimmed', () => {
+    expect(rowOf(record({ category: '  Recambios > Filtros  ' })).feedCategory).toBe('Recambios > Filtros');
+  });
+
+  it('keeps the case and the inner spacing of the cell: the mapping match is exact', () => {
+    expect(rowOf(record({ category: 'Filtros  de ACEITE' })).feedCategory).toBe('Filtros  de ACEITE');
+  });
+
+  it('reads an empty or blank cell as null, never an empty string', () => {
+    expect(rowOf(record({ category: '' })).feedCategory).toBeNull();
+    expect(rowOf(record({ category: '   ' })).feedCategory).toBeNull();
+  });
+
+  it('reads null when the feed has no category column at all, and the row is still valid', () => {
+    const without = readHeader(['id', 'title', 'price', 'url']);
+    if (!without) throw new Error('header fixture is invalid');
+    expect(rowOf(['X-1', 'Titulo', '9.99', 'https://shop.example/p/1'], without).feedCategory).toBeNull();
+  });
+
+  it('never rejects a row for its category', () => {
+    for (const category of ['', 'Categoría que no existe', 'x'.repeat(500)]) {
+      expect(validateRow(record({ category }), columns(), 2).ok).toBe(true);
+    }
+  });
+
+  it('finds the category column with a differently cased header', () => {
+    expect(readHeader(['id', 'title', 'price', 'url', ' Category '])).toMatchObject({ category: 4 });
   });
 });

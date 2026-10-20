@@ -10,6 +10,7 @@ import { seedDemoData } from '@/server/seed';
 import {
   DEMO_COUNTS,
   DEMO_DRILL,
+  DEMO_FEED_ROWS,
   DEMO_FEED_URLS,
   DEMO_SHARED,
   DEMO_WRENCHES,
@@ -39,7 +40,7 @@ async function feedId(url: string): Promise<number> {
 // The shipped demo files (demo/feeds/*.csv) through the real source reader:
 // local files only, no network.
 describe('import-feeds on the shipped demo data (brief acceptance)', () => {
-  it('first run: 3 products, 4 offers, nothing rejected, and the exact report lines', async () => {
+  it('first run: the demo products and offers, nothing rejected, and the exact report lines', async () => {
     await seedDemoData(getDb());
     const [uno, dos] = [await feedId(DEMO_FEED_URLS[0]), await feedId(DEMO_FEED_URLS[1])];
 
@@ -51,15 +52,15 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     expect(importExitCode(report)).toBe(0);
     expect(formatImportReport(report)).toBe(
       [
-        `feed ${uno} "Tienda Demo Uno": imported rows=2 products_created=2 offers_created=2 offers_updated=0 rejected=0`,
-        `feed ${dos} "Tienda Demo Dos": imported rows=2 products_created=1 offers_created=2 offers_updated=0 rejected=0`,
+        `feed ${uno} "Tienda Demo Uno": imported rows=${DEMO_FEED_ROWS.uno} products_created=${DEMO_FEED_ROWS.uno} offers_created=${DEMO_FEED_ROWS.uno} offers_updated=0 rejected=0`,
+        `feed ${dos} "Tienda Demo Dos": imported rows=${DEMO_FEED_ROWS.dos} products_created=${DEMO_FEED_ROWS.dosProductsCreated} offers_created=${DEMO_FEED_ROWS.dos} offers_updated=0 rejected=0`,
         'total: feeds=2 imported=2 skipped=0 failed=0',
       ].join('\n'),
     );
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
-  it('second run duplicates nothing: counts unchanged, offers_updated=2 per feed', async () => {
+  it('second run duplicates nothing: counts unchanged, every offer updated', async () => {
     await seedDemoData(getDb());
     const [uno, dos] = [await feedId(DEMO_FEED_URLS[0]), await feedId(DEMO_FEED_URLS[1])];
     await importFeeds(getDb());
@@ -71,8 +72,8 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     expect(await allOffers()).toHaveLength(DEMO_COUNTS.offers);
     expect(formatImportReport(report)).toBe(
       [
-        `feed ${uno} "Tienda Demo Uno": imported rows=2 products_created=0 offers_created=0 offers_updated=2 rejected=0`,
-        `feed ${dos} "Tienda Demo Dos": imported rows=2 products_created=0 offers_created=0 offers_updated=2 rejected=0`,
+        `feed ${uno} "Tienda Demo Uno": imported rows=${DEMO_FEED_ROWS.uno} products_created=0 offers_created=0 offers_updated=${DEMO_FEED_ROWS.uno} rejected=0`,
+        `feed ${dos} "Tienda Demo Dos": imported rows=${DEMO_FEED_ROWS.dos} products_created=0 offers_created=0 offers_updated=${DEMO_FEED_ROWS.dos} rejected=0`,
         'total: feeds=2 imported=2 skipped=0 failed=0',
       ].join('\n'),
     );
@@ -119,12 +120,21 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     await seedDemoData(getDb());
     await importFeeds(getDb());
     const rows = await getDb().select({ ext: offers.externalId, cents: offers.priceCents }).from(offers);
-    expect(Object.fromEntries(rows.map((row) => [row.ext, row.cents]))).toEqual({
+    const byExternalId = Object.fromEntries(rows.map((row) => [row.ext, row.cents]));
+    expect(rows).toHaveLength(DEMO_COUNTS.offers);
+    expect(byExternalId).toMatchObject({
       'UNO-001': 1299,
       'UNO-002': 4990,
+      'UNO-003': 650,
+      'UNO-004': 1590,
+      'UNO-101': 555,
+      'UNO-124': 1935,
       'DOS-100': 1149,
       'DOS-101': 2999,
+      'DOS-102': 8900,
+      'DOS-103': 5495,
     });
+    expect(Object.values(byExternalId).every(Number.isInteger)).toBe(true);
   });
 
   it('imports nothing and reports an empty run when no feed is registered', async () => {
