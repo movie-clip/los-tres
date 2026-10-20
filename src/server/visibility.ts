@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, exists, sql, type SQL } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { feeds, offers, products, shops } from '../db/schema';
@@ -11,7 +11,9 @@ import { feeds, offers, products, shops } from '../db/schema';
 //
 //   offer visible   = feed approved AND shop approved AND offer not hidden
 //                     AND offer not in the matching queue
-//   product public = product not hidden AND it has at least one visible offer
+//   product public = product not hidden AND product mapped to a category
+//                     (products.category_id is not null) AND it has at least
+//                     one visible offer
 
 /**
  * Condition over `offers` joined to `feeds` (offers.feed_id) and `shops`
@@ -34,5 +36,9 @@ export function visibleProductWhere(): SQL {
     .innerJoin(feeds, eq(offers.feedId, feeds.id))
     .innerJoin(shops, eq(feeds.shopId, shops.id))
     .where(and(eq(offers.productId, products.id), visibleOfferWhere()));
-  return and(eq(products.isHidden, false), exists(visibleOffer)) as SQL;
+  return and(
+    eq(products.isHidden, false),
+    isNotNull(products.categoryId),
+    exists(visibleOffer),
+  ) as SQL;
 }

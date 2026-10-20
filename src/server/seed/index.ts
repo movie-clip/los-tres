@@ -1,21 +1,23 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db/client';
-import { categories, feeds, networks, shops } from '../../db/schema';
-import { demoCategories, demoNetwork, demoShops } from './demo-data';
+import { categories, feedCategoryMappings, feeds, networks, shops } from '../../db/schema';
+import { demoCategories, demoCategoryMappings, demoNetwork, demoShops } from './demo-data';
 
 export type SeedReport = {
   networks: number;
   shops: number;
   feeds: number;
   categories: number;
+  categoryMappings: number;
 };
 
 /**
- * Loads the demo network, two demo shops with one demo feed each, and the
- * category tree. Loads no products: the first import is manual (TD-22).
+ * Loads the demo network, two demo shops with one demo feed each, the
+ * category tree and each demo feed's category mappings. Loads no products: the
+ * first import is manual (TD-22).
  *
  * Insert-only: every insert is `on conflict do nothing` on the natural key, so
  * running it again changes nothing and an admin's un-approve or hide survives a
@@ -24,7 +26,13 @@ export type SeedReport = {
  */
 export async function seedDemoData(db: Database): Promise<SeedReport> {
   return db.transaction(async (tx) => {
-    const report: SeedReport = { networks: 0, shops: 0, feeds: 0, categories: 0 };
+    const report: SeedReport = {
+      networks: 0,
+      shops: 0,
+      feeds: 0,
+      categories: 0,
+      categoryMappings: 0,
+    };
 
     const insertedNetworks = await tx
       .insert(networks)
@@ -88,6 +96,31 @@ export async function seedDemoData(db: Database): Promise<SeedReport> {
             .returning({ id: categories.id })
         ).length;
       }
+    }
+
+    for (const mapping of demoCategoryMappings) {
+      const [feed] = await tx
+        .select({ id: feeds.id })
+        .from(feeds)
+        .where(and(eq(feeds.url, `demo-feed:${mapping.feedFile}`), eq(feeds.isDemo, true)));
+      const [category] = await tx
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, mapping.categorySlug));
+      if (!feed || !category) continue;
+      report.categoryMappings += (
+        await tx
+          .insert(feedCategoryMappings)
+          .values({
+            feedId: feed.id,
+            feedCategory: mapping.feedCategory,
+            categoryId: category.id,
+          })
+          .onConflictDoNothing({
+            target: [feedCategoryMappings.feedId, feedCategoryMappings.feedCategory],
+          })
+          .returning({ id: feedCategoryMappings.id })
+      ).length;
     }
     return report;
   });

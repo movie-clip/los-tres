@@ -4,6 +4,7 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { getDb } from '../../db/client';
 import { feeds, offers, products, shops } from '../../db/schema';
+import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 
 // The backend/frontend contract for the product page (C-11). The page formats;
@@ -36,16 +37,13 @@ export type PublicProductPage = {
   offers: PublicOffer[];
 };
 
-const SLUG_FORMAT = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const SLUG_MAX_LENGTH = 120;
-
 /**
  * The public page of one product, or `null` for every not-public reason alike:
  * malformed slug (rejected before any query), unknown slug, hidden product, or
  * no visible offer. The caller cannot tell which, by design (TD-31).
  */
 export async function getPublicProductBySlug(slug: string): Promise<PublicProductPage | null> {
-  if (slug.length > SLUG_MAX_LENGTH || !SLUG_FORMAT.test(slug)) return null;
+  if (!isWellFormedSlug(slug)) return null;
 
   const rows = await getDb()
     .select({

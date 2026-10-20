@@ -2,6 +2,16 @@
 
 const MAX_LENGTH = 80;
 const FALLBACK = 'producto';
+const SLUG_FORMAT = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const SLUG_MAX_LENGTH = 120;
+
+/**
+ * Whether `slug` is a well-formed slug: lower-case ASCII words joined by single
+ * hyphens, at most 120 characters. Public reads check it before any query.
+ */
+export function isWellFormedSlug(slug: string): boolean {
+  return slug.length <= SLUG_MAX_LENGTH && SLUG_FORMAT.test(slug);
+}
 
 /**
  * Lower-case ASCII slug of a title: accents stripped, every run of characters

@@ -6,7 +6,14 @@ import { parseDecimalToCents } from '../money';
 import type { RejectedRow } from './types';
 
 const REQUIRED_COLUMNS = ['id', 'title', 'price', 'url'] as const;
-const OPTIONAL_COLUMNS = ['brand', 'part_number', 'description', 'ean', 'currency'] as const;
+const OPTIONAL_COLUMNS = [
+  'brand',
+  'part_number',
+  'description',
+  'ean',
+  'currency',
+  'category',
+] as const;
 
 type RequiredColumn = (typeof REQUIRED_COLUMNS)[number];
 type ColumnName = RequiredColumn | (typeof OPTIONAL_COLUMNS)[number];
@@ -45,6 +52,8 @@ export type ValidRow = {
   eanNormalised: string | null;
   priceCents: number;
   url: string;
+  /** The feed's own category string, trimmed; null when absent or empty. Never rejects a row. */
+  feedCategory: string | null;
 };
 
 export type RowResult = { ok: true; row: ValidRow } | { ok: false; reject: RejectedRow };
@@ -88,6 +97,7 @@ export function validateRow(cells: string[], columns: ColumnIndex, record: numbe
       eanNormalised: ean.kind === 'valid' ? ean.normalised : null,
       priceCents,
       url,
+      feedCategory: optional('category'),
     },
   };
 }

@@ -1,3 +1,5 @@
-id,title,brand,part_number,ean,price,currency,url,description
-DOS-100,DEMO Filtro aceite OC1234 (Dos),MarcaDemo,OC-1234,2000000000015,11.49,EUR,https://tienda-demo-dos.example/p/DOS-100,Producto ficticio de demostración: filtro de aceite que no existe ni se vende en ninguna tienda.
-DOS-101,DEMO Juego de llaves fijas 12 piezas,HerramientasDemo,LF-12,2000000000039,29.99,EUR,https://tienda-demo-dos.example/p/DOS-101,Producto ficticio de demostración: juego de llaves fijas que no existe ni se vende en ninguna tienda.
+id,title,brand,part_number,ean,price,currency,url,description,category
+DOS-100,DEMO Filtro aceite OC1234 (Dos),MarcaDemo,OC-1234,2000000000015,11.49,EUR,https://tienda-demo-dos.example/p/DOS-100,Producto ficticio de demostración: filtro de aceite que no existe ni se vende en ninguna tienda.,Filtros de aceite
+DOS-101,DEMO Juego de llaves fijas 12 piezas,HerramientasDemo,LF-12,2000000000039,29.99,EUR,https://tienda-demo-dos.example/p/DOS-101,Producto ficticio de demostración: juego de llaves fijas que no existe ni se vende en ninguna tienda.,Herramienta manual
+DOS-102,DEMO Cortacésped eléctrico 1200 W,JardinDemo,CE-1200,,89.00,EUR,https://tienda-demo-dos.example/p/DOS-102,Producto ficticio de demostración: cortacésped eléctrico que no existe ni se vende en ninguna tienda.,Jardín > Cortacésped
+DOS-103,DEMO Banco de trabajo plegable,HerramientasDemo,BT-01,,54.95,EUR,https://tienda-demo-dos.example/p/DOS-103,Producto ficticio de demostración: banco de trabajo plegable que no existe ni se vende en ninguna tienda.,

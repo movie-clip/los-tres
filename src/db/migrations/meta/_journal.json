@@ -15,6 +15,13 @@
       "when": 1792341756607,
       "tag": "0001_clicks",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792536176734,
+      "tag": "0002_category_mapping",
+      "breakpoints": true
     }
   ]
 }

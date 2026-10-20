@@ -30,3 +30,29 @@ export const demoCategories = [
     ],
   },
 ] as const;
+
+/**
+ * Each demo feed's own category strings, deliberately different per shop, and
+ * the category they map to. A feed category absent here (Jardín > Cortacésped,
+ * or an empty cell) stays unmapped, so its product is not public. No mapping
+ * points at `aceites-y-lubricantes`: it is the empty demo category.
+ */
+export const demoCategoryMappings = [
+  { feedFile: 'tienda-demo-uno.csv', feedCategory: 'Recambios > Filtros', categorySlug: 'filtros' },
+  {
+    feedFile: 'tienda-demo-uno.csv',
+    feedCategory: 'Recambios > Iluminación',
+    categorySlug: 'escobillas-y-bombillas',
+  },
+  {
+    feedFile: 'tienda-demo-uno.csv',
+    feedCategory: 'Bricolaje > Taladros',
+    categorySlug: 'herramientas-electricas',
+  },
+  { feedFile: 'tienda-demo-dos.csv', feedCategory: 'Filtros de aceite', categorySlug: 'filtros' },
+  {
+    feedFile: 'tienda-demo-dos.csv',
+    feedCategory: 'Herramienta manual',
+    categorySlug: 'herramientas-manuales',
+  },
+] as const;
