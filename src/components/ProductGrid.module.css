@@ -1,0 +1,9 @@
+/* 16rem is the narrowest a card may get; the grid reflows with no media query. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

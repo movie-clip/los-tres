@@ -1,0 +1,14 @@
+.heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.text {
+  margin: 0 0 var(--space-2);
+}
+
+.home:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
