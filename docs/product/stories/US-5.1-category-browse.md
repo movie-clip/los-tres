@@ -1,6 +1,6 @@
 # S5.1 Visitor browses products in a category
 
-Status: Draft (awaiting human approval; not ticketed until the open decisions below are answered)
+Status: approved (shipped on branch 34-category-browse, PR #215)
 Epic: E5 Browse and search · Slice: 2 · Priority: P0 · Size: L
 Issue: #34 · Tickets: #113-#118
 Depends on: none
@@ -8,7 +8,7 @@ Source: backlog revision run 2026-10-17-mvp-backlog-revision, entry S5.1; owner 
 
 ## Open decisions
 
-All of these block ticketing. The draft assumes the stated default so the ACs can be read; the human decides, and the ACs are amended to match.
+Ruled: decision D-1 (2026-10-20), "approve, defaults". Every decision OD-A to OD-J took the default stated in its entry below; the acceptance criteria stand as written. The guardrail-1 wording note stays the owner's and was not ruled.
 
 - **OD-A. Subcategory depth.** Default assumed: a category page includes products from every descendant at any depth (the tree is about 30 categories, so it is shallow). Alternative: direct children only.
 - **OD-B. Sort order.** Default assumed: lowest visible price first, ties broken stably so a page never reshuffles between requests. Alternatives: alphabetical by title, or most offers first.
