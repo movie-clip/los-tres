@@ -218,3 +218,29 @@ describe('seams (guardrail 5, S1.1 click log)', () => {
     expect(found).toEqual([]);
   });
 });
+
+describe('seams (S9.3: demo flag and owner identity)', () => {
+  it('names the feed demo flag nowhere under src/app or src/components', () => {
+    const found = sources()
+      .filter(({ file }) => file.startsWith('src/app/') || file.startsWith('src/components/'))
+      .filter(({ code }) => /\b(isDemo|is_demo)\b/.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('reads OWNER_* and CONTACT_EMAIL only in src/config/owner.ts', () => {
+    const found = offenders(/\b(OWNER_[A-Z]+|CONTACT_EMAIL)\b/, (file) => file === 'src/config/owner.ts');
+    expect(found).toEqual([]);
+    const owner = sources().find(({ file }) => file === 'src/config/owner.ts')?.code ?? '';
+    expect(owner).toMatch(/OWNER_NAME/);
+  });
+
+  it('calls getOwnerIdentity only from the two pages that need it', () => {
+    const found = sources()
+      .filter(({ code }) => /\bgetOwnerIdentity\(/.test(code))
+      .map(({ file }) => file)
+      .filter((file) => file !== 'src/config/owner.ts')
+      .sort();
+    expect(found).toEqual(['src/app/(public)/aviso-legal/page.tsx', 'src/app/(public)/privacidad/page.tsx']);
+  });
+});

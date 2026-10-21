@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { DemoNotice } from '@/components/DemoNotice';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
 import { ProductDetails, type ProductDetail } from '@/components/ProductDetails';
@@ -35,7 +36,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await load(slug);
   if (product === null) notFound();
 
-  const t = await getTranslations('Product');
+  const [t, tDemo] = await Promise.all([
+    getTranslations('Product'),
+    getTranslations('DemoNotice'),
+  ]);
 
   // A null detail is left out entirely, never shown as empty.
   const details: ProductDetail[] = [];
@@ -52,6 +56,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <>
       {jsonLd !== null && <JsonLd data={jsonLd} />}
       <main className="page">
+        {product.demoOnly && <DemoNotice text={tDemo('body')} />}
         <ProductDetails
           title={product.title}
           imageLabel={t('imagePlaceholder')}

@@ -27,7 +27,7 @@ site name is configuration.
   or emails. Never commit a secret.
 
 Absolute, and unnumbered on purpose. The agentic network's profile
-(`.agentic/projects/los-tres/project.md` § Hard guardrails) carries the same
+(`agentic/project.md` § Hard guardrails) carries the same
 five, numbered, so a `REFUSED: guardrail 2` names exactly one thing.
 
 ## Stack
@@ -59,7 +59,17 @@ First run on a fresh clone: `npm ci`, `npm run env:init`,
 port for each published service (app, db, Umami); if one is taken, set
 `APP_PORT`, `DB_HOST_PORT` or `UMAMI_PORT` in `.env` to change the host port.
 
-To load the demo data and see the demo product page, continue with:
+After `npm run env:init`, fill in the owner identity in `.env` for the legal
+pages: `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS` and `CONTACT_EMAIL` are
+required, and `OWNER_REGISTRY` is optional (blank omits the "Datos registrales"
+line). `env:init` writes all five empty. While any of the four required values
+is blank, `/aviso-legal` and `/privacidad` return 500; every other page, the
+gate, `migrate`, `seed` and `import-feeds` still work, and
+`/como-nos-financiamos` needs no identity. A changed value takes
+`docker compose up -d`, not a rebuild. Never commit `.env` or a real value.
+
+To load the demo data and see the demo product page (which carries the demo
+notice, and a footer linking the three legal pages), continue with:
 
 1. `npm run stack:up`: builds and starts `app`, `db` and `umami`. The app
    container migrates the database on every start and, when `SEED_DEMO_DATA` is

@@ -54,6 +54,9 @@ System-ui stack, `--font-sans`. Self-hosted fonts only if ever changed.
 | Empty state | heading, one sentence, one link home on a category page; on the home page the same without the link | single state per page |
 | Offer row | shop, price, "Ir a la tienda" button, updated line | unchanged |
 | Image placeholder | grey square | unchanged; not used on cards |
+| Footer | border-top edge to edge; inner column at `--content-width`; one row of three text links (Aviso legal, Privacidad, Cómo nos financiamos) at `--text-sm` in `--color-link`, each 44 px tall, wrapping on a phone | default, hover (underline), focus-visible (3 px ring), visited (same as default) |
+| Demo notice | outlined box (1px `--color-border`, 0.25rem `--color-link` left rule, `--radius`), one sentence in `--color-text`; first element in main on product and category pages; shown only when every offer listed is demo | single state |
+| Legal text | reading column 42rem; h1 `--text-xl`, h2 `--text-lg`, body `--text-md` in `--color-text`; bullets; bold lead-ins; links underlined | link default, hover, focus-visible |
 
 ## Copy voice
 

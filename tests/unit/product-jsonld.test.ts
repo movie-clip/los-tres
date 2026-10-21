@@ -18,6 +18,7 @@ const product = (o: Partial<PublicProductPage> = {}): PublicProductPage => ({
   ean: '2000000000015',
   description: 'Texto plano',
   offers: [offer(1, 1149), offer(2, 1299)],
+  demoOnly: false,
   ...o,
 });
 

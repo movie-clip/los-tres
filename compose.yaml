@@ -13,6 +13,12 @@ services:
       DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/${DB_NAME:-lostres}
       # Unset means off: a server that forgets it shows no demo shops.
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      # Owner identity for the legal pages; blank keeps every other page working.
+      OWNER_NAME: ${OWNER_NAME:-}
+      OWNER_NIF: ${OWNER_NIF:-}
+      OWNER_ADDRESS: ${OWNER_ADDRESS:-}
+      OWNER_REGISTRY: ${OWNER_REGISTRY:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production

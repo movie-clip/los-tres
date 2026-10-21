@@ -165,3 +165,89 @@ describe('messages/es-ES.json Category namespace (S5.1)', () => {
     expect(category).not.toMatch(/env[ií]o/i);
   });
 });
+
+describe('legal pages messages (S9.3)', () => {
+  const keysOf = (namespace: string): string[] =>
+    Object.keys((messages as Record<string, Record<string, string>>)[namespace] ?? {});
+
+  it.each([
+    ['Footer', ['legalNotice', 'privacy', 'funding']],
+    ['DemoNotice', ['body']],
+    [
+      'LegalNotice',
+      [
+        'metaTitle', 'heading', 'intro', 'holder', 'nif', 'address', 'email', 'registry',
+        'objectHeading', 'objectBody', 'pricesHeading', 'pricesBody', 'demoHeading', 'demoBody',
+        'ipHeading', 'ipBody', 'linksHeading', 'linksBody', 'lawHeading', 'lawBody',
+      ],
+    ],
+    [
+      'Privacy',
+      [
+        'metaTitle', 'heading', 'controllerHeading', 'controllerBody', 'cookiesHeading',
+        'cookiesBody', 'dataHeading', 'dataClicks', 'dataStats', 'dataLogs', 'dataBasis',
+        'leavingHeading', 'leavingBody', 'writingHeading', 'writingBody', 'adminsHeading',
+        'adminsBody', 'recipientsHeading', 'recipientsBody', 'rightsHeading', 'rightsBody',
+        'changesHeading', 'changesBody',
+      ],
+    ],
+    ['Funding', ['metaTitle', 'heading', 'intro', 'noExtraCost', 'noSales', 'noPaidRanking']],
+  ])('%s has exactly the contract keys, each a non-empty string', (namespace, keys) => {
+    expect(keysOf(namespace).sort()).toEqual([...keys].sort());
+    for (const key of keys) {
+      const value = lookup(`${namespace}.${key}`);
+      expect(typeof value).toBe('string');
+      expect((value as string).trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('labels the footer links as the contract says', () => {
+    expect(lookup('Footer.legalNotice')).toBe('Aviso legal');
+    expect(lookup('Footer.privacy')).toBe('Privacidad');
+    expect(lookup('Footer.funding')).toBe('Cómo nos financiamos');
+  });
+
+  it.each(['LegalNotice', 'Privacy', 'Funding'])('%s.metaTitle takes {siteName}', (namespace) => {
+    expect(lookup(`${namespace}.metaTitle`)).toContain('{siteName}');
+  });
+
+  it('takes the owner placeholders where the owner text needs them', () => {
+    expect(lookup('LegalNotice.holder')).toContain('{ownerName}');
+    expect(lookup('LegalNotice.nif')).toContain('{ownerNif}');
+    expect(lookup('LegalNotice.address')).toContain('{ownerAddress}');
+    expect(lookup('LegalNotice.email')).toContain('<email>{contactEmail}</email>');
+    expect(lookup('LegalNotice.registry')).toContain('{ownerRegistry}');
+    const controller = lookup('Privacy.controllerBody') as string;
+    for (const placeholder of ['{ownerName}', '{ownerNif}', '{ownerAddress}']) {
+      expect(controller).toContain(placeholder);
+    }
+    expect(controller).toContain('<email>{contactEmail}</email>');
+    expect(lookup('Privacy.rightsBody')).toContain('<email>{contactEmail}</email>');
+    expect(lookup('Privacy.rightsBody')).toContain('<aepd>www.aepd.es</aepd>');
+  });
+
+  it('names {ownerRegistry} in LegalNotice.registry only', () => {
+    const offenders = Object.entries(messages as Record<string, Record<string, string>>).flatMap(
+      ([namespace, entries]) =>
+        Object.entries(entries)
+          .filter(([key, value]) => value.includes('{ownerRegistry}') && `${namespace}.${key}` !== 'LegalNotice.registry')
+          .map(([key]) => `${namespace}.${key}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps bold as <b> tags and never leaves a ** marker in any message', () => {
+    expect(collectStrings(messages).filter((value) => value.includes('**'))).toEqual([]);
+    for (const key of ['Privacy.dataClicks', 'Privacy.dataStats', 'Privacy.dataLogs', 'Funding.noExtraCost', 'Funding.noSales', 'Funding.noPaidRanking']) {
+      expect(lookup(key)).toMatch(/^<b>[^<]+<\/b>/);
+    }
+  });
+
+  it('uses only the tags b, email and aepd in the legal namespaces', () => {
+    const legal = ['LegalNotice', 'Privacy', 'Funding', 'Footer', 'DemoNotice'].flatMap((namespace) =>
+      collectStrings((messages as Record<string, unknown>)[namespace]),
+    );
+    const tags = new Set(legal.flatMap((value) => [...value.matchAll(/<\/?([a-z]+)>/g)].map((m) => m[1])));
+    expect([...tags].sort()).toEqual(['aepd', 'b', 'email']);
+  });
+});
