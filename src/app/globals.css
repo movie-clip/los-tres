@@ -9,6 +9,13 @@
   --space-3: 1.5rem;
   --space-4: 3rem;
   --content-width: 64rem;
+  --radius: 0.5rem;
+  --tap-target: 2.75rem;
+  --focus-ring: 3px solid var(--color-link);
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 2rem;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 

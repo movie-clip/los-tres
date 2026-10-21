@@ -26,7 +26,7 @@ const feed = (url: string, isDemo = false) => ({ id: 1, url, isDemo });
 describe('demo-feed: scheme', () => {
   it('reads demo/feeds/<name>.csv for a demo feed', async () => {
     const text = await readFeedSource(feed('demo-feed:tienda-demo-uno.csv', true));
-    expect(text.split(/\r?\n/)[0]).toBe('id,title,brand,part_number,ean,price,currency,url,description');
+    expect(text.split(/\r?\n/)[0]).toBe('id,title,brand,part_number,ean,price,currency,url,description,category');
     expect(fetchStub).not.toHaveBeenCalled();
   });
 

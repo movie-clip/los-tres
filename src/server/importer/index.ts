@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
-import { feeds, offers, products, shops } from '../../db/schema';
+import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
 import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
 import { parseCsv } from './csv';
@@ -23,6 +23,9 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // The only writer of `products` and `offers` from outside data (guardrail 1).
 // It reads feeds registered as rows, never a URL or a path (guardrail 2), and
 // never writes an approval, hidden or review column on an existing row (TD-21).
+// Product text is written once (TD-23). `products.category_id` is the one
+// product column it may set later, and only from null: the first mapped feed
+// category wins and nothing is ever cleared or overwritten (D-3).
 
 export { FeedNotRegisteredError, formatImportReport, importExitCode };
 export type { FeedImportReport, ImportDeps, ImportReport, RejectedRow };
@@ -133,6 +136,7 @@ async function importRecords(
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
+  const mappings = await loadMappings(tx, feed.id);
 
   for (const [position, cells] of records.entries()) {
     const record = position + 2; // the header is record 1
@@ -153,6 +157,7 @@ async function importRecords(
     const known = await findOffer(tx, feed.id, row.externalId);
     if (known) {
       await writeOffer(tx, feed.id, known.productId, row, startedAt);
+      await assignCategory(tx, known.productId, mappedCategory(mappings, row));
       report.offersUpdated += 1;
       continue;
     }
@@ -172,9 +177,43 @@ async function importRecords(
       report.productsCreated += 1;
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
+    await assignCategory(tx, productId, mappedCategory(mappings, row));
     report.offersCreated += 1;
   }
   return report;
+}
+
+/** This feed's mappings: the feed's category string to our category id. */
+async function loadMappings(tx: Executor, feedId: number): Promise<Map<string, number>> {
+  const rows = await tx
+    .select({
+      feedCategory: feedCategoryMappings.feedCategory,
+      categoryId: feedCategoryMappings.categoryId,
+    })
+    .from(feedCategoryMappings)
+    .where(eq(feedCategoryMappings.feedId, feedId));
+  return new Map(rows.map((mapping) => [mapping.feedCategory, mapping.categoryId]));
+}
+
+/** The category the row's feed category maps to, or null (absent or unmapped). */
+function mappedCategory(mappings: Map<string, number>, row: ValidRow): number | null {
+  return row.feedCategory === null ? null : (mappings.get(row.feedCategory) ?? null);
+}
+
+/**
+ * Sets the product's category only while it has none: first mapped wins, an
+ * existing category is never overwritten and none is ever cleared (D-3).
+ */
+async function assignCategory(
+  tx: Executor,
+  productId: number,
+  categoryId: number | null,
+): Promise<void> {
+  if (categoryId === null) return;
+  await tx
+    .update(products)
+    .set({ categoryId })
+    .where(and(eq(products.id, productId), isNull(products.categoryId)));
 }
 
 async function findOffer(tx: Executor, feedId: number, externalId: string) {
@@ -218,8 +257,9 @@ async function createProduct(
 }
 
 /**
- * Upserts on (feed_id, external_id). The update lists exactly price, url and
- * date: never product_id, is_hidden or in_review (TD-21, TD-24).
+ * Upserts on (feed_id, external_id). The update lists exactly price, url, date
+ * and feed_category (all feed data): never product_id, is_hidden or in_review
+ * (TD-21, TD-24).
  */
 async function writeOffer(
   tx: Executor,
@@ -236,10 +276,16 @@ async function writeOffer(
       externalId: row.externalId,
       priceCents: row.priceCents,
       url: row.url,
+      feedCategory: row.feedCategory,
       priceUpdatedAt: startedAt,
     })
     .onConflictDoUpdate({
       target: [offers.feedId, offers.externalId],
-      set: { priceCents: row.priceCents, url: row.url, priceUpdatedAt: startedAt },
+      set: {
+        priceCents: row.priceCents,
+        url: row.url,
+        feedCategory: row.feedCategory,
+        priceUpdatedAt: startedAt,
+      },
     });
 }

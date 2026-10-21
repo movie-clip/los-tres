@@ -22,7 +22,16 @@ describe('migrations (TD-37)', () => {
     );
     const present = result.rows.map((row) => row.tablename);
     expect(present).toEqual(
-      expect.arrayContaining(['networks', 'shops', 'feeds', 'categories', 'products', 'offers', 'clicks']),
+      expect.arrayContaining([
+        'networks',
+        'shops',
+        'feeds',
+        'categories',
+        'products',
+        'offers',
+        'clicks',
+        'feed_category_mappings',
+      ]),
     );
   });
 

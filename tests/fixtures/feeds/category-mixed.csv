@@ -1,0 +1,6 @@
+id,title,brand,part_number,ean,price,currency,url,description,category
+M-1,Mixto Filtro mapeado,MarcaM,,,10.00,EUR,https://shop-m.example/p/1,,Filtros
+M-2,Mixto Sin mapa,MarcaM,,,11.00,EUR,https://shop-m.example/p/2,,Categoria sin mapa
+M-3,Mixto Celda vacia,MarcaM,,,12.00,EUR,https://shop-m.example/p/3,,
+M-4,Mixto Espacios,MarcaM,,,13.00,EUR,https://shop-m.example/p/4,,  Filtros  
+M-5,Mixto Otra caja,MarcaM,,,14.00,EUR,https://shop-m.example/p/5,,filtros

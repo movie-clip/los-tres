@@ -122,6 +122,36 @@ describe('seams (guardrails 1, 2, 4)', () => {
   });
 });
 
+describe('seams (guardrail 1, S5.1 mapped products)', () => {
+  it('names the mapped condition in the visibility scope, so the scan below is not vacuous', () => {
+    const code = sources().find(({ file }) => file === 'src/server/visibility.ts')?.code ?? '';
+    expect(code).toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
+  });
+
+  it('tests products.category_id for null only in the visibility scope', () => {
+    const found = offenders(
+      /isNotNull\(\s*products\.categoryId\s*\)|categor(y_id|yId)\s+is\s+not\s+null/i,
+      (file) => file === 'src/server/visibility.ts',
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('has the category read go through the shared visibility scope, never its own flag test', () => {
+    const code =
+      sources().find(({ file }) => file === 'src/server/catalogue/category-page.ts')?.code ?? '';
+    expect(code).toContain('visibleProductWhere()');
+    expect(code).toContain('visibleOfferWhere()');
+  });
+
+  it('updates products only in the importer and the seed', () => {
+    const found = offenders(
+      /\.update\(\s*products\s*\)/,
+      (file) => file.startsWith('src/server/importer/') || file.startsWith('src/server/seed/'),
+    );
+    expect(found).toEqual([]);
+  });
+});
+
 describe('seams (guardrail 5, S1.1 click log)', () => {
   it('finds the click modules it scans, so the rules below are not vacuous', () => {
     const files = sources().map(({ file }) => file);

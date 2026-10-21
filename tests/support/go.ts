@@ -48,7 +48,7 @@ export async function insertGoOffer(
   o: {
     shop?: { isApproved?: boolean };
     feed?: { isApproved?: boolean; isDemo?: boolean };
-    product?: { isHidden?: boolean };
+    product?: { isHidden?: boolean; categoryId?: number | null };
     offer?: { isHidden?: boolean; inReview?: boolean; url?: string };
   } = {},
 ) {

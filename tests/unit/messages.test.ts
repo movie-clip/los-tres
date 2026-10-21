@@ -106,3 +106,51 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
     expect(product).not.toMatch(/env[ií]o/i);
   });
 });
+
+describe('messages/es-ES.json Category namespace (S5.1)', () => {
+  it.each([
+    'Category.metaTitle',
+    'Category.metaTitlePaged',
+    'Category.metaDescription',
+    'Category.summary',
+    'Category.summaryPaged',
+    'Category.paginationLabel',
+    'Category.previousPage',
+    'Category.nextPage',
+    'Category.pageIndicator',
+    'Category.priceFrom',
+    'Category.emptyHeading',
+    'Category.emptyBody',
+  ])('has a non-empty string at %s', (key) => {
+    const value = lookup(key);
+    expect(typeof value).toBe('string');
+    expect((value as string).trim().length).toBeGreaterThan(0);
+  });
+
+  it('takes the placeholders the page passes', () => {
+    expect(lookup('Category.metaTitle')).toContain('{category}');
+    expect(lookup('Category.metaTitle')).toContain('{siteName}');
+    expect(lookup('Category.metaTitlePaged')).toContain('{page}');
+    expect(lookup('Category.metaDescription')).toContain('{category}');
+    expect(lookup('Category.pageIndicator')).toContain('{page}');
+    expect(lookup('Category.pageIndicator')).toContain('{pages}');
+    expect(lookup('Category.summaryPaged')).toContain('{page}');
+    expect(lookup('Category.summaryPaged')).toContain('{pages}');
+  });
+
+  it.each(['Category.summary', 'Category.summaryPaged'])(
+    'writes %s as an ICU plural with one and other branches',
+    (key) => {
+      const message = lookup(key) as string;
+      expect(message).toMatch(/^\{count, plural,/);
+      expect(message).toMatch(/one\s*\{[^}]*#[^}]*\}/);
+      expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
+    },
+  );
+
+  it('puts no price and no mention of shipping in the copy', () => {
+    const category = collectStrings((messages as Record<string, unknown>).Category).join(' | ');
+    expect(category).not.toMatch(/\d+[.,]\d{2}\s*€/);
+    expect(category).not.toMatch(/env[ií]o/i);
+  });
+});

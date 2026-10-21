@@ -12,6 +12,20 @@
     "body": "La página que buscas no existe o ya no está disponible.",
     "backHome": "Volver al inicio"
   },
+  "Category": {
+    "metaTitle": "{category} | {siteName}",
+    "metaTitlePaged": "{category}, página {page} | {siteName}",
+    "metaDescription": "Compara precios de {category} en las tiendas de España y elige la más barata.",
+    "summary": "{count, plural, one {# producto} other {# productos}}",
+    "summaryPaged": "{count, plural, one {# producto} other {# productos}} · Página {page} de {pages}",
+    "paginationLabel": "Paginación",
+    "previousPage": "Anterior",
+    "nextPage": "Siguiente",
+    "pageIndicator": "Página {page} de {pages}",
+    "priceFrom": "Desde",
+    "emptyHeading": "Aún no hay productos en esta categoría",
+    "emptyBody": "Estamos añadiendo productos y tiendas. Vuelve pronto."
+  },
   "Product": {
     "metaTitle": "{title} | {siteName}",
     "metaDescription": "Compara el precio de {title} en las tiendas de España y elige la más barata.",

@@ -6,6 +6,7 @@ import { feeds, offers, products, shops } from '@/db/schema';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 
 import {
+  insertCategory,
   insertFeed,
   insertOffer,
   insertProduct,
@@ -106,6 +107,41 @@ describe('getPublicProductBySlug visibility (guardrail 1)', () => {
     const kept = await insertOffer({ productId: product.id, feedId: enabled, priceCents: 900 });
     const page = await getPublicProductBySlug('dos-feeds');
     expect(page?.offers.map((offer) => offer.offerId)).toEqual([kept]);
+  });
+});
+
+describe('mapped products only (S5.1, guardrail 1)', () => {
+  it('returns null for an unmapped product even though its offer is fully visible', async () => {
+    await insertVisibleOffer({ slug: 'sin-categoria', categoryId: null });
+    expect(await getPublicProductBySlug('sin-categoria')).toBeNull();
+  });
+
+  it('serves the same product once it is mapped, and nothing else changed', async () => {
+    const { product } = await insertVisibleOffer({ slug: 'se-mapea', categoryId: null });
+    expect(await getPublicProductBySlug('se-mapea')).toBeNull();
+
+    const category = await insertCategory();
+    await getDb().update(products).set({ categoryId: category.id }).where(eq(products.id, product.id));
+
+    expect(await getPublicProductBySlug('se-mapea')).toMatchObject({ slug: 'se-mapea' });
+  });
+
+  it('keeps a mapped product non-public when it is hidden', async () => {
+    const { product } = await insertVisibleOffer({ slug: 'mapeado-oculto' });
+    await getDb().update(products).set({ isHidden: true }).where(eq(products.id, product.id));
+    expect(await getPublicProductBySlug('mapeado-oculto')).toBeNull();
+  });
+
+  it('keeps a mapped product non-public when its only feed is not approved', async () => {
+    const { feedId } = await insertVisibleOffer({ slug: 'mapeado-sin-feed' });
+    await getDb().update(feeds).set({ isApproved: false }).where(eq(feeds.id, feedId));
+    expect(await getPublicProductBySlug('mapeado-sin-feed')).toBeNull();
+  });
+
+  it('keeps a mapped product non-public when its only offer is in the matching queue', async () => {
+    const { offerId } = await insertVisibleOffer({ slug: 'mapeado-en-cola' });
+    await getDb().update(offers).set({ inReview: true }).where(eq(offers.id, offerId));
+    expect(await getPublicProductBySlug('mapeado-en-cola')).toBeNull();
   });
 });
 

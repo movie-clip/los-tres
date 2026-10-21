@@ -1,0 +1,98 @@
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  font-size: var(--text-md);
+  line-height: 1.4;
+}
+
+.card:hover {
+  border-color: var(--color-link);
+  cursor: pointer;
+}
+
+.title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+/* The one link covers the whole card. The title is not positioned, so the
+   stretched box is sized by .card and is not clipped by the title's clamp. */
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+.card:hover .link,
+.link:focus-visible {
+  text-decoration: underline;
+}
+
+/* The focus ring is drawn around the whole card, on the stretched box. */
+.link:focus-visible {
+  outline: none;
+}
+
+.link:focus-visible::after {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.brand {
+  display: block;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.priceGroup {
+  white-space: nowrap;
+}
+
+.from {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.price {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.shops {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
