@@ -105,8 +105,9 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - Prove a malformed slug runs no query black-box: stop the pool, point
   `DATABASE_URL` at an unused port, call the read function. A malformed slug
   returns null; a well-formed one rejects.
-- On Windows (autocrlf) existing files are CRLF, so a multi-line Edit
-  `old_string` fails: use single-line edits or rewrite the file with Write.
+- On Windows (autocrlf) existing files are CRLF, so a scripted multi-line
+  string replace silently does nothing: use the Edit tool, which matches
+  across CRLF, and check `git diff`.
 - A Python script that opens a file with `open(p,'wb')` before building the
   content truncates it if the build raises: read, build, then write. Pass
   `encoding='utf-8'`; the default is cp1252.

@@ -4,10 +4,10 @@ For the `designer` lane, in both modes: UX (the spec, before the tech lead's
 design pass) and UX-REVIEW (the gate, on the running app). It covers the public
 catalogue and the admin area.
 
-The site has no design system yet. The tracer-bullet slices shipped a plain
-placeholder look: `system-ui`, a white page, one link blue. The first UX order
-that touches a public screen sets the system in its `Design system` section and
-marks `direction: new`.
+The design system is `docs/design/system.md`, approved in the S5.1 and S5.2
+runs; its tokens live in `src/app/globals.css`. A UX order that applies it
+marks `direction: unchanged`; one that changes it marks `direction: changed`
+and writes the whole system in its `Design system` section.
 
 ---
 
