@@ -37,17 +37,6 @@ a {
   color: var(--color-link);
 }
 
-.site-header {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.site-header__name {
-  color: var(--color-text);
-  font-weight: 700;
-  text-decoration: none;
-}
-
 .page {
   max-width: var(--content-width);
   margin: 0 auto;

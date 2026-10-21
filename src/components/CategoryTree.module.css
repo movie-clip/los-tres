@@ -1,0 +1,76 @@
+/* 18rem is the narrowest a group may get; the grid reflows with no media query. */
+.groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  align-items: start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Also separates the heading row from the first child. */
+.row {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Name left, count right on the name's first baseline; a grid so the content
+   stays centred when the row is held up to the tap target. */
+.link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  align-content: center;
+  column-gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-link);
+  font-size: var(--text-md);
+  font-weight: 400;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.headingLink {
+  padding: var(--space-2);
+  font-weight: 700;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.link:hover .name,
+.link:focus-visible .name {
+  text-decoration: underline;
+}
+
+.count {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Inset, so the box edge and the neighbouring row never clip the ring. */
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -3px;
+}
