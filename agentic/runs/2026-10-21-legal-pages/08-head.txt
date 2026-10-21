@@ -1,0 +1,13 @@
+REPORT HEAD 2026-10-21-legal-pages/08
+artifact:        C:\projects\investments\los-tres\agentic\runs\2026-10-21-legal-pages\08-ux-review.md
+status:          DONE
+verdict:         PASS
+verification:    PASS
+detail:          30 of 31 checks SATISFIED from screenshots or computed styles, 1 not checked (26, not producible); 0 GAP, 0 DRIFTED that blocks; anchor is the rendered page, Tab script run (focus is a screenshot chec
+changed:         0
+contract_notes:  0
+pack_corrections: 4
+handoff:         7
+skill_calls:     0
+risks:           6
+headline:    Footer, three legal pages and demo notice pass UX review at 390 and 1280 px: 30 of 31 checks satisfied, check 26 not producible, four non-blocking SHOULD_FIX, stack restored to .env state.

@@ -1,0 +1,13 @@
+REPORT HEAD 2026-10-21-legal-pages/07
+artifact:        C:\projects\investments\los-tres\agentic\runs\2026-10-21-legal-pages\07-integration.md
+status:          DONE
+verdict:         PASS
+verification:    PASS
+detail:          exit 0; lint and both tsc clean; vitest 49 files 858 passed; playwright 88 passed, 4 skipped (identity-configured branch, host .env OWNER_* blank). Copy anchor: legal-es.md, 0 mismatches by script.
+changed:         0
+contract_notes:  0
+pack_corrections: 2
+handoff:         3
+skill_calls:     0
+risks:           4
+headline:        S9.3 integrates cleanly: contract matches the plan, guardrails 1 and 5 hold, copy is verbatim, gate exit 0; PASS with no change requests.
