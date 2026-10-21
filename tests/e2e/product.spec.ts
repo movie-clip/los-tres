@@ -167,4 +167,73 @@ test.describe('product page /producto/<slug> (C-13)', () => {
       expect(await response.text()).toContain(messages.NotFound.heading);
     });
   }
+
+  test.describe('product JSON-LD (S6.1)', () => {
+    const SELECTOR = 'script[type="application/ld+json"][data-testid="product-jsonld"]';
+    const scripts = (html: string) =>
+      [...html.matchAll(/<script[^>]* type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(
+        (match) => match[1],
+      );
+
+    test('the shared-EAN page has exactly one parseable product-jsonld script matching the offer list', async ({
+      request,
+      browser,
+    }) => {
+      const response = await request.get(path(DEMO_SHARED.slug));
+      expectNoSetCookie(response);
+      const html = await response.text();
+      expect(scripts(html)).toHaveLength(1);
+
+      const { page, close } = await openRawHtml(browser, html);
+      await expect(page.locator(SELECTOR)).toHaveCount(1);
+      const json = JSON.parse((await page.locator(SELECTOR).textContent()) ?? '');
+
+      expect(json).toMatchObject({
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: DEMO_SHARED.title,
+        brand: { '@type': 'Brand', name: DEMO_SHARED.brand },
+        mpn: DEMO_SHARED.partNumber,
+        gtin: DEMO_SHARED.ean,
+      });
+
+      // The JSON-LD agrees with the visible list on the same page.
+      const visible = (await text(page, 'offer-price')).map((price) =>
+        price.replace(/[^\d,]/g, '').replace(',', '.'),
+      );
+      expect(json.offers['@type']).toBe('AggregateOffer');
+      expect(json.offers.priceCurrency).toBe('EUR');
+      expect(json.offers.offerCount).toBe(await page.getByTestId('offer-row').count());
+      expect(json.offers.lowPrice).toBe(visible[0]);
+      expect(json.offers.highPrice).toBe(visible[visible.length - 1]);
+      expect(json.offers.lowPrice).toBe('11.49');
+      expect(json.offers.highPrice).toBe('12.99');
+      expect(typeof json.offers.lowPrice).toBe('string');
+
+      // No scripts with a source, no shop host: the tag carries no link out.
+      expect(JSON.stringify(json)).not.toContain('/go/');
+      for (const host of DEMO_SHOP_HOSTS) expect(JSON.stringify(json)).not.toContain(host);
+      await close();
+    });
+
+    test('a single-shop product has equal low and high prices', async ({ request }) => {
+      const html = await (await request.get(path(DEMO_DRILL.slug))).text();
+      const found = scripts(html);
+      expect(found).toHaveLength(1);
+      const json = JSON.parse(found[0]);
+      expect(json.name).toBe(DEMO_DRILL.title);
+      expect(json.offers).toMatchObject({
+        lowPrice: '49.90',
+        highPrice: '49.90',
+        offerCount: 1,
+        priceCurrency: 'EUR',
+      });
+    });
+
+    test('the 404 page carries no JSON-LD', async ({ request }) => {
+      const response = await request.get(path('no-existe-este-producto'));
+      expect(response.status()).toBe(404);
+      expect(scripts(await response.text())).toHaveLength(0);
+    });
+  });
 });

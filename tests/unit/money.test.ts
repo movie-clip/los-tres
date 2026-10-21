@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatEuroCents, parseDecimalToCents } from '@/server/money';
+import { centsToDecimalString, formatEuroCents, parseDecimalToCents } from '@/server/money';
 
 import { normaliseSpaces } from '../support/messages';
 
@@ -85,6 +85,31 @@ describe('formatEuroCents (C-12, TD-34)', () => {
       const cents = parseDecimalToCents(text);
       expect(cents).not.toBeNull();
       expect(normaliseSpaces(formatEuroCents(cents as number))).toBe(`${text.replace('.', ',')} €`);
+    }
+  });
+});
+
+describe('centsToDecimalString (schema.org machine format)', () => {
+  it.each([
+    [1999, '19.99'],
+    [5, '0.05'],
+    [50, '0.50'],
+    [100, '1.00'],
+    [100000, '1000.00'],
+    [0, '0.00'],
+    [4990, '49.90'],
+    [999999999, '9999999.99'],
+  ])('formats %s cents as %s', (cents, expected) => {
+    expect(centsToDecimalString(cents)).toBe(expected);
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])('throws RangeError for %s', (cents) => {
+    expect(() => centsToDecimalString(cents)).toThrow(RangeError);
+  });
+
+  it('round-trips what the parser produces, without a float', () => {
+    for (const text of ['19.99', '0.29', '1.10', '4.35']) {
+      expect(centsToDecimalString(parseDecimalToCents(text) as number)).toBe(text);
     }
   });
 });
