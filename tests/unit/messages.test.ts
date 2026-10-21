@@ -39,6 +39,10 @@ describe('messages/es-ES.json (C-8)', () => {
     'Metadata.description',
     'Home.heading',
     'Home.tagline',
+    'Home.categoriesHeading',
+    'Home.productCount',
+    'Home.emptyHeading',
+    'Home.emptyBody',
     'NotFound.heading',
     'NotFound.body',
     'NotFound.backHome',
@@ -50,6 +54,13 @@ describe('messages/es-ES.json (C-8)', () => {
 
   it.each(['Metadata.title', 'Home.heading'])('%s takes the {siteName} placeholder', (key) => {
     expect(lookup(key)).toContain('{siteName}');
+  });
+
+  it('writes Home.productCount as an ICU plural with one and other branches', () => {
+    const message = lookup('Home.productCount') as string;
+    expect(message).toMatch(/^\{count, plural,/);
+    expect(message).toMatch(/one\s*\{[^}]*#[^}]*\}/);
+    expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
   });
 
   it('contains the code name in no message', () => {

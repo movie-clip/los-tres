@@ -55,7 +55,7 @@ export async function insertFeed(
 const DEFAULT_CATEGORY_SLUG = 'categoria-de-prueba';
 
 export async function insertCategory(
-  o: { slug?: string; name?: string; parentId?: number | null } = {},
+  o: { slug?: string; name?: string; parentId?: number | null; position?: number } = {},
 ): Promise<{ id: number; slug: string; name: string }> {
   await assertTestDatabase();
   const n = next();
@@ -63,7 +63,7 @@ export async function insertCategory(
   const name = o.name ?? `Categoría ${n}`;
   const [row] = await getDb()
     .insert(categories)
-    .values({ slug, name, parentId: o.parentId ?? null })
+    .values({ slug, name, parentId: o.parentId ?? null, position: o.position ?? 0 })
     .returning({ id: categories.id });
   return { id: row.id, slug, name };
 }

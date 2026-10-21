@@ -1,0 +1,28 @@
+.panel {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-link);
+  color: var(--color-bg);
+}
+
+.title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Two classes: `.page p` (0,1,1) would otherwise grey the tagline. */
+.panel .tagline {
+  margin: 0;
+  color: var(--color-bg);
+  font-size: var(--text-md);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}

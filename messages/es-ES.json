@@ -5,7 +5,11 @@
   },
   "Home": {
     "heading": "{siteName}",
-    "tagline": "Compara precios de recambios y herramientas en las tiendas de España."
+    "tagline": "Compara precios de recambios y herramientas en las tiendas de España.",
+    "categoriesHeading": "Categorías",
+    "productCount": "{count, plural, one {# producto} other {# productos}}",
+    "emptyHeading": "Estamos preparando el catálogo",
+    "emptyBody": "Todavía no hay productos que comparar. Vuelve pronto."
   },
   "NotFound": {
     "heading": "Página no encontrada",
