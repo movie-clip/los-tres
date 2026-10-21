@@ -143,6 +143,12 @@ describe('seams (guardrail 1, S5.1 mapped products)', () => {
     expect(code).toContain('visibleOfferWhere()');
   });
 
+  it('has the home tree read go through the shared visibility scope, never its own flag test', () => {
+    const code =
+      sources().find(({ file }) => file === 'src/server/catalogue/category-tree.ts')?.code ?? '';
+    expect(code).toContain('visibleProductWhere()');
+  });
+
   it('updates products only in the importer and the seed', () => {
     const found = offenders(
       /\.update\(\s*products\s*\)/,
