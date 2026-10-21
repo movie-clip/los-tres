@@ -45,6 +45,11 @@ export type PublicCategoryPage = {
   productCount: number;
   /** Length 0..CATEGORY_PAGE_SIZE; 0 only when productCount is 0. */
   products: CategoryProductCard[];
+  /**
+   * True when products.length >= 1 and every visible offer behind the listed
+   * cards is from a demo feed. False for an empty category.
+   */
+  demoOnly: boolean;
 };
 
 /**
@@ -100,6 +105,7 @@ export async function getPublicCategoryPage(
       brand: products.brand,
       lowestPriceCents: lowestPrice,
       offerCount: sql<number>`count(*)::int`,
+      allDemo: sql<boolean>`bool_and(${feeds.isDemo})`,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))
@@ -117,6 +123,13 @@ export async function getPublicCategoryPage(
     page,
     pageCount,
     productCount,
-    products: rows,
+    products: rows.map((row) => ({
+      slug: row.slug,
+      title: row.title,
+      brand: row.brand,
+      lowestPriceCents: row.lowestPriceCents,
+      offerCount: row.offerCount,
+    })),
+    demoOnly: rows.length > 0 && rows.every((row) => row.allDemo),
   };
 }

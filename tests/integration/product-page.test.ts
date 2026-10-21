@@ -61,6 +61,7 @@ describe('getPublicProductBySlug shape (C-11)', () => {
       ean: '2000000000015',
       description: 'Texto plano',
       offers: [{ offerId, shopName: 'Tienda Forma', priceCents: 1999, priceUpdatedAt: updated }],
+      demoOnly: false,
     } satisfies PublicProductPage);
     expect(page?.offers[0].priceUpdatedAt).toBeInstanceOf(Date);
     expect(Number.isInteger(page?.offers[0].priceCents)).toBe(true);

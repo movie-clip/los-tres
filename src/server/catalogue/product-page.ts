@@ -35,6 +35,8 @@ export type PublicProductPage = {
   description: string | null;
   /** Length >= 1, visible offers only, already sorted by price, shop, id. */
   offers: PublicOffer[];
+  /** True when every listed (visible) offer is from a demo feed. offers.length >= 1, so never vacuous. */
+  demoOnly: boolean;
 };
 
 /**
@@ -57,6 +59,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       shopName: shops.name,
       priceCents: offers.priceCents,
       priceUpdatedAt: offers.priceUpdatedAt,
+      isDemo: feeds.isDemo,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))
@@ -80,5 +83,6 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       priceCents: row.priceCents,
       priceUpdatedAt: row.priceUpdatedAt,
     })),
+    demoOnly: rows.every((row) => row.isDemo),
   };
 }
