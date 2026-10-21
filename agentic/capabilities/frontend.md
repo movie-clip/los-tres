@@ -31,13 +31,15 @@ The stack is recorded in `CLAUDE.md` § Stack. Report `BLOCKED` if the tech-lead
 
 UI under `src/app` (pages), `src/components`, `src/i18n` (`locale.ts`, `request.ts`), `messages/es-ES.json`, `src/app/globals.css` (CSS Modules, owner ruling 2026-10-17, `docs/decisions/0011`: co-located `*.module.css`; `globals.css` keeps the reset and the CSS custom properties; add no new global classes). Public pages under `src/app/(public)/`, admin under `src/app/admin/`. A component never imports `src/db`, `src/server` or `src/config`, with one named exception that takes precedence over the `src/server` ban for that file only: `JsonLd.tsx` imports `serializeJsonLd` and `type ProductJsonLd` from `src/server/catalogue/product-jsonld.ts` (a pure module, no `server-only`; ruled in the S6.1 run, decision D-2). Every other component receives finished strings: the layout or page reads configuration and passes it down as a prop. A page (`page.tsx`) is a server component and may import `src/server` read functions, `formatEuroCents` and `goPath` (`src/server/clicks/go-path.ts`); it never imports `src/db`.
 
-Listing components: `ProductCard`, `ProductGrid`, `Pagination`, `CategoryEmpty` (`homeLabel` optional: no link when omitted), `CategoryTree` (home groups), `SiteHeader` (styles in `SiteHeader.module.css`) in `src/components` (display strings only); page-level styles in a `page.module.css` beside the `page.tsx`.
+Listing components: `ProductCard`, `ProductGrid`, `Pagination`, `CategoryEmpty` (`homeLabel` optional: no link when omitted), `CategoryTree` (home groups), `SiteHeader` (styles in `SiteHeader.module.css`), `SiteFooter` (root layout, after children), `DemoNotice` (`p role=note`, first child of main), `LegalText` (42rem column plus `LegalTitle`/`LegalHeading`/`LegalParagraph`/`LegalList`/`LegalItem` and `legalRichTags`) in `src/components` (display strings only); legal page bodies live in a sibling `content.tsx` taking `{ t, siteName, owner }`; page-level styles in a `page.module.css` beside the `page.tsx`.
 
 `.page p { color: var(--color-muted) }` (specificity 0,1,1) beats a single-class module rule on any `<p>` inside `.page`: text that must not be muted is a `span` or `h2`, and `p` is for muted prose; where it must stay a `p` (the home tagline), override with a two-class selector under the container (`.panel .tagline`), never `!important`.
 
+`body` is a flex column with `body > main { flex: 1 0 auto; width: 100% }` in `globals.css` so the footer sits at the bottom of short pages; `.page` centres with auto margins, which stops a flex item stretching, so any new full-width flex child of body needs an explicit width.
+
 A CSS Module file next to a component is imported as `styles` and typed by Next's `*.module.css` declaration. Class names are hashed in the HTML, so tests select by `data-testid` or role, never by class.
 
-Working-copy files are CRLF on Windows (autocrlf): edit existing files with the Edit tool and write new ones with Write. A long Bash heredoc containing an apostrophe failed to parse in Git Bash.
+Working-copy files are CRLF on Windows (autocrlf): edit existing files with the Edit tool and write new ones with Write. A heredoc containing an apostrophe in a comment fails the whole Bash command and writes nothing; use Write for files with prose comments.
 
 ## Spanish market conventions
 
@@ -57,6 +59,7 @@ Working-copy files are CRLF on Windows (autocrlf): edit existing files with the 
 - Pages and the root layout that show configuration or data export `dynamic = 'force-dynamic'`; never read `SITE_NAME` or any env at module load. A changed `SITE_NAME` takes a container restart (`docker compose up -d`), not a rebuild.
 - `next.config.ts` is wrapped with `createNextIntlPlugin('./src/i18n/request.ts')`; server components use `getTranslations(namespace)` and `getLocale()` from `next-intl/server`. Add `NextIntlClientProvider` only when the first client component needs messages.
 - `getRequestConfig` sets `timeZone: 'Europe/Madrid'`; dates are ICU placeholders in messages, for example `{date, date, medium}`. Counts use ICU plurals. Public product pages live at `src/app/(public)/producto/[slug]/page.tsx`, call one `cache()`-wrapped read function, and call `notFound()` on `null`.
+- Messages with rich tags (`<b>`, `<email>`, `<aepd>`) are rendered with `t.rich` and tag functions from `legalRichTags`; owner values enter as ICU values and are escaped. The owner's identity is read only in the `page.tsx` of `aviso-legal` and `privacidad` via `getOwnerIdentity()`.
 - Listing pages read `?pagina` through `parsePageParam`, call `notFound()` on a null read, link page 1 as the clean path with no `?pagina=1`, and use plain `<a>` (not `next/link`) for card and pagination links.
 
 ## Guardrails, in code terms

@@ -32,6 +32,8 @@ Vitest 5 with two projects in `vitest.config.mts` (the package stays CommonJS; t
 
 E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), which runs `docker compose run --rm -T --no-deps app import-feeds` and throws a named message on `feeds=0` (quoted in `CLAUDE.md` § Commands). The e2e write rule is in § What must always be covered.
 
+`legal.spec.ts` branches on the host `.env`: all four required `OWNER_*` values non-blank means 200 and values asserted as booleans (never printed), otherwise 500 and no brace in the visible text. To exercise the 200 branch without touching `.env`, export fake `OWNER_*` in the shell, run `docker compose up -d app`, run playwright with the same exports, then unset and run `docker compose up -d app` again.
+
 Umami answers 307 at `/`. Assert 200 on `/api/heartbeat`, and on `/` only through a client that follows redirects. Host port 3000 may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
 Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`.
@@ -69,6 +71,8 @@ matching test, and it should be one that would fail if the rule broke:
   scans the source so the visibility flags, `fetch(`, `node:fs`, `@/db` in
   pages and `/ 100` stay out of places they do not belong.
 
+- **Demo notice.** Any e2e that reads the first paragraph of `main` on a demo product or category page must skip `p[role=note]`.
+
 Never call a live affiliate network in a test. Import from local fixture feed
 files.
 
@@ -95,6 +99,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - The escape for U+2028 or U+2029 (backslash, `u`, then the four digits) typed in a test string literal may arrive as the raw character: use `String.raw` for expected escape text.
 - Check a written test file for a stray raw character with `cat -A`.
 - Also in `tests/support`: `pg-error.ts`, `page-checks.ts`, `messages.ts`.
+- `expectLocalScriptsAndLinks(page, { allowHrefs })` lets exact hrefs through (legal pages pass the `mailto:` and `https://www.aepd.es`); `expectLegalFooter(page)` asserts the contentinfo landmark, three exact hrefs and labels, no `p` or heading. Legal content components render in unit tests with `createTranslator` from `use-intl/core` and the real messages; the owner fake values are in `tests/unit/owner-config.test.ts` and `legal-pages.test.ts`.
 - React components render in the unit project with `renderToStaticMarkup` from
   `react-dom/server` and `createElement`; `.module.css` imports need no config.
 - The ESLint Node API runs in Vitest (`new ESLint({cwd})`, `lintText(code,

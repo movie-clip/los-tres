@@ -51,6 +51,8 @@ one lives in code:
   - `src/server/clicks/offer-target.ts`: the only reader of `offers.url`.
   - `src/server/clicks/handle-go.ts`: the handler.
   - `src/app/(public)/go/[offer]/route.ts`: the route.
+- **Owner identity** (`src/config/owner.ts`). The only reader of `OWNER_*` and `CONTACT_EMAIL`; only the `aviso-legal` and `privacidad` `page.tsx` call it.
+- **Demo flag.** `demoOnly` is computed only in `src/server/catalogue` from `feeds.is_demo`, inside the `visibleOfferWhere()` query; no file under `src/app` or `src/components` names `isDemo` (`seams.test.ts` enforces).
 
 ## Proposing a stack
 
