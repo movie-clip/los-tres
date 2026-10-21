@@ -37,3 +37,18 @@ export function formatEuroCents(cents: number): string {
   }
   return euroFormat.format(cents / 100);
 }
+
+/**
+ * Formats integer cents as the machine decimal text schema.org takes, for
+ * example `1999` gives `19.99` and `5` gives `0.05`: always a dot, always two
+ * decimals, no thousands separator. By digit slicing, with no division and no
+ * float. `formatEuroCents` stays the display format. Throws `RangeError` for a
+ * non-integer or negative argument.
+ */
+export function centsToDecimalString(cents: number): string {
+  if (!Number.isInteger(cents) || cents < 0) {
+    throw new RangeError('cents must be a non-negative integer');
+  }
+  const digits = String(cents).padStart(3, '0');
+  return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
+}
