@@ -27,7 +27,7 @@ site name is configuration.
   or emails. Never commit a secret.
 
 Absolute, and unnumbered on purpose. The agentic network's profile
-(`.agentic/projects/los-tres/project.md` § Hard guardrails) carries the same
+(`agentic/project.md` § Hard guardrails) carries the same
 five, numbered, so a `REFUSED: guardrail 2` names exactly one thing.
 
 ## Stack
