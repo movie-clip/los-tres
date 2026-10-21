@@ -52,7 +52,7 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     expect(values).toEqual([DEMO_SHARED.brand, DEMO_SHARED.partNumber, DEMO_SHARED.ean]);
 
     // The description paragraph comes first (the demo feeds say the product is fictional).
-    await expect(page.locator('main p').first()).toContainText('ficticio');
+    await expect(page.locator('main p:not([role="note"])').first()).toContainText('ficticio');
     await expect(page.getByTestId('shop-count')).toHaveText(icuPlural(messages.Product.shopCount, 2));
     await expect(page.locator('h2')).toHaveText(messages.Product.offersHeading);
     await expect(page.getByText(messages.Product.vatIncluded, { exact: true })).toHaveCount(1);

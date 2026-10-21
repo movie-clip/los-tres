@@ -1,5 +1,7 @@
 import { expect, type APIResponse, type Browser, type Page } from '@playwright/test';
 
+import messages from '../../messages/es-ES.json';
+
 // Shared browser-level checks for the public pages. The raw server HTML is
 // parsed by `page.setContent` in a context with JavaScript off, so there is no
 // HTML parser dependency and nothing a script could add.
@@ -20,8 +22,17 @@ export function expectNoSetCookie(response: APIResponse): void {
   expect(response.headers()['set-cookie']).toBeUndefined();
 }
 
-/** Every script `src` and every link `href` on the page is a same-origin path. */
-export async function expectLocalScriptsAndLinks(page: Page): Promise<void> {
+/**
+ * Every script `src` and every link `href` on the page is a same-origin path.
+ * `allowHrefs` names the exceptions by exact string (the legal pages allow only
+ * the contact `mailto:` and the AEPD site); a near miss such as another host or
+ * a different path on the same host still fails.
+ */
+export async function expectLocalScriptsAndLinks(
+  page: Page,
+  options: { allowHrefs?: string[] } = {},
+): Promise<void> {
+  const allowed = new Set(options.allowHrefs ?? []);
   const scriptSources = await page
     .locator('script[src]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('src') ?? ''));
@@ -32,8 +43,26 @@ export async function expectLocalScriptsAndLinks(page: Page): Promise<void> {
     .locator('a[href]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href') ?? ''));
   for (const href of hrefs) {
-    expect(href.startsWith('/') && !href.startsWith('//')).toBe(true);
+    expect(allowed.has(href) || (href.startsWith('/') && !href.startsWith('//'))).toBe(true);
   }
+}
+
+/** The footer every page carries (S9.3): three plain links, no heading, no paragraph. */
+export async function expectLegalFooter(page: Page): Promise<void> {
+  const footer = page.getByRole('contentinfo');
+  await expect(footer).toHaveCount(1);
+  const links = footer.locator('a');
+  expect(await links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual([
+    '/aviso-legal',
+    '/privacidad',
+    '/como-nos-financiamos',
+  ]);
+  expect((await links.allTextContents()).map((label) => label.trim())).toEqual([
+    messages.Footer.legalNotice,
+    messages.Footer.privacy,
+    messages.Footer.funding,
+  ]);
+  await expect(footer.locator('p, h1, h2, h3, h4, h5, h6')).toHaveCount(0);
 }
 
 /** No request left the app origin (data: and blob: do not count). */
