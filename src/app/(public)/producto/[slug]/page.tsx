@@ -3,9 +3,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
 import { ProductDetails, type ProductDetail } from '@/components/ProductDetails';
 import { getSiteName } from '@/config/site';
+import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { goPath } from '@/server/clicks/go-path';
 import { formatEuroCents } from '@/server/money';
@@ -43,27 +45,33 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
   if (product.ean !== null) details.push({ label: t('ean'), value: product.ean });
 
+  // Null when no offer is visible: then no script tag is rendered at all.
+  const jsonLd = buildProductJsonLd(product);
+
   return (
-    <main className="page">
-      <ProductDetails
-        title={product.title}
-        imageLabel={t('imagePlaceholder')}
-        details={details}
-        description={product.description}
-      />
-      <OfferList
-        heading={t('offersHeading')}
-        shopCount={t('shopCount', { count: product.offers.length })}
-        vatNote={t('vatIncluded')}
-        offers={product.offers.map((offer) => ({
-          key: String(offer.offerId),
-          shopName: offer.shopName,
-          price: formatEuroCents(offer.priceCents),
-          updated: t('priceUpdatedOn', { date: offer.priceUpdatedAt }),
-          goHref: goPath(offer.offerId),
-          goLabel: t('goToShop', { shopName: offer.shopName }),
-        }))}
-      />
-    </main>
+    <>
+      {jsonLd !== null && <JsonLd data={jsonLd} />}
+      <main className="page">
+        <ProductDetails
+          title={product.title}
+          imageLabel={t('imagePlaceholder')}
+          details={details}
+          description={product.description}
+        />
+        <OfferList
+          heading={t('offersHeading')}
+          shopCount={t('shopCount', { count: product.offers.length })}
+          vatNote={t('vatIncluded')}
+          offers={product.offers.map((offer) => ({
+            key: String(offer.offerId),
+            shopName: offer.shopName,
+            price: formatEuroCents(offer.priceCents),
+            updated: t('priceUpdatedOn', { date: offer.priceUpdatedAt }),
+            goHref: goPath(offer.offerId),
+            goLabel: t('goToShop', { shopName: offer.shopName }),
+          }))}
+        />
+      </main>
+    </>
   );
 }
