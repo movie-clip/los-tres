@@ -42,5 +42,68 @@
     "priceUpdatedOn": "Precio actualizado el {date, date, medium}",
     "goToShop": "Ir a la tienda de {shopName}",
     "imagePlaceholder": "Imagen del producto no disponible"
+  },
+  "Footer": {
+    "legalNotice": "Aviso legal",
+    "privacy": "Privacidad",
+    "funding": "Cómo nos financiamos"
+  },
+  "DemoNotice": {
+    "body": "Esta página muestra datos de demostración: los productos, los precios y las tiendas no son reales."
+  },
+  "LegalNotice": {
+    "metaTitle": "Aviso legal | {siteName}",
+    "heading": "Aviso legal",
+    "intro": "En cumplimiento del artículo 10 de la Ley 34/2002, de 11 de julio, de servicios de la sociedad de la información y de comercio electrónico (LSSI-CE), se informa de los datos del titular de este sitio web:",
+    "holder": "Titular: {ownerName}",
+    "nif": "NIF: {ownerNif}",
+    "address": "Domicilio: {ownerAddress}",
+    "email": "Correo electrónico: <email>{contactEmail}</email>",
+    "registry": "Datos registrales: {ownerRegistry}",
+    "objectHeading": "Objeto",
+    "objectBody": "{siteName} es un comparador de precios de recambios y consumibles para el automóvil y de herramientas eléctricas y manuales. {siteName} no vende ningún producto: muestra ofertas de tiendas de terceros y enlaza a ellas. La compra se realiza siempre en la tienda, con sus propias condiciones de venta, envío, garantía y devolución.",
+    "pricesHeading": "Información de precios",
+    "pricesBody": "Los precios, la disponibilidad y las descripciones proceden de los catálogos que las tiendas publican a través de redes de afiliación. Los precios incluyen el IVA. Pueden cambiar en cualquier momento, y el precio válido es el que muestra la tienda en el momento de la compra. {siteName} no se hace responsable de los errores que contengan esos catálogos.",
+    "demoHeading": "Datos de demostración",
+    "demoBody": "Mientras las redes de afiliación revisan el sitio, algunas páginas pueden mostrar productos y ofertas de demostración. Esas páginas lo indican de forma visible.",
+    "ipHeading": "Propiedad intelectual e industrial",
+    "ipBody": "Los textos y el diseño de {siteName} pertenecen a su titular. Las marcas, logotipos, nombres comerciales e imágenes de productos pertenecen a sus respectivos propietarios y se muestran solo para identificar los productos y las tiendas.",
+    "linksHeading": "Enlaces a terceros",
+    "linksBody": "Los enlaces a tiendas llevan a sitios web de terceros. {siteName} no controla su contenido ni sus políticas, y no responde de ellos.",
+    "lawHeading": "Legislación aplicable",
+    "lawBody": "Este aviso legal se rige por la legislación española."
+  },
+  "Privacy": {
+    "metaTitle": "Privacidad | {siteName}",
+    "heading": "Política de privacidad",
+    "controllerHeading": "Responsable del tratamiento",
+    "controllerBody": "{ownerName}, NIF {ownerNif}, con domicilio en {ownerAddress}. Puedes contactar en <email>{contactEmail}</email>.",
+    "cookiesHeading": "No usamos cookies",
+    "cookiesBody": "{siteName} no instala cookies ni tecnologías similares en el navegador de los visitantes. Por eso no verás ningún aviso de cookies.",
+    "dataHeading": "Qué datos registramos cuando visitas el sitio",
+    "dataClicks": "<b>Clics hacia las tiendas.</b> Cuando pulsas el enlace a una tienda, registramos la oferta, la tienda, el producto, la hora y la página desde la que pulsaste. No registramos tu dirección IP, tu navegador ni ningún identificador tuyo. Lo usamos para saber qué ofertas interesan y para cuadrar las cuentas con las redes de afiliación.",
+    "dataStats": "<b>Estadísticas de visitas.</b> Usamos Umami, una herramienta de analítica instalada en nuestro propio servidor, que funciona sin cookies y no guarda direcciones IP. Registra la página visitada, la página de procedencia, el tipo de navegador, sistema operativo y dispositivo, el idioma y el país. Solo consultamos cifras agregadas, y estos datos no se comparten con terceros.",
+    "dataLogs": "<b>Registros del servidor.</b> Los registros técnicos del servidor no guardan direcciones IP ni datos del navegador.",
+    "dataBasis": "Con estos datos no podemos identificarte. La base jurídica es nuestro interés legítimo en conocer el uso del sitio y en gestionar la afiliación (artículo 6.1.f del Reglamento General de Protección de Datos, RGPD).",
+    "leavingHeading": "Al salir hacia una tienda",
+    "leavingBody": "Cuando pulsas el enlace a una tienda, sales de {siteName}. La red de afiliación y la tienda pueden instalar sus propias cookies para atribuir la compra, según sus propias políticas de privacidad, que te recomendamos consultar.",
+    "writingHeading": "Si nos escribes",
+    "writingBody": "Si nos envías un correo electrónico, usamos tu dirección y tu mensaje solo para responderte, y los conservamos un máximo de 12 meses. La base jurídica es tu consentimiento al escribirnos.",
+    "adminsHeading": "Administradores",
+    "adminsBody": "El área de administración usa una cookie de sesión, estrictamente necesaria para iniciar sesión. Solo la reciben los administradores del sitio; los visitantes nunca la reciben.",
+    "recipientsHeading": "Destinatarios",
+    "recipientsBody": "El sitio se aloja en un proveedor de servidores situado en la Unión Europea, que actúa como encargado del tratamiento. No cedemos datos a terceros ni realizamos transferencias internacionales de datos.",
+    "rightsHeading": "Tus derechos",
+    "rightsBody": "Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y portabilidad escribiendo a <email>{contactEmail}</email>. Si consideras que no hemos atendido tu solicitud correctamente, puedes presentar una reclamación ante la Agencia Española de Protección de Datos (<aepd>www.aepd.es</aepd>).",
+    "changesHeading": "Cambios en esta política",
+    "changesBody": "Si esta política cambia, publicaremos la nueva versión en esta página."
+  },
+  "Funding": {
+    "metaTitle": "Cómo nos financiamos | {siteName}",
+    "heading": "Cómo se financia {siteName}",
+    "intro": "{siteName} es gratuito para ti. Nos financiamos con comisiones de afiliación: cuando pulsas el enlace a una tienda y compras, la tienda puede pagarnos una comisión a través de una red de afiliación.",
+    "noExtraCost": "<b>No pagas más.</b> El precio es el mismo que si entraras en la tienda directamente.",
+    "noSales": "<b>No vendemos nada.</b> La compra, el envío, la garantía y las devoluciones son siempre responsabilidad de la tienda.",
+    "noPaidRanking": "<b>Ninguna tienda paga por aparecer antes.</b> Las ofertas se ordenan por precio, de menor a mayor."
   }
 }

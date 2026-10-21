@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
 import { CategoryEmpty } from '@/components/CategoryEmpty';
+import { DemoNotice } from '@/components/DemoNotice';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { getSiteName } from '@/config/site';
@@ -45,10 +46,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const category = await load(slug, parsePageParam(pagina));
   if (category === null) notFound();
 
-  const [t, tProduct, tNotFound] = await Promise.all([
+  const [t, tProduct, tNotFound, tDemo] = await Promise.all([
     getTranslations('Category'),
     getTranslations('Product'),
     getTranslations('NotFound'),
+    getTranslations('DemoNotice'),
   ]);
 
   if (category.productCount === 0) {
@@ -86,6 +88,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   return (
     <main className="page">
+      {category.demoOnly && <DemoNotice text={tDemo('body')} />}
       <div className={styles.header}>
         <h1 className={styles.title}>{category.name}</h1>
         <p className={styles.note} data-testid="category-summary">
