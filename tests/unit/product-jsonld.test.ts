@@ -104,7 +104,7 @@ describe('buildProductJsonLd', () => {
 
 describe('serializeJsonLd', () => {
   const hostile = {
-    name: '</script><script>alert(1)</script> <!-- & "q"     fin',
+    name: '</script><script>alert(1)</script> <!-- & "q" \u2028 \u2029 fin',
   };
 
   it('escapes <, >, & so the text cannot close the script tag', () => {
@@ -119,8 +119,8 @@ describe('serializeJsonLd', () => {
 
   it('escapes U+2028 and U+2029', () => {
     const out = serializeJsonLd(hostile);
-    expect(out).not.toContain(' ');
-    expect(out).not.toContain(' ');
+    expect(out).not.toContain('\u2028');
+    expect(out).not.toContain('\u2029');
     expect(out).toContain(String.raw`\u2028`);
     expect(out).toContain(String.raw`\u2029`);
   });
