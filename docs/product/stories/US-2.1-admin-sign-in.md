@@ -57,7 +57,7 @@ Out (later stories or not in the MVP):
 
 Accounts and the command
 
-1. No page, link, route or action on the public site or in the admin area lets anyone create an account, request an invitation or reset a password. A request to a path that looks like a sign-up or reset path gets the ordinary 404 page.
+1. No page, link, route or action on the public site or in the admin area lets anyone create an account, request an invitation or reset a password. An anonymous request to a sign-up or reset looking path under `/admin/` (and to any other unmatched `/admin/*` path) redirects to the admin sign-in page and sets no cookie (D-19). An anonymous request to such a path outside `/admin/`, such as `/registro`, or to the auth API paths for sign-up or reset, gets the ordinary 404 page. A signed-in admin who requests an unmatched `/admin/*` path gets the admin 404 page.
 2. Running the create-admin command with an email address and a password creates an admin account, and that email and password then sign in successfully (AC 9). The command runs through the documented npm form and through `docker compose run --rm app create-admin`, and exits 0 on success.
 3. The command never takes the password as a command-line argument, so the password is not left in shell history or a process listing. It does not print, echo or log the password or the email, on success or failure (guardrail 5).
 4. Running the command again for an email that already has an account sets the new password on that account, creates no second account, and ends every open session of that account. The old password no longer signs in. This is the recovery path (D-5; D-12).
