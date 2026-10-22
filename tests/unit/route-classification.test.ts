@@ -36,6 +36,20 @@ describe('route classification (C-5, TD-6)', () => {
     expect(classifyRoute('(public)/categoria/[slug]/page.tsx')).toBe('public');
   });
 
+  it('keeps the sign-in page and the shell below admin (US-2.1)', () => {
+    const admin = routes.filter((file) => classifyRoute(file) === 'admin');
+    expect(admin).toEqual(expect.arrayContaining(['admin/acceso/page.tsx', 'admin/(shell)/page.tsx']));
+    // No admin page or route sits outside the admin directory by another name.
+    expect(routes.filter((file) => /admin|acceso/.test(file) && classifyRoute(file) !== 'admin')).toEqual([]);
+  });
+
+  it('has no public route that looks like sign-up, reset or the framework auth handler (AC 1)', () => {
+    const lookalike = routes.filter((file) =>
+      /sign-?up|register|registr|reset|forgot|olvid|restablec|api\/auth/i.test(file),
+    );
+    expect(lookalike).toEqual([]);
+  });
+
   it('detects a route placed outside the two directories', () => {
     expect(classifyRoute('page.tsx')).toBe('unclassified');
     expect(classifyRoute('api/leak/route.ts')).toBe('unclassified');

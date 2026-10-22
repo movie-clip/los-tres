@@ -1,0 +1,15 @@
+.heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Left-aligned in the shared column, so the layout does not jump when a message appears. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 24rem;
+}

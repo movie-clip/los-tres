@@ -19,6 +19,7 @@
     "db:migrate": "npm run cli:build && node --env-file=.env --conditions=react-server dist/cli/migrate.js",
     "db:seed": "npm run cli:build && node --env-file=.env --conditions=react-server dist/cli/seed.js",
     "import-feeds": "npm run cli:build && node --env-file=.env --conditions=react-server dist/cli/import-feeds.js",
+    "create-admin": "npm run cli:build && node --env-file=.env --conditions=react-server dist/cli/create-admin.js",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
@@ -27,6 +28,7 @@
     "gate": "npm run lint && npm run typecheck && npm run db:up && npm test && npm run stack:up && npm run test:e2e"
   },
   "dependencies": {
+    "better-auth": "1.7.12",
     "drizzle-orm": "^0.45.4",
     "next": "^16.4.2",
     "next-intl": "^4.14.9",

@@ -22,6 +22,22 @@ test.describe('app image entrypoint', () => {
     expect(result.stderr).toContain('usage: docker-entrypoint.sh');
   });
 
+  test('the usage line for an unknown verb lists create-admin', () => {
+    expect(composeRun('bogus').stderr).toContain('create-admin');
+  });
+
+  test('create-admin with no input exits 2 with a usage line and creates nothing', () => {
+    const result = composeRun('create-admin');
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('usage: create-admin');
+  });
+
+  test('create-admin refuses an argument, so a password cannot be given on the command line', () => {
+    const result = composeRun('create-admin', '--password', 'argv-sentinel-4412');
+    expect(result.status).toBe(2);
+    expect(`${result.stdout}${result.stderr}`).not.toContain('argv-sentinel-4412');
+  });
+
   test('import-feeds run twice: the second run creates nothing', () => {
     const first = composeRun('import-feeds');
     expect(first.status).toBe(0);

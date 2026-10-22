@@ -4,6 +4,7 @@
 #   migrate      apply pending migrations
 #   seed         load the demo data (always; `seed --if-enabled` honours the flag)
 #   import-feeds import the approved feeds; `--feed <id>` imports one
+#   create-admin create an admin, or replace its password; email then password on stdin
 # The CLI is compiled to dist/ and runs with the react-server condition so the
 # `server-only` marker resolves to an empty module.
 set -eu
@@ -18,12 +19,12 @@ case "$verb" in
     node --conditions=react-server dist/cli/seed.js --if-enabled
     exec node server.js
     ;;
-  migrate|seed|import-feeds)
+  migrate|seed|import-feeds|create-admin)
     shift
     exec node --conditions=react-server "dist/cli/$verb.js" "$@"
     ;;
   *)
-    echo "usage: docker-entrypoint.sh server|migrate|seed|import-feeds" >&2
+    echo "usage: docker-entrypoint.sh server|migrate|seed|import-feeds|create-admin" >&2
     echo "unknown command: $verb" >&2
     exit 64
     ;;

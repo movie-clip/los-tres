@@ -173,9 +173,38 @@ describe('seams (guardrail 5, S1.1 click log)', () => {
     expect(counting?.code).toMatch(/user-agent/i);
   });
 
-  it('reads the user agent only in src/server/clicks/counting.ts', () => {
-    const found = offenders(/user-agent|userAgent/i, (file) => file === 'src/server/clicks/counting.ts');
+  // The two admin auth files name the column; they never read the header. The
+  // allow-list is these exact files, and the next test pins how they use it.
+  const USER_AGENT_FILES = new Set([
+    'src/server/clicks/counting.ts',
+    'src/db/schema/auth.ts',
+    'src/server/auth/auth.ts',
+  ]);
+
+  it('reads the user agent only in the click counter and the two admin auth files that null it', () => {
+    const found = offenders(/user-agent|userAgent/i, (file) => USER_AGENT_FILES.has(file));
     expect(found).toEqual([]);
+  });
+
+  it('lets the admin auth files name the user agent only as a null column or a null assignment', () => {
+    const code = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+    const mentions = (file: string) =>
+      code(file)
+        .split(/\r?\n/)
+        .filter((line) => /user-agent|userAgent|user_agent/i.test(line))
+        .map((line) => line.trim());
+
+    // The hook that nulls it: no header read, no value from the request.
+    expect(mentions('src/server/auth/auth.ts')).not.toEqual([]);
+    for (const line of mentions('src/server/auth/auth.ts')) {
+      expect(line).toMatch(/userAgent:\s*null/);
+      expect(line).not.toMatch(/headers?\b|\.get\(/i);
+    }
+    // The schema: the nullable column and the check that keeps it null.
+    expect(mentions('src/db/schema/auth.ts')).not.toEqual([]);
+    for (const line of mentions('src/db/schema/auth.ts')) {
+      expect(line).toMatch(/userAgent: text\('user_agent'\)|no_ip_or_user_agent|userAgent\} is null/i);
+    }
   });
 
   it('reads no client address header anywhere in src', () => {
@@ -242,5 +271,81 @@ describe('seams (S9.3: demo flag and owner identity)', () => {
       .filter((file) => file !== 'src/config/owner.ts')
       .sort();
     expect(found).toEqual(['src/app/(public)/aviso-legal/page.tsx', 'src/app/(public)/privacidad/page.tsx']);
+  });
+});
+
+describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
+  const inAuth = (file: string) => file.startsWith('src/server/auth/');
+
+  it('finds the auth modules it scans, so the rules below are not vacuous', () => {
+    const files = sources().map(({ file }) => file);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        'src/server/auth/auth.ts',
+        'src/server/auth/guard.ts',
+        'src/server/auth/actions.ts',
+        'src/server/auth/accounts.ts',
+      ]),
+    );
+  });
+
+  it('imports better-auth only under src/server/auth', () => {
+    expect(offenders(/['"]better-auth(\/[a-z/-]+)?['"]/, inAuth)).toEqual([]);
+  });
+
+  it('mounts no Better Auth HTTP handler and installs no cookie plugin', () => {
+    expect(offenders(/\b(toNextJsHandler|nextCookies)\b/, () => false)).toEqual([]);
+  });
+
+  it('reads and writes cookies only under src/server/auth', () => {
+    expect(offenders(/\bcookies\s*\(|\.cookies\b|set-cookie/i, inAuth)).toEqual([]);
+  });
+
+  it('writes the cookie only in the sign-in and sign-out actions', () => {
+    const found = sources()
+      .filter(({ file }) => inAuth(file))
+      .filter(({ code }) => /\bstore\.set\(|\bcookies\(\)\.set\(|\.set\(\s*name\b/.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual(['src/server/auth/actions.ts']);
+  });
+
+  it('keeps the admin UI free of the database and the auth library', () => {
+    const found = sources()
+      .filter(({ file }) => file.startsWith('src/app/admin/') || file.startsWith('src/components/admin/'))
+      .filter(({ code }) => /['"]@\/db|\/db\/|better-auth/.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('links to the admin area from nowhere outside the admin code (AC 26)', () => {
+    const found = offenders(
+      /['"`]\/admin\b/,
+      (file) =>
+        file.startsWith('src/app/admin/') ||
+        file.startsWith('src/components/admin/') ||
+        inAuth(file),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('lists no admin URL in a sitemap or robots file (AC 23)', () => {
+    const found = sources()
+      .filter(({ file }) => /\/(sitemap|robots)\.[a-z]+$/.test(file))
+      .filter(({ code }) => /admin/i.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('reads AUTH_SECRET and SITE_URL only in src/config/auth.ts', () => {
+    const found = offenders(/\b(AUTH_SECRET|SITE_URL)\b/, (file) => file === 'src/config/auth.ts');
+    expect(found).toEqual([]);
+  });
+
+  it('writes admin accounts only in src/server/auth/accounts.ts', () => {
+    const found = offenders(
+      /\.(insert|update|delete)\(\s*admin(Users|Accounts)\s*\)/,
+      (file) => file === 'src/server/auth/accounts.ts',
+    );
+    expect(found).toEqual([]);
   });
 });

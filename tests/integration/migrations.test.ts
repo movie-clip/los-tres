@@ -31,6 +31,10 @@ describe('migrations (TD-37)', () => {
         'offers',
         'clicks',
         'feed_category_mappings',
+        'admin_users',
+        'admin_accounts',
+        'admin_sessions',
+        'admin_verifications',
       ]),
     );
   });

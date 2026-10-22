@@ -1,0 +1,43 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-muted);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  /* 1rem or more, so phones do not zoom on focus. */
+  font-size: var(--text-md);
+}
+
+.input:focus-visible {
+  border-color: var(--color-link);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A thicker border; the padding gives back the extra pixel so the field does not grow. */
+.invalid {
+  padding: calc(var(--space-1) - 1px) calc(var(--space-2) - 1px);
+  border: 2px solid var(--color-text);
+}
+
+/* A span, not a paragraph: `.page p` in globals.css would grey it. */
+.message {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
