@@ -1,11 +1,12 @@
 import 'server-only';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { getDb } from '../../db/client';
 import { feeds, offers, products, shops } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
+import { hasNonDemoOfferWhere } from './demo';
 
 // The backend/frontend contract for the product page (C-11). The page formats;
 // this returns integer cents and `Date`, never a formatted amount or date.
@@ -37,6 +38,13 @@ export type PublicProductPage = {
   offers: PublicOffer[];
   /** True when every listed (visible) offer is from a demo feed. offers.length >= 1, so never vacuous. */
   demoOnly: boolean;
+  /**
+   * True when the product has an offer, in any state, from a non-demo feed:
+   * search engines may index the page (canonical) and the sitemap lists it.
+   * False means noindex. Never null. Independent of `demoOnly`, which drives
+   * the demo notice only.
+   */
+  indexable: boolean;
 };
 
 /**
@@ -60,6 +68,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       priceCents: offers.priceCents,
       priceUpdatedAt: offers.priceUpdatedAt,
       isDemo: feeds.isDemo,
+      indexable: sql<boolean>`${hasNonDemoOfferWhere()}`,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))
@@ -84,5 +93,6 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       priceUpdatedAt: row.priceUpdatedAt,
     })),
     demoOnly: rows.every((row) => row.isDemo),
+    indexable: first.indexable,
   };
 }

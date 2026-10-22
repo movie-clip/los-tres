@@ -6,6 +6,7 @@ import { getDb } from '../../db/client';
 import { categories, feeds, offers, products, shops } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
+import { hasNonDemoOfferWhere } from './demo';
 
 // The backend/frontend contract for the category page (C-3). The page formats;
 // this returns integer cents, never a formatted amount. Every product it lists
@@ -50,6 +51,12 @@ export type PublicCategoryPage = {
    * cards is from a demo feed. False for an empty category.
    */
   demoOnly: boolean;
+  /**
+   * True when the category subtree holds at least one public product with an
+   * offer from a non-demo feed. The same for every page of the category.
+   * False means noindex.
+   */
+  indexable: boolean;
 };
 
 /**
@@ -94,6 +101,11 @@ export async function getPublicCategoryPage(
     .from(products)
     .where(and(visibleProductWhere(), inSubtree(category.id)));
   const productCount = counted?.productCount ?? 0;
+  const [indexed] = await db
+    .select({ indexedCount: sql<number>`count(*)::int` })
+    .from(products)
+    .where(and(visibleProductWhere(), hasNonDemoOfferWhere(), inSubtree(category.id)));
+  const indexable = (indexed?.indexedCount ?? 0) > 0;
   const pageCount = Math.max(1, Math.ceil(productCount / CATEGORY_PAGE_SIZE));
   if (page > pageCount) return null;
 
@@ -131,5 +143,6 @@ export async function getPublicCategoryPage(
       offerCount: row.offerCount,
     })),
     demoOnly: rows.length > 0 && rows.every((row) => row.allDemo),
+    indexable,
   };
 }
