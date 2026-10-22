@@ -116,14 +116,31 @@ test.describe('anonymous visitors', () => {
     expect(raw.headers()['set-cookie']).toBeUndefined();
   });
 
-  test('a path that looks like sign-up or reset gets the ordinary 404, and no cookie (AC 1)', async ({
+  test('an anonymous sign-up or reset looking path under /admin goes to sign-in, outside /admin it is the ordinary 404, and no cookie (AC 1)', async ({
     request,
   }) => {
-    for (const url of ['/admin/registro', '/admin/registrarse', '/admin/olvide-contrasena', '/admin/restablecer', '/registro', '/api/auth/sign-up/email', '/api/auth/forget-password']) {
+    for (const url of ['/admin/registro', '/admin/registrarse', '/admin/olvide-contrasena', '/admin/restablecer']) {
+      const response = await request.get(url, { maxRedirects: 0 });
+      expect(response.status(), url).toBe(307);
+      expect(response.headers()['location'], url).toMatch(/\/admin\/acceso/);
+      expect(response.headers()['set-cookie'], url).toBeUndefined();
+    }
+    for (const url of ['/registro', '/api/auth/sign-up/email', '/api/auth/forget-password']) {
       const response = await request.get(url, { maxRedirects: 0 });
       expect(response.status(), url).toBe(404);
       expect(response.headers()['set-cookie'], url).toBeUndefined();
     }
+  });
+
+  test('an anonymous unmatched /admin path goes to sign-in and reveals no admin 404 (AC 1)', async ({ request }) => {
+    const response = await request.get('/admin/no-existe', { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()['location']).toMatch(/\/admin\/acceso/);
+    expect(response.headers()['set-cookie']).toBeUndefined();
+    const body = await response.text();
+    // Only the body copy is unique to the admin 404: its heading and link text equal the public 404's,
+    // and Next embeds the public not-found payload in every admin redirect body.
+    expect(body).not.toContain(admin.NotFound.body);
   });
 });
 
@@ -288,11 +305,19 @@ test.describe('signing in and out', () => {
     await expect(page).toHaveURL(/\/admin\/?$/);
   });
 
-  test('a signed-in visit to an address that does not exist shows the public 404, not an admin page', async ({ page }) => {
+  test('a signed-in visit to an unmatched /admin address shows the admin 404 with admin chrome and no public footer (AC 1)', async ({
+    page,
+  }) => {
     await signIn(page);
-    const response = await page.goto('/admin/registro');
-    expect(response?.status()).toBe(404);
-    await expect(page.getByRole('heading', { name: messages.NotFound.heading })).toBeVisible();
+    for (const url of ['/admin/registro', '/admin/no-existe']) {
+      const response = await page.goto(url);
+      expect(response?.status(), url).toBe(404);
+      await expect(page.getByRole('heading', { name: admin.NotFound.heading }), url).toBeVisible();
+      await expect(page.getByText(admin.NotFound.body), url).toBeVisible();
+      await expect(page.getByTestId('admin-identity'), url).toBeVisible();
+      await expect(page.getByRole('contentinfo'), url).toHaveCount(0);
+      await expect(page.getByText(messages.NotFound.body), url).toHaveCount(0);
+    }
   });
 
   test('signing out ends the session on the server, clears the cookie and lands on sign-in (AC 15, 20)', async ({
