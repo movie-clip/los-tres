@@ -8,6 +8,9 @@ import { requireAdminPage } from '@/server/auth/guard';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
+  // Next resolves metadata before the page body, so this is a server entry point of
+  // an admin route: the role check comes first (guardrail 3). Cached per request.
+  await requireAdminPage();
   const t = await getTranslations('Admin.Meta');
   return { title: t('homeTitle', { siteName: getSiteName() }) };
 }
