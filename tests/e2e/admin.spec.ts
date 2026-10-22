@@ -74,7 +74,7 @@ test.describe('anonymous visitors', () => {
     // The redirect body may carry the page title (static copy); it carries no
     // shell content, identity or admin data.
     const body = await raw.text();
-    for (const shown of [admin.Home.emptyBody, admin.Chrome.signedInAs, admin.Nav.feeds, EMAIL, 'admin-identity', 'admin-nav']) {
+    for (const shown of [admin.Home.emptyBody, admin.Meta.homeTitle.split('{siteName}')[0], admin.Chrome.signedInAs, admin.Nav.feeds, EMAIL, 'admin-identity', 'admin-nav']) {
       expect(body).not.toContain(shown);
     }
 

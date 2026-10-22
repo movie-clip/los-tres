@@ -12,6 +12,16 @@ import { classifyRoute, listRouteFiles } from './routes';
 /** The only admin page that may answer an anonymous request: it is where anonymous requests end. */
 export const ANONYMOUS_ALLOWLIST = ['admin/acceso/page.tsx'];
 
+/**
+ * Admin files whose `generate*` exports may answer an anonymous request. The
+ * admin root layout's metadata is static copy (a title and noindex, no data) and
+ * also serves the sign-in page, so it cannot be guarded. Nothing that reads data belongs here.
+ */
+export const METADATA_ALLOWLIST = ['admin/layout.tsx'];
+
+/** Next.js exports that run before or beside the page body and so are server entry points of the route. */
+export const GENERATE_EXPORTS = ['generateMetadata', 'generateViewport', 'generateStaticParams'] as const;
+
 const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 
 export type AnonymousAnswer =
@@ -39,6 +49,29 @@ export async function answerPage(file: string): Promise<AnonymousAnswer> {
     return { kind: 'threw', message: error instanceof Error ? error.name : 'non-error' };
   }
   return { kind: 'content', detail: 'rendered' };
+}
+
+/**
+ * Each `generate*` export of a page or layout, called anonymously the way Next
+ * resolves metadata (before the page body). Keys are the export names that
+ * exist; a missing export is simply absent.
+ */
+export async function answerGenerators(file: string): Promise<Record<string, AnonymousAnswer>> {
+  const mod = (await import(/* @vite-ignore */ file)) as Record<string, unknown>;
+  const answers: Record<string, AnonymousAnswer> = {};
+  for (const name of GENERATE_EXPORTS) {
+    const generator = mod[name];
+    if (typeof generator !== 'function') continue;
+    try {
+      await generator({ params: Promise.resolve({}), searchParams: Promise.resolve({}) }, Promise.resolve({}));
+      answers[name] = { kind: 'content', detail: `${name} returned` };
+    } catch (error) {
+      const to = redirectTo(error);
+      answers[name] =
+        to !== null ? { kind: 'redirect', to } : { kind: 'threw', message: error instanceof Error ? error.name : 'non-error' };
+    }
+  }
+  return answers;
 }
 
 /** A route handler answered an anonymous request: each exported method must refuse. */
@@ -82,6 +115,7 @@ export function isRefusal(answer: AnonymousAnswer): boolean {
 export async function findUnguardedAdminRoutes(
   appDir: string,
   allowlist: string[] = ANONYMOUS_ALLOWLIST,
+  metadataAllowlist: string[] = METADATA_ALLOWLIST,
 ): Promise<string[]> {
   const unguarded: string[] = [];
   for (const relative of listRouteFiles(appDir)) {
@@ -92,7 +126,28 @@ export async function findUnguardedAdminRoutes(
       : await answerHandlers(absolute);
     if (answers.length === 0 || !answers.every(isRefusal)) unguarded.push(relative);
   }
-  return unguarded;
+  // CR-2: generateMetadata and friends run without the page body, so each needs
+  // the check itself. Layouts count too; the sign-in page is covered by the allow-list above.
+  for (const relative of listLayoutAndPageFiles(appDir)) {
+    if (classifyRoute(relative) !== 'admin' || allowlist.includes(relative) || metadataAllowlist.includes(relative)) {
+      continue;
+    }
+    const answers = await answerGenerators(path.join(appDir, relative));
+    for (const [name, answer] of Object.entries(answers)) {
+      if (!isRefusal(answer)) unguarded.push(`${relative}#${name}`);
+    }
+  }
+  return unguarded.sort();
+}
+
+const GENERATOR_HOLDER = /^(page|layout)\.(ts|tsx|js|jsx|mdx)$/;
+
+/** Every `page.*` / `layout.*` file under `appDir`, posix paths relative to it. */
+export function listLayoutAndPageFiles(appDir: string): string[] {
+  return walk(appDir)
+    .filter((full) => GENERATOR_HOLDER.test(path.basename(full)))
+    .map((full) => path.relative(appDir, full).split(path.sep).join('/'))
+    .sort();
 }
 
 // ---------------------------------------------------------------------------

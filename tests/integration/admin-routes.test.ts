@@ -6,6 +6,8 @@ import { closeDb } from '@/db/client';
 
 import {
   ANONYMOUS_ALLOWLIST,
+  METADATA_ALLOWLIST,
+  answerGenerators,
   answerPage,
   filesWithServerActions,
   findUnguardedAdminRoutes,
@@ -56,6 +58,11 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
     expect(answer).toEqual({ kind: 'redirect', to: '/admin/acceso?aviso=sesion' });
   });
 
+  it('sends the shell page generateMetadata to the sign-in page, so metadata never reads data first', async () => {
+    const answers = await answerGenerators(path.join(appDir, 'admin/(shell)/page.tsx'));
+    expect(answers.generateMetadata).toEqual({ kind: 'redirect', to: '/admin/acceso?aviso=sesion' });
+  });
+
   it('sets no cookie while refusing', async () => {
     await findUnguardedAdminRoutes(appDir);
     expect(nextRequest.cookieWrites).toEqual([]);
@@ -68,13 +75,22 @@ describe('the enumerator itself can fail (AC 22)', () => {
     expect(found).toEqual(['admin/leak-handler/route.ts', 'admin/leak/page.tsx']);
   });
 
+  it('reports an admin page whose generateMetadata runs without the role check, though its body is guarded', async () => {
+    const found = await findUnguardedAdminRoutes(path.join(fixtures, 'unguarded-metadata'));
+    expect(found).toEqual(['admin/leak-meta/page.tsx#generateMetadata']);
+  });
+
+  it('allow-lists only the static admin root layout for metadata', () => {
+    expect(METADATA_ALLOWLIST).toEqual(['admin/layout.tsx']);
+  });
+
   it('passes a guarded admin page and a route handler that answers 401', async () => {
     expect(await findUnguardedAdminRoutes(path.join(fixtures, 'guarded'))).toEqual([]);
   });
 
   it('reports the sign-in page when it is not allow-listed, since it answers an anonymous request', async () => {
     const found = await findUnguardedAdminRoutes(appDir, []);
-    expect(found).toEqual(['admin/acceso/page.tsx']);
+    expect(found).toContain('admin/acceso/page.tsx');
   });
 });
 
