@@ -57,6 +57,13 @@ System-ui stack, `--font-sans`. Self-hosted fonts only if ever changed.
 | Footer | border-top edge to edge; inner column at `--content-width`; one row of three text links (Aviso legal, Privacidad, Cómo nos financiamos) at `--text-sm` in `--color-link`, each 44 px tall, wrapping on a phone | default, hover (underline), focus-visible (3 px ring), visited (same as default) |
 | Demo notice | outlined box (1px `--color-border`, 0.25rem `--color-link` left rule, `--radius`), one sentence in `--color-text`; first element in main on product and category pages; shown only when every offer listed is demo | single state |
 | Legal text | reading column 42rem; h1 `--text-xl`, h2 `--text-lg`, body `--text-md` in `--color-text`; bullets; bold lead-ins; links underlined | link default, hover, focus-visible |
+| Admin header (`src/components/admin/`) | 0.25rem `--color-text` top rule and edge-to-edge bottom border; inner column at `--content-width`; rows at least `--tap-target`, wrapping; brand (site name, 700), divider, "Administración" label in `--color-muted`; when signed in, an identity block ("Sesión iniciada como", the email) and the sign-out button | signed out (brand only), signed in |
+| Admin nav | own row under the header, edge-to-edge bottom border; items at least `--tap-target` tall with a 3 px bottom rule; live link in `--color-link`, underlined; current item 700 in `--color-text` with a `--color-text` rule and `aria-current`; later sections as non-focusable `aria-disabled` placeholders in `--color-muted` | live, current, placeholder, hover (thicker underline), focus-visible (3 px ring) |
+| Text field | label above (600), control at least `--tap-target` tall, 1rem text, 1px `--color-muted` border, square; no placeholder; message below at `--text-sm` 600 linked by `aria-describedby`; full width of the form column (max 24rem) | default, focus-visible (ring, `--color-link` border), invalid (2px `--color-text` border), read-only while submitting |
+| Button, filled and outlined | filled: `--color-link` fill, `--color-bg` text, 600; outlined: transparent, 1px `--color-link` border and text; both at least `--tap-target` tall, square | default, hover (underline), focus-visible (ring, offset 2px), pending (`--color-muted`, `aria-disabled`, second press ignored) |
+| Admin notice | the demo-notice look (outline, 0.25rem `--color-link` left rule, `--radius`), `role="status"` | single state |
+| Error block | 2px `--color-text` border, `--radius`, bold title then message, `role="alert"`; no colour says "error" | single state |
+| Admin message | `.page` main with an h1, one muted sentence and an optional link; the Unavailable and not-found screens | single state |
 
 ## Copy voice
 
@@ -70,4 +77,4 @@ Visible 3 px focus ring on every interactive element (`--focus-ring`), including
 
 Used as they are: `--color-bg`, `--color-text`, `--color-muted`, `--color-border`, `--color-link`, `--space-1` to `--space-4`, `--content-width`, `--font-sans`, `--radius`, `--tap-target`, `--focus-ring`, `--text-sm`, `--text-md`, `--text-lg`, `--text-xl`.
 
-`--radius`, `--tap-target`, `--focus-ring` and the four `--text-*` sizes were added in S5.1 (no existing value changed): `--radius` `0.5rem`, `--tap-target` `2.75rem`, `--focus-ring` `3px solid var(--color-link)`, `--text-sm` `0.875rem`, `--text-md` `1rem`, `--text-lg` `1.25rem`, `--text-xl` `2rem`. S5.2 adds none.
+`--radius`, `--tap-target`, `--focus-ring` and the four `--text-*` sizes were added in S5.1 (no existing value changed): `--radius` `0.5rem`, `--tap-target` `2.75rem`, `--focus-ring` `3px solid var(--color-link)`, `--text-sm` `0.875rem`, `--text-md` `1rem`, `--text-lg` `1.25rem`, `--text-xl` `2rem`. S5.2 adds none. S2.1 (admin sign-in) adds none: its component sizes are constants of the admin components (for example the 24rem form column), not global tokens.

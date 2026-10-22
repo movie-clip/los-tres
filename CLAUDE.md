@@ -46,6 +46,8 @@ line here is the owner's call: propose it and stop.
   queue (0008)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   cookieless Umami; no ads (0009)
+- **Admin sign-in:** Better Auth 1.7.12 used as a library, server-stored
+  sessions, no cookie before sign-in (0012)
 - **Styling:** CSS Modules, co-located `*.module.css`; `globals.css` keeps the
   variables and reset (0011)
 
@@ -90,14 +92,42 @@ fails with this message, on one line:
 
 > e2e setup: the import found no approved feed. Set SEED_DEMO_DATA=true in .env and run: docker compose up -d
 
-The migrate, seed and import verbs also run inside the app image through
-Compose, against the Compose database: `docker compose run --rm app migrate`,
-`docker compose run --rm app seed` (always seeds), and
-`docker compose run --rm app import-feeds [--feed <id>]`. Scripts and tests add
-`-T` (no TTY) and `--no-deps` when the stack is already up. Any other verb
-exits 64. The `npm run` forms read `.env` through `node --env-file`, rebuild
+The migrate, seed, import and create-admin verbs also run inside the app image
+through Compose, against the Compose database: `docker compose run --rm app migrate`,
+`docker compose run --rm app seed` (always seeds),
+`docker compose run --rm app import-feeds [--feed <id>]` and
+`docker compose run --rm app create-admin`. Scripts and tests add
+`-T` (no TTY) and `--no-deps` when the stack is already up. Any verb other than
+`server`, `migrate`, `seed`, `import-feeds` and `create-admin` exits 64. The
+`npm run` forms read `.env` through `node --env-file`, rebuild
 `dist/` first and use the host database; the Compose forms do not need `npm`
 or a host port.
+
+**Admin sign-in (S2.1).** There is no sign-up: an admin is created by
+`create-admin`, which takes **no arguments** (any argument prints a usage line
+and exits 2) and reads the email, then the password, from stdin. On a terminal
+it prompts `Email:` then `Password:` and does not echo the password. Piped, line
+1 is the email and line 2 the password:
+`printf 'admin@example.test\npassword\n' | docker compose run --rm -T --no-deps app create-admin`.
+Passwords are at least 6 and at most 128 characters. It prints
+`create-admin: created` or, when the email already exists,
+`create-admin: updated, sessions ended` (the password is replaced and all of
+that admin's sessions end; this is also the password recovery). Exit 0 on
+success, 2 on a refusal (missing or invalid email, missing or short or long
+password, any argument; nothing is written and the output never repeats the
+input), 1 on a failure (an error code only).
+
+`.env` needs two settings for the admin area, both written by `npm run env:init`:
+`AUTH_SECRET` (generated, at least 32 characters) and `SITE_URL`
+(`http://127.0.0.1:<APP_PORT>`). A `.env` created before S2.1 lacks both and
+`env:init` will not touch it: add them by hand and run `docker compose up -d`.
+`SITE_URL` must be exactly the origin the browser uses, so open the admin at
+`127.0.0.1`, not `localhost`; a different origin makes sign-in answer
+"unavailable". Without them the admin pages show the Unavailable screen and
+public pages are unaffected; the gate's e2e (`tests/e2e/admin.spec.ts`) fails
+until both are set. That e2e creates its admin, `e2e-admin@example.test`, in the
+development database through `create-admin`. **S2.1 is password-only: do not
+deploy the admin area before S2.2 adds a second factor** (0012).
 
 | Purpose | Command | Needs |
 |---|---|---|
@@ -111,6 +141,7 @@ or a host port.
 | import feeds | `npm run import-feeds` (imports every approved feed and prints counts and rejected rows; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
+| create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
 | e2e | `npm run test:e2e` (`playwright test`; its setup runs `docker compose run --rm -T --no-deps app import-feeds`) | `npm run stack:up` with `SEED_DEMO_DATA=true`, Playwright browser |
 | **gate** | `npm run gate` | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
 
