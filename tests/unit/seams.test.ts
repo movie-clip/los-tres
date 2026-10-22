@@ -328,10 +328,50 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([]);
   });
 
+  // Every file that builds a sitemap or robots response: the metadata files
+  // (sitemap.ts, robots.ts), the route handlers (sitemap.xml/route.ts,
+  // sitemaps/[file]/route.ts) and the catalogue sitemap modules (S6.2).
+  const isSitemapOrRobotsFile = (file: string): boolean =>
+    /^src\/app\/.*\/(sitemap|robots)[^/]*(\/|\.[a-z]+$)/.test(file) ||
+    /^src\/app\/(sitemap|robots)[^/]*(\/|\.[a-z]+$)/.test(file) ||
+    /^src\/app\/.*\/sitemaps\//.test(file) ||
+    /^src\/server\/catalogue\/sitemap[^/]*\.ts$/.test(file);
+
+  it('scans the sitemap and robots files, route handlers included (AC 23, not vacuous)', () => {
+    const files = sources()
+      .map(({ file }) => file)
+      .filter(isSitemapOrRobotsFile);
+    expect(files.length).toBeGreaterThanOrEqual(5);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        'src/app/robots.ts',
+        'src/app/(public)/sitemap.xml/route.ts',
+        'src/app/(public)/sitemaps/[file]/route.ts',
+        'src/server/catalogue/sitemap.ts',
+        'src/server/catalogue/sitemap-xml.ts',
+      ]),
+    );
+  });
+
   it('lists no admin URL in a sitemap or robots file (AC 23)', () => {
     const found = sources()
-      .filter(({ file }) => /\/(sitemap|robots)\.[a-z]+$/.test(file))
+      .filter(({ file }) => isSitemapOrRobotsFile(file))
       .filter(({ code }) => /admin/i.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('builds the sitemap set from the visibility scope and the non-demo condition (S6.2)', () => {
+    const code =
+      sources().find(({ file }) => file === 'src/server/catalogue/sitemap.ts')?.code ?? '';
+    expect(code).toContain('visibleProductWhere()');
+    expect(code).toContain('hasNonDemoOfferWhere()');
+  });
+
+  it('keeps the sitemap routes off the database layer and the visibility flags (S6.2)', () => {
+    const found = sources()
+      .filter(({ file }) => /^src\/app\/.*\/(sitemap\.xml|sitemaps)\/.*route\.ts$/.test(file))
+      .filter(({ code }) => /['"]@\/db|\/db\/|\bis(Hidden|Approved)\b|\binReview\b/.test(code))
       .map(({ file }) => file);
     expect(found).toEqual([]);
   });

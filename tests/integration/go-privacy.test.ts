@@ -167,6 +167,7 @@ describe('guardrail 5: a counted /go click holds no personal data', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
     expect(response.headers.get('set-cookie')).toBeNull();
     expect(response.headers.get('location')).toBeNull();
     expect(await response.text()).toBe('');

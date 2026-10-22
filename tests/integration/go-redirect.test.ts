@@ -28,6 +28,22 @@ describe('GET /go/<offer> redirect (S1.1)', () => {
     expect(await response.text()).toBe('');
   });
 
+  it('sends X-Robots-Tag: noindex, nofollow on the 302 and on the 404', async () => {
+    const { offerId } = await insertGoOffer();
+    const hiddenOffer = await insertGoOffer({ offer: { isHidden: true } });
+    const redirect = await callGo(offerId);
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    const refusal = await callGo(hiddenOffer.offerId);
+    expect(refusal.status).toBe(404);
+    expect(refusal.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+  });
+
+  it.each(['HEAD', 'OPTIONS'] as const)('sends X-Robots-Tag on %s too', async (method) => {
+    const { offerId } = await insertGoOffer();
+    expect((await callGo(offerId, { method })).headers.get('x-robots-tag')).toBe('noindex, nofollow');
+  });
+
   it.each(['GET', 'HEAD', 'OPTIONS'] as const)('answers %s with the same 302', async (method) => {
     const { offerId, url } = await insertGoOffer();
     const response = await callGo(offerId, { method });

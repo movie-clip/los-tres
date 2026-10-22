@@ -47,6 +47,7 @@ describe('getPublicCategoryPage shape (C-3)', () => {
         { slug: 'filtro-a', title: 'Filtro A', brand: 'MarcaX', lowestPriceCents: 1149, offerCount: 2 },
       ],
       demoOnly: false,
+      indexable: true,
     });
   });
 
@@ -327,6 +328,7 @@ describe('empty category (AC 14)', () => {
       productCount: 0,
       products: [],
       demoOnly: false,
+      indexable: false,
     });
   });
 
