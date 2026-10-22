@@ -19,6 +19,10 @@ services:
       OWNER_ADDRESS: ${OWNER_ADDRESS:-}
       OWNER_REGISTRY: ${OWNER_REGISTRY:-}
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      # Admin sign-in (US-2.1). Blank keeps every public page working; the admin
+      # area then shows Unavailable.
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      SITE_URL: ${SITE_URL:-}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production

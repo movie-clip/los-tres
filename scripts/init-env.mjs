@@ -18,13 +18,15 @@ for (const line of lines) {
   if (match) values.set(match[1], match[2]);
 }
 
-for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET']) {
+for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET', 'AUTH_SECRET']) {
   if (!values.get(name)) values.set(name, secret());
 }
 values.set(
   'DATABASE_URL',
   `postgres://${values.get('DB_USER')}:${values.get('DB_PASSWORD')}@127.0.0.1:${values.get('DB_HOST_PORT')}/${values.get('DB_NAME')}`,
 );
+
+if (!values.get('SITE_URL')) values.set('SITE_URL', `http://127.0.0.1:${values.get('APP_PORT')}`);
 
 const out = lines
   .map((line) => {
