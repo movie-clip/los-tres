@@ -105,5 +105,63 @@
     "noExtraCost": "<b>No pagas más.</b> El precio es el mismo que si entraras en la tienda directamente.",
     "noSales": "<b>No vendemos nada.</b> La compra, el envío, la garantía y las devoluciones son siempre responsabilidad de la tienda.",
     "noPaidRanking": "<b>Ninguna tienda paga por aparecer antes.</b> Las ofertas se ordenan por precio, de menor a mayor."
+  },
+  "Admin": {
+    "Meta": {
+      "signInTitle": "Acceso de administración | {siteName}",
+      "homeTitle": "Inicio | Administración | {siteName}",
+      "title": "Administración | {siteName}"
+    },
+    "Chrome": {
+      "areaLabel": "Administración",
+      "signedInAs": "Sesión iniciada como",
+      "identityFallback": "Sesión de administrador",
+      "signOut": "Cerrar sesión",
+      "signingOut": "Cerrando sesión…",
+      "navLabel": "Menú de administración"
+    },
+    "Nav": {
+      "home": "Inicio",
+      "feeds": "Feeds",
+      "categories": "Categorías",
+      "products": "Productos",
+      "review": "Cola de revisión",
+      "comingSoon": "(próximamente)"
+    },
+    "SignIn": {
+      "heading": "Acceso de administración",
+      "emailLabel": "Correo electrónico",
+      "passwordLabel": "Contraseña",
+      "submit": "Iniciar sesión",
+      "submitting": "Iniciando sesión…",
+      "signInRequired": "Necesitas iniciar sesión para continuar. Las sesiones duran {hours, plural, one {# hora} other {# horas}}.",
+      "sessionEnded": "Tu sesión ha terminado. Inicia sesión de nuevo para continuar.",
+      "signedOut": "Has cerrado sesión.",
+      "emailRequired": "Escribe tu correo electrónico.",
+      "emailInvalid": "Escribe un correo electrónico válido.",
+      "passwordRequired": "Escribe tu contraseña.",
+      "errorTitle": "No se ha podido iniciar sesión",
+      "invalidCredentials": "El correo electrónico o la contraseña no son correctos. Revísalos e inténtalo de nuevo.",
+      "unavailable": "Ha habido un problema al comprobar tus datos. Inténtalo de nuevo en unos minutos."
+    },
+    "Home": {
+      "heading": "Inicio",
+      "emptyBody": "Todavía no hay nada que gestionar aquí. Las secciones del menú se activarán más adelante."
+    },
+    "NotFound": {
+      "heading": "Página no encontrada",
+      "body": "Esta página de administración no existe.",
+      "backHome": "Volver al inicio"
+    },
+    "Error": {
+      "heading": "Ha ocurrido un error",
+      "body": "No se ha podido mostrar esta página. Inténtalo de nuevo en unos minutos.",
+      "backHome": "Volver al inicio"
+    },
+    "Unavailable": {
+      "heading": "No podemos comprobar tu sesión",
+      "body": "El servicio no responde ahora mismo. Inténtalo de nuevo en unos minutos.",
+      "retry": "Volver a intentarlo"
+    }
   }
 }
