@@ -42,7 +42,7 @@ one lives in code:
 - **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The
   importer and the admin merge and split tools both call it.
 - **Role check.** Every server entry point declares whether it is public or
-  admin, and admin entry points check the session on the server (guardrail 3).
+  admin, and admin entry points check the session on the server (guardrail 3). Role check (`src/server/auth/guard.ts`): `requireAdminPage`, `requireAdminAction`, `checkAdminSession`; the only reader of the session cookie.
 - **Money** (`src/server/money.ts`). One money helper, in integer cents, which
   every price goes through (guardrail 4).
 - **Click log.** Its row shape has no field for IP, user agent, cookie or referer (guardrail 5). Files and roles:
@@ -101,6 +101,7 @@ frontend, then test. Name which lane owns what.
 4. **No second copy** of the visibility scope, the importer write path, the
    matcher, the money helper or the role check.
 5. **Tests test the contract**, not the implementation.
+6. **Every exported server function of an admin page or layout** (`default`, `generateMetadata`, `generateViewport`) runs the role check first; the AC 22 enumerator calls each.
 
 ## Severity calls
 

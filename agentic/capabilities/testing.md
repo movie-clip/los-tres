@@ -34,6 +34,10 @@ E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), whic
 
 `legal.spec.ts` branches on the host `.env`: all four required `OWNER_*` values non-blank means 200 and values asserted as booleans (never printed), otherwise 500 and no brace in the visible text. To exercise the 200 branch without touching `.env`, export fake `OWNER_*` in the shell, run `docker compose up -d app`, run playwright with the same exports, then unset and run `docker compose up -d app` again.
 
+Integration workers get fixed `AUTH_SECRET` and `SITE_URL` (`http://127.0.0.1:3000`) from `tests/support/test-database-env.ts`, so admin tests run without them in `.env`. Server components and actions are called directly with `next/headers` mocked: `vi.mock('next/headers', async () => (await import('../support/next-request')).nextHeadersModule)`; `startAdminRequest({cookie, origin})` sets the request, `nextRequest.cookieWrites` records every cookie the code under test would send, `redirectOf(fn)` returns the `NEXT_REDIRECT` target.
+
+`e2e/admin.spec.ts` is serial and creates its admin with `docker compose run --rm -T --no-deps app create-admin` (stdin: email, then password; the fixed e2e admin is defined in that spec). A re-run ends that admin's sessions, so no other spec may use the account. It needs `AUTH_SECRET` and `SITE_URL` in the container: without them the sign-in answers unavailable and the spec throws a hint. To run it on an old `.env` without editing it: export `AUTH_SECRET` (32+ chars) and `SITE_URL=http://127.0.0.1:<APP_PORT>` in the shell, run `docker compose up -d --build --wait`, run playwright with the same exports, then `docker compose up -d app` in a clean shell.
+
 Umami answers 307 at `/`. Assert 200 on `/api/heartbeat`, and on `/` only through a client that follows redirects. Host port 3000 may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
 Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`.
@@ -55,6 +59,8 @@ matching test, and it should be one that would fail if the rule broke:
   - A product with `products.category_id` null is not public: assert it on the shared scope (`visibility.test.ts`), the product page, `/go` and the category page. `tests/unit/seams.test.ts` keeps the `isNotNull(products.categoryId)` condition in `src/server/visibility.ts` only.
 - **(2)** The importer refuses a source that is not a registered feed.
 - **(3)** An anonymous request cannot reach any admin route or server action.
+  - Proven by `tests/integration/admin-routes.test.ts`: any page, layout or route handler under `src/app/admin` that answers anonymous with content fails, and every `'use server'` export in `src` must start with `requireAdminAction` plus `isAdminRefusal` except `signInAction` and `signOutAction`; a `'use server'` file outside `src/server/auth`, `src/app/admin` and `src/components/admin` fails.
+  - `findUnguardedAdminRoutes` also calls the `generate*` exports of admin pages and layouts; entries look like `file#generateMetadata`; `admin/layout.tsx` is in `METADATA_ALLOWLIST` (static title, serves sign-in).
 - **(4)** Feed prices parse to integer cents. Include a case where float
   parsing would round wrongly (for example `19.99`, `0.29`).
 - **(5)** A `/go/<offer>` click row holds no IP, user agent or cookie, and the
@@ -62,6 +68,7 @@ matching test, and it should be one that would fail if the rule broke:
   - Counting rules are proven in the integration project one rule at a time on an otherwise countable request.
   - The e2e cannot show a counted row because every e2e offer is a demo offer.
   - The privacy test spies on `console.*` and reads `row_to_json` of the click row.
+  - Admin cookie rules: only `signInAction` writes a cookie (`nextRequest.cookieWrites` is empty for every refusal, guard call and expired cookie); `admin_sessions` `ip_address` and `user_agent` are null (`admin-storage.test.ts`); sentinel logs in `admin-logs.test.ts`; the public no-cookie e2e stays on public routes and `admin.spec.ts` asserts the one `admin.session_token` cookie.
 - **Matching (0008), slice B cut:** EAN attach, EAN with a different brand
   rejected into the report (`ean_brand_conflict`), null brand on either side
   attaches, no EAN creates a product, invalid EAN rejected. Brand + part-number
@@ -98,6 +105,10 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - `tests/integration/product-jsonld.test.ts` feeds `getPublicProductBySlug` into `buildProductJsonLd` to prove hidden and unapproved offers cannot reach the JSON-LD.
 - The escape for U+2028 or U+2029 (backslash, `u`, then the four digits) typed in a test string literal may arrive as the raw character: use `String.raw` for expected escape text.
 - Check a written test file for a stray raw character with `cat -A`.
+- `tests/support/admin.ts`: `createAdmin`, `signInForCookie` (real Better Auth sign-in, returns cookie/setCookie/token), `requestWith(cookie)`, `expireSessionRow`, `forge`, `sessionRows`/`accountRows`/`userRows`. `tests/support/admin-routes.ts`: `findUnguardedAdminRoutes(appDir, allowlist?, metadataAllowlist?)` (AC 22; imports each admin page and handler and calls it anonymously; returns sorted entries, `file` for an unguarded page or handler, `file#name` for an unguarded generate export; allow-list `admin/acceso/page.tsx`) and `unguardedActions(file, code)`; fixtures in `tests/fixtures/admin-routes/{guarded,unguarded,unguarded-metadata}`.
+- A Playwright `request` fixture keeps a cookie jar: after a successful sign-in the next POST carries the session and the sign-in page redirects to `/admin`. Use `playwright.request.newContext` per post when proving a refusal. Chromium ignores a `route.continue` override of the `Origin` header, so prove the Origin check with a raw multipart POST to `/admin/acceso` built from the page's hidden `$ACTION_*` inputs, with a control post from the site origin.
+- A server-only module imported in a vitest page-module call (`await import(path)` then call `default` with `{params, searchParams}` promises) works under the existing alias; real `next/navigation` `redirect()` throws an error whose digest is `NEXT_REDIRECT;replace;<url>;307;` and needs no mock.
+- Better Auth under vitest: `vi.useFakeTimers({ toFake: ['Date'] })` moves session expiry correctly (it compares in JS), `pg` still works. Compile the CLI inside the test (`node node_modules/typescript/bin/tsc -p tsconfig.cli.json` in `beforeAll`) before spawning `dist/cli/*.js` with `--conditions=react-server`, so a stale `dist` cannot pass.
 - Also in `tests/support`: `pg-error.ts`, `page-checks.ts`, `messages.ts`.
 - `expectLocalScriptsAndLinks(page, { allowHrefs })` lets exact hrefs through (legal pages pass the `mailto:` and `https://www.aepd.es`); `expectLegalFooter(page)` asserts the contentinfo landmark, three exact hrefs and labels, no `p` or heading. Legal content components render in unit tests with `createTranslator` from `use-intl/core` and the real messages; the owner fake values are in `tests/unit/owner-config.test.ts` and `legal-pages.test.ts`.
 - React components render in the unit project with `renderToStaticMarkup` from

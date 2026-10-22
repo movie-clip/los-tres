@@ -119,6 +119,9 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | not found | `/categoria/no-existe` and `/categoria/filtros?pagina=3` (404) |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
 | legal page, identity blank | `/aviso-legal` returns 500 with Next's default English error page |
+| admin signed in | run the `CLAUDE.md` § Commands `create-admin` command for the e2e admin in `tests/e2e/admin.spec.ts` (credentials are in that file), then sign in with a Playwright script at `/admin/acceso` |
+| admin submitting | `page.route` delays the POST to `/admin/acceso*` |
+| admin 404 | `/admin/no-existe` (signed in: the admin 404; anonymous: redirect to sign-in) |
 | demo notice | shown on the demo product, `/categoria/filtros`, `?pagina=2`, `/categoria/escobillas-y-bombillas`; absent on home, the empty category, 404 and the legal pages |
 
 Any state this table cannot produce (one offer, a missing image, the longest
