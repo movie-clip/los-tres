@@ -61,11 +61,35 @@ describe('scripts/init-env.mjs', () => {
     expect(values.get('SITE_NAME')).toBe(example.get('SITE_NAME'));
   });
 
+  it('generates a distinct 48-hex AUTH_SECRET and derives SITE_URL from APP_PORT (US-2.1)', () => {
+    expect(run().status).toBe(0);
+    const values = parse(readFileSync(path.join(tree, '.env'), 'utf8'));
+    const example = parse(readFileSync(path.join(tree, '.env.example'), 'utf8'));
+
+    // The example ships both blank, so a committed file holds no secret.
+    expect(example.get('AUTH_SECRET')).toBe('');
+    expect(example.get('SITE_URL')).toBe('');
+
+    expect(values.get('AUTH_SECRET')).toMatch(/^[0-9a-f]{48}$/);
+    expect(values.get('AUTH_SECRET')).not.toBe(values.get('DB_PASSWORD'));
+    expect(values.get('AUTH_SECRET')).not.toBe(values.get('UMAMI_APP_SECRET'));
+    expect(values.get('SITE_URL')).toBe(`http://127.0.0.1:${values.get('APP_PORT')}`);
+  });
+
+  it('generates a different AUTH_SECRET on every run', () => {
+    expect(run().status).toBe(0);
+    const first = parse(readFileSync(path.join(tree, '.env'), 'utf8')).get('AUTH_SECRET');
+    rmSync(path.join(tree, '.env'));
+    expect(run().status).toBe(0);
+    const second = parse(readFileSync(path.join(tree, '.env'), 'utf8')).get('AUTH_SECRET');
+    expect(first).not.toBe(second);
+  });
+
   it('prints no secret to stdout or stderr', () => {
     const result = run();
     const values = parse(readFileSync(path.join(tree, '.env'), 'utf8'));
     const printed = `${result.stdout}${result.stderr}`;
-    for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET', 'DATABASE_URL']) {
+    for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET', 'AUTH_SECRET', 'DATABASE_URL']) {
       expect(printed).not.toContain(values.get(name) as string);
     }
   });

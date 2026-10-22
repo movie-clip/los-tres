@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
+import { createTranslator } from 'use-intl/core';
 import { describe, expect, it } from 'vitest';
 
 import messages from '../../messages/es-ES.json';
@@ -24,6 +25,15 @@ function collectStrings(node: unknown, into: string[] = []): string[] {
     for (const value of Object.values(node)) collectStrings(value, into);
   }
   return into;
+}
+
+/** Every string leaf as [dotted key, text], whatever the nesting. */
+function leaves(node: unknown, prefix = ''): [string, string][] {
+  if (typeof node === 'string') return [[prefix, node]];
+  if (node && typeof node === 'object') {
+    return Object.entries(node).flatMap(([key, value]) => leaves(value, prefix ? `${prefix}.${key}` : key));
+  }
+  return [];
 }
 
 function listFiles(dir: string): string[] {
@@ -168,7 +178,7 @@ describe('messages/es-ES.json Category namespace (S5.1)', () => {
 
 describe('legal pages messages (S9.3)', () => {
   const keysOf = (namespace: string): string[] =>
-    Object.keys((messages as Record<string, Record<string, string>>)[namespace] ?? {});
+    Object.keys((messages as unknown as Record<string, Record<string, string>>)[namespace] ?? {});
 
   it.each([
     ['Footer', ['legalNotice', 'privacy', 'funding']],
@@ -227,12 +237,10 @@ describe('legal pages messages (S9.3)', () => {
   });
 
   it('names {ownerRegistry} in LegalNotice.registry only', () => {
-    const offenders = Object.entries(messages as Record<string, Record<string, string>>).flatMap(
-      ([namespace, entries]) =>
-        Object.entries(entries)
-          .filter(([key, value]) => value.includes('{ownerRegistry}') && `${namespace}.${key}` !== 'LegalNotice.registry')
-          .map(([key]) => `${namespace}.${key}`),
-    );
+    // Walks nested namespaces (Admin) too, so a leaf anywhere is checked.
+    const offenders = leaves(messages)
+      .filter(([key, value]) => value.includes('{ownerRegistry}') && key !== 'LegalNotice.registry')
+      .map(([key]) => key);
     expect(offenders).toEqual([]);
   });
 
@@ -249,5 +257,89 @@ describe('legal pages messages (S9.3)', () => {
     );
     const tags = new Set(legal.flatMap((value) => [...value.matchAll(/<\/?([a-z]+)>/g)].map((m) => m[1])));
     expect([...tags].sort()).toEqual(['aepd', 'b', 'email']);
+  });
+});
+
+describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
+  const admin = (messages as unknown as Record<string, Record<string, Record<string, string>>>).Admin;
+
+  // The keys the admin screens read (05-ux.md section Copy). Containment, not
+  // equality: later admin stories add keys to the same namespace.
+  const REQUIRED: Record<string, string[]> = {
+    Meta: ['title', 'signInTitle', 'homeTitle'],
+    Chrome: ['areaLabel', 'signedInAs', 'identityFallback', 'signOut', 'signingOut', 'navLabel'],
+    Nav: ['home', 'feeds', 'categories', 'products', 'review', 'comingSoon'],
+    SignIn: [
+      'heading', 'emailLabel', 'passwordLabel', 'submit', 'submitting', 'signInRequired', 'signedOut',
+      'emailRequired', 'emailInvalid', 'passwordRequired', 'errorTitle', 'invalidCredentials', 'unavailable',
+    ],
+    Home: ['heading', 'emptyBody'],
+    NotFound: ['heading', 'body', 'backHome'],
+    Unavailable: ['heading', 'body', 'retry'],
+  };
+
+  it('is its own top-level section, apart from the public namespaces', () => {
+    expect(typeof admin).toBe('object');
+    expect(Object.keys(messages)).toContain('Admin');
+    for (const [namespace, keys] of Object.entries(REQUIRED)) {
+      expect(Object.keys(admin)).toContain(namespace);
+      expect(Object.keys(admin[namespace])).toEqual(expect.arrayContaining(keys));
+    }
+  });
+
+  it('keeps every admin string under Admin and none among the public namespaces', () => {
+    const publicKeys = leaves(Object.fromEntries(Object.entries(messages).filter(([name]) => name !== 'Admin'))).map(
+      ([key]) => key,
+    );
+    expect(publicKeys.filter((key) => /sign.?in|sign.?out|log.?in|password/i.test(key))).toEqual([]);
+  });
+
+  it('has a non-empty string at every Admin key', () => {
+    const all = leaves(admin);
+    expect(all.length).toBeGreaterThan(20);
+    for (const [key, value] of all) {
+      expect(value.trim().length, `Admin.${key}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('takes {siteName} in the three page titles', () => {
+    for (const key of ['title', 'signInTitle', 'homeTitle']) {
+      expect(admin.Meta[key]).toContain('{siteName}');
+    }
+  });
+
+  it('pluralises the session lifetime for 1 and 8 hours', () => {
+    const t = createTranslator({
+      locale: 'es-ES',
+      messages,
+      namespace: 'Admin.SignIn',
+      onError: (error) => {
+        throw error;
+      },
+    });
+    expect(t('signInRequired', { hours: 8 })).toContain('8 horas');
+    expect(t('signInRequired', { hours: 1 })).toContain('1 hora.');
+    expect(t('signInRequired', { hours: 1 })).not.toContain('horas');
+  });
+
+  it('writes the sign-in screen text the UX spec fixes', () => {
+    expect(admin.SignIn.heading).toBe('Acceso de administración');
+    expect(admin.SignIn.errorTitle).toBe('No se ha podido iniciar sesión');
+    expect(admin.SignIn.signedOut).toBe('Has cerrado sesión.');
+    expect(admin.Chrome.signOut).toBe('Cerrar sesión');
+  });
+
+  it('uses no ICU placeholder the pages do not pass', () => {
+    const allowed = new Set(['siteName', 'hours']);
+    for (const [key, value] of leaves(admin)) {
+      for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {
+        expect(allowed.has(match[1]), `Admin.${key} names {${match[1]}}`).toBe(true);
+      }
+    }
+  });
+
+  it('puts no recovery, sign-up or remember-me wording in the sign-in copy (AC 1)', () => {
+    const text = leaves(admin).map(([, value]) => value).join(' | ');
+    expect(text).not.toMatch(/olvid|registr|recuérd|recuerd|restablec/i);
   });
 });
