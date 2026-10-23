@@ -402,6 +402,30 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([]);
   });
 
+  // Deliberate (issue #24, S2.3): the approval writer is one file, and it never
+  // reads the feed URL, which may embed a network API key (guardrail 5).
+  it('updates shops and feeds only in src/server/admin/sources.ts, which is found (not vacuous)', () => {
+    const found = offenders(
+      /\.update\(\s*(shops|feeds)\s*\)/,
+      (file) => file === 'src/server/admin/sources.ts',
+    );
+    expect(found).toEqual([]);
+    const code = sources().find(({ file }) => file === 'src/server/admin/sources.ts')?.code ?? '';
+    expect(code).toMatch(/\.update\(\s*shops\s*\)/);
+    expect(code).toMatch(/\.update\(\s*feeds\s*\)/);
+  });
+
+  it('never names a feed or offer url under src/server/admin or src/app/admin/(shell)/tiendas', () => {
+    const files = sources().filter(
+      ({ file }) => file.startsWith('src/server/admin/') || file.startsWith('src/app/admin/(shell)/tiendas/'),
+    );
+    expect(files.map(({ file }) => file)).toEqual(
+      expect.arrayContaining(['src/server/admin/sources.ts', 'src/app/admin/(shell)/tiendas/actions.ts']),
+    );
+    const found = files.filter(({ code }) => /(feeds|offers)\.url|url\s*:/.test(code)).map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
   it('writes admin accounts only in src/server/auth/accounts.ts', () => {
     const found = offenders(
       /\.(insert|update|delete)\(\s*admin(Users|Accounts)\s*\)/,
