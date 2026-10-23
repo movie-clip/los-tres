@@ -7,7 +7,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3010}:3000"
     environment:
       SITE_NAME: ${SITE_NAME:?run npm run env:init}
       DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/${DB_NAME:-lostres}
@@ -47,7 +47,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-lostres}
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
@@ -55,24 +54,6 @@ services:
       retries: 10
       start_period: 10s
 
-  umami:
-    image: ghcr.io/umami-software/umami:postgresql-v2.20.2
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${UMAMI_PORT:-3001}:3000"
-    environment:
-      DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET:?run npm run env:init}
-      DISABLE_TELEMETRY: "1"
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/heartbeat || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
 
 volumes:
   db-data:

@@ -9,8 +9,8 @@ Status: accepted, 2026-10-16
 - A click row holds **offer, shop, product, timestamp and source page** only.
   It holds **no IP address, no user agent and no cookie**. Los Tres sets no
   cookie on public visitors.
-- Traffic analytics use self-hosted **Umami** in Compose, which works without
-  cookies.
+- ~~Traffic analytics use self-hosted **Umami** in Compose, which works without
+  cookies.~~ Superseded by 0014: no traffic analytics for now.
 - **No ads in the MVP.**
 
 ## Why

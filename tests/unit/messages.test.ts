@@ -195,7 +195,7 @@ describe('legal pages messages (S9.3)', () => {
       'Privacy',
       [
         'metaTitle', 'heading', 'controllerHeading', 'controllerBody', 'cookiesHeading',
-        'cookiesBody', 'dataHeading', 'dataClicks', 'dataStats', 'dataLogs', 'dataBasis',
+        'cookiesBody', 'dataHeading', 'dataClicks', 'dataLogs', 'dataBasis',
         'leavingHeading', 'leavingBody', 'writingHeading', 'writingBody', 'adminsHeading',
         'adminsBody', 'recipientsHeading', 'recipientsBody', 'rightsHeading', 'rightsBody',
         'changesHeading', 'changesBody',
@@ -246,7 +246,7 @@ describe('legal pages messages (S9.3)', () => {
 
   it('keeps bold as <b> tags and never leaves a ** marker in any message', () => {
     expect(collectStrings(messages).filter((value) => value.includes('**'))).toEqual([]);
-    for (const key of ['Privacy.dataClicks', 'Privacy.dataStats', 'Privacy.dataLogs', 'Funding.noExtraCost', 'Funding.noSales', 'Funding.noPaidRanking']) {
+    for (const key of ['Privacy.dataClicks', 'Privacy.dataLogs', 'Funding.noExtraCost', 'Funding.noSales', 'Funding.noPaidRanking']) {
       expect(lookup(key)).toMatch(/^<b>[^<]+<\/b>/);
     }
   });

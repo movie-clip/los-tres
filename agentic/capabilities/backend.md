@@ -33,7 +33,7 @@ Admin sign-in code is `src/server/auth`: `config.ts` (no `server-only`), `auth.t
 
 `better-auth` is ESM-only and the CLI is CommonJS: a static import in the CLI graph fails `tsc` with TS1479, so import it with `await import('better-auth/crypto')`; Node 22 loads it. Never switch the CLI to ESM for this.
 
-Compose binds every published port to `127.0.0.1`. The `app` image runs `HOSTNAME=0.0.0.0`. `.gitattributes` keeps `*.sh` LF. Pinned: TypeScript 5.9 (npm `latest` is 7.x, unverified against eslint-config-next), ESLint 9, Next 16, Postgres 17, Umami `postgresql-v2.20.2`.
+Compose binds every published port to `127.0.0.1`. The `app` image runs `HOSTNAME=0.0.0.0`. `.gitattributes` keeps `*.sh` LF. Pinned: TypeScript 5.9 (npm `latest` is 7.x, unverified against eslint-config-next), ESLint 9, Next 16, Postgres 17.
 
 Next 16 loads `.env` itself, so `npm run dev` needs no env loader. If a host port is taken (for example 3000), set `APP_PORT` in `.env`; never stop another project's container to free it.
 

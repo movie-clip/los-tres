@@ -158,8 +158,8 @@ best effort; the network's report is the authority for commission.
 
 ## Analytics
 
-Self-hosted **Umami**, which works without cookies, so the site needs no
-cookie-consent banner.
+None for now (decision 0014). The `/go/<offer>` click log is the only usage
+record, and the site sets no cookie, so it needs no cookie-consent banner.
 
 ## Revenue
 

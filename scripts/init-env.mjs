@@ -18,7 +18,7 @@ for (const line of lines) {
   if (match) values.set(match[1], match[2]);
 }
 
-for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET', 'AUTH_SECRET']) {
+for (const name of ['DB_PASSWORD', 'AUTH_SECRET']) {
   if (!values.get(name)) values.set(name, secret());
 }
 values.set(

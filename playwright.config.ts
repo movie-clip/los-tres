@@ -9,7 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
 if (existsSync('.env')) process.loadEnvFile('.env');
 const baseURL =
   process.env.E2E_BASE_URL?.trim().replace(/\/$/, '') ||
-  `http://127.0.0.1:${process.env.APP_PORT?.trim() || '3000'}`;
+  `http://127.0.0.1:${process.env.APP_PORT?.trim() || '3010'}`;
 
 // No webServer: the Compose stack is the server under test (npm run stack:up).
 export default defineConfig({

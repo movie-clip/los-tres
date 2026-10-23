@@ -33,8 +33,3 @@ export function testDatabaseUrl(): string {
   return withDatabaseName(url, `${database}_test`);
 }
 
-/** Where Umami answers: `http://127.0.0.1:${UMAMI_PORT}`. */
-export function umamiBaseUrl(): string {
-  loadEnv();
-  return `http://127.0.0.1:${process.env.UMAMI_PORT?.trim() || '3001'}`;
-}

@@ -52,8 +52,7 @@ describe('scripts/init-env.mjs', () => {
     const example = parse(readFileSync(path.join(tree, '.env.example'), 'utf8'));
 
     expect(values.get('DB_PASSWORD')).toMatch(/^[0-9a-f]{48}$/);
-    expect(values.get('UMAMI_APP_SECRET')).toMatch(/^[0-9a-f]{48}$/);
-    expect(values.get('DB_PASSWORD')).not.toBe(values.get('UMAMI_APP_SECRET'));
+    expect(values.has('UMAMI_APP_SECRET')).toBe(false);
     expect(values.get('DATABASE_URL')).toBe(
       `postgres://${example.get('DB_USER')}:${values.get('DB_PASSWORD')}@127.0.0.1:${example.get('DB_HOST_PORT')}/${example.get('DB_NAME')}`,
     );
@@ -72,7 +71,6 @@ describe('scripts/init-env.mjs', () => {
 
     expect(values.get('AUTH_SECRET')).toMatch(/^[0-9a-f]{48}$/);
     expect(values.get('AUTH_SECRET')).not.toBe(values.get('DB_PASSWORD'));
-    expect(values.get('AUTH_SECRET')).not.toBe(values.get('UMAMI_APP_SECRET'));
     expect(values.get('SITE_URL')).toBe(`http://127.0.0.1:${values.get('APP_PORT')}`);
   });
 
@@ -89,7 +87,7 @@ describe('scripts/init-env.mjs', () => {
     const result = run();
     const values = parse(readFileSync(path.join(tree, '.env'), 'utf8'));
     const printed = `${result.stdout}${result.stderr}`;
-    for (const name of ['DB_PASSWORD', 'UMAMI_APP_SECRET', 'AUTH_SECRET', 'DATABASE_URL']) {
+    for (const name of ['DB_PASSWORD', 'AUTH_SECRET', 'DATABASE_URL']) {
       expect(printed).not.toContain(values.get(name) as string);
     }
   });

@@ -92,8 +92,8 @@ Working-copy files are CRLF on Windows (autocrlf): edit existing files with the 
   UX choice, not access control.
 - **(4)** Show the final product price with IVA included. Never do money
   arithmetic in floats on the client.
-- **(5)** Set no cookie for public visitors. Only cookieless Umami analytics,
-  with no PII in client logs or analytics events.
+- **(5)** Set no cookie for public visitors. No analytics script (0014), and
+  no PII in client logs.
 
 ## Definition of done for this lane
 
