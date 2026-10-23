@@ -62,7 +62,9 @@ describe('seams (guardrails 1, 2, 4)', () => {
         file === 'src/server/visibility.ts' ||
         file.startsWith('src/db/') ||
         file.startsWith('src/server/seed/') ||
-        file.startsWith('src/server/importer/'),
+        file.startsWith('src/server/importer/') ||
+        // Deliberate (issue #24, S2.3): the admin approval writer.
+        file === 'src/server/admin/sources.ts',
     );
     expect(found).toEqual([]);
   });
