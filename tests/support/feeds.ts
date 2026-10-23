@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 import type { ImportDeps } from '@/server/importer';
 import type { FeedBytes } from '@/server/importer/types';
@@ -50,4 +51,55 @@ export function textDeps(byFeedId: Record<number, string | Uint8Array | Error>):
       return bytesOf(served);
     },
   };
+}
+
+/** One feed row for the generators below; every key is a canonical column. */
+export type FeedRow = Partial<Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'ean' | 'currency', string>>;
+
+const ROW_COLUMNS = ['id', 'title', 'price', 'url', 'brand', 'ean', 'currency'] as const;
+
+/** The rows as CSV text (header first). Values must not need quoting. */
+export function csvOf(rows: FeedRow[]): string {
+  const lines = rows.map((row) => ROW_COLUMNS.map((column) => row[column] ?? '').join(','));
+  return `${ROW_COLUMNS.join(',')}\n${lines.join('\n')}\n`;
+}
+
+/** The same rows as an XML document with one `product` element per row. */
+export function xmlOf(rows: FeedRow[]): string {
+  const products = rows.map((row) => {
+    const children = ROW_COLUMNS.filter((column) => row[column] !== undefined)
+      .map((column) => `<${column}>${row[column]}</${column}>`)
+      .join('');
+    return `<product>${children}</product>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<products>\n${products.join('\n')}\n</products>\n`;
+}
+
+/** Gzip of the text or bytes, made in the test so no binary is committed. */
+export function gzipOf(content: string | Uint8Array): Uint8Array {
+  return gzipSync(typeof content === 'string' ? Buffer.from(content, 'utf8') : content);
+}
+
+/**
+ * A byte source that records how many of its chunks were pulled and whether it
+ * was released early. `pulled` counts chunks handed to the consumer; `released`
+ * is true once the consumer stopped before the end.
+ */
+export function lazyBytes(chunks: () => Iterable<Uint8Array>): {
+  bytes: FeedBytes;
+  state: { pulled: number; released: boolean; finished: boolean };
+} {
+  const state = { pulled: 0, released: false, finished: false };
+  async function* generate(): FeedBytes {
+    try {
+      for (const chunk of chunks()) {
+        state.pulled += 1;
+        yield chunk;
+      }
+      state.finished = true;
+    } finally {
+      if (!state.finished) state.released = true;
+    }
+  }
+  return { bytes: generate(), state };
 }

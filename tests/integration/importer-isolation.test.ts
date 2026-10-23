@@ -5,7 +5,7 @@ import { formatImportReport, importExitCode, importFeeds } from '@/server/import
 
 import { allOffers, allProducts, insertFeed, insertShop } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
-import { readFeedFixture, textDeps } from '../support/feeds';
+import { bytesOf, readFeedFixture, textDeps } from '../support/feeds';
 import { stubNetworkOff } from '../support/network-off';
 
 beforeEach(async () => {
@@ -75,7 +75,7 @@ describe('one transaction per feed, a failing feed never stops the others (TD-28
       deps: {
         readSource: async (feed) => {
           order.push(feed.id);
-          return readFeedFixture('ean-first.csv').replace(/A-/g, `F${feed.id}-`);
+          return bytesOf(readFeedFixture('ean-first.csv').replace(/A-/g, `F${feed.id}-`));
         },
       },
     });

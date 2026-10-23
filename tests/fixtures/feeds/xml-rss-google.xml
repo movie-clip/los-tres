@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Tienda feed</title>
+    <link>https://shop-g.example/</link>
+    <item>
+      <g:id>G-1</g:id>
+      <g:title>Google Filtro de aire</g:title>
+      <g:price>12.34</g:price>
+      <g:link>ignored</g:link>
+      <g:ean>2000000000046</g:ean>
+      <url>https://shop-g.example/p/G-1</url>
+      <g:brand><![CDATA[Marca & Co]]></g:brand>
+      <g:brand>Segunda marca</g:brand>
+      <g:additional_image_link>https://shop-g.example/i.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>G-2</g:id>
+      <g:title>Google Taladro &amp; broca</g:title>
+      <g:price>99.99</g:price>
+      <url>https://shop-g.example/p/G-2</url>
+    </item>
+  </channel>
+</rss>

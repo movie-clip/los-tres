@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!DOCTYPE products [<!ENTITY x "expanded">]>
+<products>
+  <product><id>D-1</id><title>&x;</title><price>1.00</price><url>https://shop-d.example/1</url></product>
+</products>
