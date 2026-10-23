@@ -216,6 +216,21 @@ describe('inflated and record caps', () => {
     expect(await failureOf(() => recordsOf(bytes))).toBe('too_large');
   });
 
+  it('stops one endless whitespace run inside the XML root as too_large, without draining the source', async () => {
+    // No element interrupts the run, so the parser would otherwise hold it whole.
+    const { bytes, state } = lazyBytes(() => [
+      new TextEncoder().encode('<products>'),
+      ...filler(0x20, 40 * 1024 * 1024),
+    ]);
+    const total = 1 + 40 * 16;
+    const started = Date.now();
+    expect(await failureOf(() => recordsOf(bytes))).toBe('too_large');
+    expect(state.finished).toBe(false);
+    expect(state.released).toBe(true);
+    expect(state.pulled).toBeLessThan(total);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 30_000);
+
   it('stops a gzip bomb over the 512 MiB inflated cap as too_large and leaves the source unread', async () => {
     // 600 MiB inflates past the cap of 512 MiB; the gzip itself is a few MiB. The
     // filler is an empty element then spaces, so the XML parser flushes its text

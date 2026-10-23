@@ -51,9 +51,13 @@ class RecordScanner {
   private recordName: string | null = null;
   private recordDepth = -1;
   private records = 0;
+  /** Text and CDATA characters since the last tag, whether or not a cell keeps them. */
+  private run = 0;
 
   constructor() {
-    this.sax = parser(true, { trim: false, normalize: false, xmlns: false, position: false });
+    // `position` must stay on: sax checks its buffers (and hands over text in
+    // pieces of at most 64 Ki characters) only while it tracks the position.
+    this.sax = parser(true, { trim: false, normalize: false, xmlns: false, position: true });
     this.sax.onerror = () => {
       this.failed = true;
     };
@@ -110,6 +114,7 @@ class RecordScanner {
   }
 
   private open(qualified: string): void {
+    this.run = 0;
     const parent = this.stack.at(-1);
     const depth = this.stack.length;
     if (parent) {
@@ -134,6 +139,14 @@ class RecordScanner {
   }
 
   private text(text: string): void {
+    // Any run is bounded, not only the cells: one long text between tags must
+    // fail fast and not be held whole.
+    this.run += text.length;
+    if (this.run > MAX_CELL_CHARS) {
+      this.oversize = true;
+      this.failed = true;
+      return;
+    }
     const frame = this.stack.at(-1);
     if (!frame?.collectsText) return;
     frame.text += text;
@@ -144,6 +157,7 @@ class RecordScanner {
   }
 
   private close(): void {
+    this.run = 0;
     const frame = this.stack.pop();
     if (!frame) return;
     if (frame.isRecord) {
