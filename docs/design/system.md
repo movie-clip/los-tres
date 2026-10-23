@@ -64,6 +64,11 @@ System-ui stack, `--font-sans`. Self-hosted fonts only if ever changed.
 | Admin notice | the demo-notice look (outline, 0.25rem `--color-link` left rule, `--radius`), `role="status"` | single state |
 | Error block | 2px `--color-text` border, `--radius`, bold title then message, `role="alert"`; no colour says "error" | single state |
 | Admin message | `.page` main with an h1, one muted sentence and an optional link; the Unavailable and not-found screens | single state |
+| Shop group (S2.3) | outlined box (1px `--color-border`, `--radius`), h2 shop name (`--text-lg`, 700, `overflow-wrap: anywhere`), meta line (`--text-sm`, `--color-muted`), optional note (`--text-sm`, `--color-text`), control group; then a nested list of feed rows separated by 1px `--color-border` rules | shop approved, shop not approved |
+| Status tag (S2.3) | inline text, `--text-sm` 700, padding 0.125rem `--space-1`, `--radius`; not interactive, not focusable. Approved: `--color-text` fill, `--color-bg` text. Not approved: 1px `--color-muted` border, `--color-muted` text. Approved but paused (feed only): 1px dashed `--color-text` border, `--color-text` text. Never the only cue: the words carry the meaning | approved, not approved, paused |
+| Confirm panel (S2.3) | the Admin notice look (1px `--color-border`, 0.25rem `--color-link` left rule, `--radius`), `role="group"` named by its title (600), one sentence in `--color-text`, then two buttons: "Cancelar" (outlined) then the confirm (filled); asked for disabling only, never for approving | closed, open, pending |
+| Row feedback (S2.3) | one line under the control group: a status line (`role="status"`, `--text-sm`, `--color-text`) or the Error block (`role="alert"`) | none, done, failed |
+| Action button (S2.3) | the outlined Button look for a button that does not submit a form (it opens or closes a panel); the styles are composed from the outlined PendingButton, no copied rules | default, hover (underline), focus-visible (ring, offset 2px) |
 
 ## Copy voice
 
@@ -77,4 +82,4 @@ Visible 3 px focus ring on every interactive element (`--focus-ring`), including
 
 Used as they are: `--color-bg`, `--color-text`, `--color-muted`, `--color-border`, `--color-link`, `--space-1` to `--space-4`, `--content-width`, `--font-sans`, `--radius`, `--tap-target`, `--focus-ring`, `--text-sm`, `--text-md`, `--text-lg`, `--text-xl`.
 
-`--radius`, `--tap-target`, `--focus-ring` and the four `--text-*` sizes were added in S5.1 (no existing value changed): `--radius` `0.5rem`, `--tap-target` `2.75rem`, `--focus-ring` `3px solid var(--color-link)`, `--text-sm` `0.875rem`, `--text-md` `1rem`, `--text-lg` `1.25rem`, `--text-xl` `2rem`. S5.2 adds none. S2.1 (admin sign-in) adds none: its component sizes are constants of the admin components (for example the 24rem form column), not global tokens.
+`--radius`, `--tap-target`, `--focus-ring` and the four `--text-*` sizes were added in S5.1 (no existing value changed): `--radius` `0.5rem`, `--tap-target` `2.75rem`, `--focus-ring` `3px solid var(--color-link)`, `--text-sm` `0.875rem`, `--text-md` `1rem`, `--text-lg` `1.25rem`, `--text-xl` `2rem`. S5.2 adds none. S2.1 (admin sign-in) adds none: its component sizes are constants of the admin components (for example the 24rem form column), not global tokens. S2.3 (admin shops and feeds) adds none: its constants (list column `48rem`, button `min-width: 9rem`, tag padding `0.125rem var(--space-1)`) stay in the admin components.

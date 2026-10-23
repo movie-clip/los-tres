@@ -62,7 +62,9 @@ describe('seams (guardrails 1, 2, 4)', () => {
         file === 'src/server/visibility.ts' ||
         file.startsWith('src/db/') ||
         file.startsWith('src/server/seed/') ||
-        file.startsWith('src/server/importer/'),
+        file.startsWith('src/server/importer/') ||
+        // Deliberate (issue #24, S2.3): the admin approval writer.
+        file === 'src/server/admin/sources.ts',
     );
     expect(found).toEqual([]);
   });
@@ -397,6 +399,30 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
 
   it('reads AUTH_SECRET and SITE_URL only in src/config/auth.ts', () => {
     const found = offenders(/\b(AUTH_SECRET|SITE_URL)\b/, (file) => file === 'src/config/auth.ts');
+    expect(found).toEqual([]);
+  });
+
+  // Deliberate (issue #24, S2.3): the approval writer is one file, and it never
+  // reads the feed URL, which may embed a network API key (guardrail 5).
+  it('updates shops and feeds only in src/server/admin/sources.ts, which is found (not vacuous)', () => {
+    const found = offenders(
+      /\.update\(\s*(shops|feeds)\s*\)/,
+      (file) => file === 'src/server/admin/sources.ts',
+    );
+    expect(found).toEqual([]);
+    const code = sources().find(({ file }) => file === 'src/server/admin/sources.ts')?.code ?? '';
+    expect(code).toMatch(/\.update\(\s*shops\s*\)/);
+    expect(code).toMatch(/\.update\(\s*feeds\s*\)/);
+  });
+
+  it('never names a feed or offer url under src/server/admin or src/app/admin/(shell)/tiendas', () => {
+    const files = sources().filter(
+      ({ file }) => file.startsWith('src/server/admin/') || file.startsWith('src/app/admin/(shell)/tiendas/'),
+    );
+    expect(files.map(({ file }) => file)).toEqual(
+      expect.arrayContaining(['src/server/admin/sources.ts', 'src/app/admin/(shell)/tiendas/actions.ts']),
+    );
+    const found = files.filter(({ code }) => /(feeds|offers)\.url|url\s*:/.test(code)).map(({ file }) => file);
     expect(found).toEqual([]);
   });
 

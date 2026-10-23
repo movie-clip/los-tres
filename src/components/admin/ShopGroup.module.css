@@ -1,0 +1,20 @@
+.box {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.shop {
+  padding: var(--space-2);
+}
+
+.feeds {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The rule runs the box width; only the content is indented. */
+.feed {
+  padding: var(--space-2) var(--space-2) var(--space-2) calc(var(--space-2) * 2);
+  border-top: 1px solid var(--color-border);
+}

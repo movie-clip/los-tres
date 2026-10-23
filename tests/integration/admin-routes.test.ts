@@ -37,7 +37,7 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
   const adminRoutes = listRouteFiles(appDir).filter((file) => classifyRoute(file) === 'admin');
 
   it('finds the admin routes that exist, so the check below is not vacuous', () => {
-    expect(adminRoutes).toEqual(expect.arrayContaining(['admin/acceso/page.tsx', 'admin/(shell)/page.tsx']));
+    expect(adminRoutes).toEqual(expect.arrayContaining(['admin/acceso/page.tsx', 'admin/(shell)/page.tsx', 'admin/(shell)/tiendas/page.tsx']));
   });
 
   it('allow-lists exactly the sign-in page', () => {
@@ -144,6 +144,16 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(files.map(({ file }) => file)).toEqual(expect.arrayContaining(['src/server/auth/actions.ts']));
     const unguarded = files.flatMap(({ file, code }) => unguardedActions(file, code));
     expect(unguarded).toEqual([]);
+  });
+
+  it('scans the shops and feeds actions (S2.3) and finds both, guarded and only these two exports', () => {
+    const entry = filesWithServerActions(root, 'src').find(
+      ({ file }) => file === 'src/app/admin/(shell)/tiendas/actions.ts',
+    );
+    expect(entry).toBeDefined();
+    const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
+    expect(exported).toEqual(['setShopApprovalAction', 'setFeedApprovalAction']);
+    expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 
   it('keeps server actions to the admin code: none sits in a public page or component', () => {
