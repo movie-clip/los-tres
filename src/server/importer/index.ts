@@ -6,11 +6,13 @@ import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
 import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
-import { parseCsv } from './csv';
+import { openRecords, type FeedRecords } from './records';
 import { formatImportReport, importExitCode } from './report';
 import { readFeedSource, SourceError } from './source';
 import {
+  FeedFormatError,
   FeedNotRegisteredError,
+  type FeedBytes,
   type FeedFailure,
   type FeedImportReport,
   type FeedSourceRef,
@@ -100,46 +102,57 @@ function failed(feed: FeedRow, failure: FeedFailure): FeedImportReport {
 async function importOneFeed(
   db: Database,
   feed: FeedRow,
-  readSource: (feed: FeedSourceRef) => Promise<string>,
+  readSource: (feed: FeedSourceRef) => Promise<FeedBytes>,
   startedAt: Date,
 ): Promise<FeedImportReport> {
   if (!feed.isApproved) {
     return { ...emptyReport(feed), outcome: 'skipped', skipReason: 'not_approved' };
   }
 
-  let text: string;
+  // Opening (gzip, format, the CSV header) happens before the transaction, so a
+  // feed with no usable header fails without a transaction. The errors are
+  // dropped: they may name the URL, which can hold an API key.
+  let opened: FeedRecords;
   try {
-    text = await readSource({ id: feed.id, url: feed.url, isDemo: feed.isDemo });
+    const bytes = await readSource({ id: feed.id, url: feed.url, isDemo: feed.isDemo });
+    opened = await openRecords(bytes);
   } catch (error) {
-    // The error is dropped: it may name the URL, which can hold an API key.
-    return failed(feed, error instanceof SourceError ? error.code : 'fetch_failed');
+    return failed(feed, failureOf(error, 'fetch_failed'));
   }
-
-  const [header, ...records] = parseCsv(text);
-  const columns = header ? readHeader(header) : null;
-  if (!columns) return failed(feed, 'invalid_header');
 
   try {
-    return await db.transaction((tx) => importRecords(tx, feed, columns, records, startedAt));
-  } catch {
-    // Rolled back. The error is dropped: a driver message can carry row values.
-    return failed(feed, 'database_error');
+    const columns = opened.header ? readHeader(opened.header) : null;
+    if (!columns) return failed(feed, 'invalid_header');
+    try {
+      return await db.transaction((tx) => importRecords(tx, feed, columns, opened.records, startedAt));
+    } catch (error) {
+      // Rolled back, whatever was written. The error is dropped: a driver
+      // message can carry row values. A read failure part-way (bad gzip or XML,
+      // a cap, a dropped connection) keeps its own code; the rest is the database.
+      return failed(feed, failureOf(error, 'database_error'));
+    }
+  } finally {
+    await opened.close();
   }
+}
+
+/** The report's failure for an error from the source or the format readers, else `otherwise`. */
+function failureOf(error: unknown, otherwise: FeedFailure): FeedFailure {
+  return error instanceof SourceError || error instanceof FeedFormatError ? error.code : otherwise;
 }
 
 async function importRecords(
   tx: Executor,
   feed: FeedRow,
   columns: ColumnIndex,
-  records: string[][],
+  records: FeedRecords['records'],
   startedAt: Date,
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
   const mappings = await loadMappings(tx, feed.id);
 
-  for (const [position, cells] of records.entries()) {
-    const record = position + 2; // the header is record 1
+  for await (const { record, cells } of records) {
     report.rows += 1;
 
     const result = validateRow(cells, columns, record);

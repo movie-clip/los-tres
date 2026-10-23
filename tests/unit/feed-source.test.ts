@@ -23,9 +23,17 @@ afterEach(() => {
 
 const feed = (url: string, isDemo = false) => ({ id: 1, url, isDemo });
 
+/** Reads the whole byte stream a source returns, as UTF-8 text. */
+async function readText(bytes: AsyncIterable<Uint8Array>): Promise<string> {
+  const decoder = new TextDecoder();
+  let text = '';
+  for await (const chunk of bytes) text += decoder.decode(chunk, { stream: true });
+  return text + decoder.decode();
+}
+
 describe('demo-feed: scheme', () => {
   it('reads demo/feeds/<name>.csv for a demo feed', async () => {
-    const text = await readFeedSource(feed('demo-feed:tienda-demo-uno.csv', true));
+    const text = await readText(await readFeedSource(feed('demo-feed:tienda-demo-uno.csv', true)));
     expect(text.split(/\r?\n/)[0]).toBe('id,title,brand,part_number,ean,price,currency,url,description,category');
     expect(fetchStub).not.toHaveBeenCalled();
   });
@@ -76,14 +84,18 @@ describe('schemes other than https', () => {
 });
 
 describe('https feeds', () => {
-  it('fetches the URL with a timeout signal and returns the body as UTF-8 text', async () => {
+  it('fetches the URL with a timeout signal and manual redirects and returns the body bytes', async () => {
     fetchStub.mockResolvedValueOnce(new Response('id,title\nA,Ñandú\n', { status: 200 }));
-    const text = await readFeedSource(feed(`https://feeds.example/f.csv?key=${SECRET_KEY}`));
-    expect(text).toBe('id,title\nA,Ñandú\n');
+    const bytes = await readFeedSource(feed(`https://feeds.example/f.csv?key=${SECRET_KEY}`));
+    expect(await readText(bytes)).toBe('id,title\nA,Ñandú\n');
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    const [target, init] = fetchStub.mock.calls[0] as [URL, { signal?: AbortSignal }];
+    const [target, init] = fetchStub.mock.calls[0] as [
+      URL,
+      { signal?: AbortSignal; redirect?: string },
+    ];
     expect(new URL(target).hostname).toBe('feeds.example');
     expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.redirect).toBe('manual');
   });
 
   it('reports a non-2xx answer as fetch_failed', async () => {
@@ -106,7 +118,7 @@ describe('https feeds', () => {
     expect(String((error as SourceError).stack)).not.toContain(SECRET_KEY);
   });
 
-  it('refuses a body larger than 50 MiB as fetch_failed', async () => {
+  it('refuses a body larger than 50 MiB as too_large', async () => {
     const chunk = new Uint8Array(1024 * 1024);
     let sent = 0;
     const body = new ReadableStream<Uint8Array>({
@@ -117,9 +129,9 @@ describe('https feeds', () => {
       },
     });
     fetchStub.mockResolvedValueOnce(new Response(body, { status: 200 }));
-    await expect(readFeedSource(feed('https://feeds.example/huge.csv'))).rejects.toMatchObject({
-      code: 'fetch_failed',
-    });
+    await expect(
+      readFeedSource(feed('https://feeds.example/huge.csv')).then(readText),
+    ).rejects.toMatchObject({ code: 'too_large' });
     expect(sent).toBeLessThan(60);
   });
 });
