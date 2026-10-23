@@ -55,6 +55,12 @@ export type SourceRowProps = {
 
 const IDLE: SourceActionState = { status: 'idle' };
 
+/** Next throws a redirect as an error carrying a NEXT_REDIRECT digest; it is navigation, not a failure. */
+function isNextRedirect(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT');
+}
+
 /** The result line for a stored result, chosen from what the server stored and never from the request. */
 function doneLine(state: Extract<SourceActionState, { status: 'done' }>, labels: SourceRowLabels): string {
   if (!state.approved) return labels.doneDisabled;
@@ -69,7 +75,20 @@ function doneLine(state: Extract<SourceActionState, { status: 'done' }>, labels:
  * the row never claims a state the server has not stored.
  */
 export function SourceRow({ kind, id, title, meta, note, approved, paused, labels, action }: SourceRowProps) {
-  const [state, formAction, pending] = useActionState(action, IDLE);
+  // A transport failure (a 500, a dropped connection) rejects the action's promise,
+  // which would reach the error boundary and replace the page. It becomes a failed
+  // result for this row instead. Next's own redirect (a session that has ended) is
+  // rethrown so it still navigates to sign-in.
+  const guardedAction = async (previous: SourceActionState, form: FormData): Promise<SourceActionState> => {
+    try {
+      const result = await action(previous, form);
+      return result && typeof result === 'object' ? result : previous;
+    } catch (error) {
+      if (isNextRedirect(error)) throw error;
+      return { status: 'failed', kind, id };
+    }
+  };
+  const [state, formAction, pending] = useActionState(guardedAction, IDLE);
   // The panel is open only for the state it was opened in: any new result closes it.
   const [openedFor, setOpenedFor] = useState<SourceActionState | null>(null);
   const confirming = openedFor === state;
