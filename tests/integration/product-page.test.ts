@@ -62,6 +62,7 @@ describe('getPublicProductBySlug shape (C-11)', () => {
       description: 'Texto plano',
       offers: [{ offerId, shopName: 'Tienda Forma', priceCents: 1999, priceUpdatedAt: updated }],
       demoOnly: false,
+      indexable: true,
     } satisfies PublicProductPage);
     expect(page?.offers[0].priceUpdatedAt).toBeInstanceOf(Date);
     expect(Number.isInteger(page?.offers[0].priceCents)).toBe(true);

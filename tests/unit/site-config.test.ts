@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getDatabaseUrl } from '@/config/env';
-import { getSiteName } from '@/config/site';
+import { getPublicOrigin, getSiteName } from '@/config/site';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -64,5 +64,33 @@ describe('getDatabaseUrl', () => {
     expect(() => getDatabaseUrl()).toThrow(new Error('DATABASE_URL is not set'));
     vi.stubEnv('DATABASE_URL', '  ');
     expect(() => getDatabaseUrl()).toThrow(new Error('DATABASE_URL is not set'));
+  });
+});
+
+describe('getPublicOrigin', () => {
+  it('is null when SITE_URL is unset or blank', () => {
+    vi.stubEnv('SITE_URL', undefined);
+    expect(getPublicOrigin()).toBeNull();
+    vi.stubEnv('SITE_URL', '');
+    expect(getPublicOrigin()).toBeNull();
+  });
+
+  it('is null for a value that is not http or https', () => {
+    vi.stubEnv('SITE_URL', 'ftp://x.example');
+    expect(getPublicOrigin()).toBeNull();
+    vi.stubEnv('SITE_URL', 'not a url');
+    expect(getPublicOrigin()).toBeNull();
+  });
+
+  it('reduces a valid value to its origin, without a trailing slash', () => {
+    vi.stubEnv('SITE_URL', 'http://127.0.0.1:3000/x?q=1');
+    expect(getPublicOrigin()).toBe('http://127.0.0.1:3000');
+  });
+
+  it('reads the environment on every call', () => {
+    vi.stubEnv('SITE_URL', 'https://uno.example');
+    expect(getPublicOrigin()).toBe('https://uno.example');
+    vi.stubEnv('SITE_URL', 'https://dos.example');
+    expect(getPublicOrigin()).toBe('https://dos.example');
   });
 });

@@ -7,9 +7,11 @@ import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { DemoNotice } from '@/components/DemoNotice';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
-import { getSiteName } from '@/config/site';
+import { getPublicOrigin, getSiteName } from '@/config/site';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { parsePageParam } from '@/server/catalogue/page-param';
+import { categoryPath, productPath } from '@/server/catalogue/paths';
+import { pageSeo } from '@/server/catalogue/seo';
 import { formatEuroCents } from '@/server/money';
 
 import styles from './page.module.css';
@@ -37,6 +39,7 @@ export async function generateMetadata({
   return {
     title: category.page > 1 ? t('metaTitlePaged', values) : t('metaTitle', values),
     description: t('metaDescription', { category: category.name }),
+    ...pageSeo(getPublicOrigin(), categoryPath(category.slug, category.page), category.indexable),
   };
 }
 
@@ -68,9 +71,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     );
   }
 
-  const basePath = `/categoria/${category.slug}`;
-  // Page 1 is the clean category URL, never ?pagina=1.
-  const pageHref = (page: number) => (page === 1 ? basePath : `${basePath}?pagina=${page}`);
+  // categoryPath gives page 1 the clean category URL, never ?pagina=1.
+  const pageHref = (page: number) => categoryPath(category.slug, page);
   const counts = {
     count: category.productCount,
     page: category.page,
@@ -99,7 +101,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       <ProductGrid
         cards={category.products.map((product) => ({
           key: product.slug,
-          href: `/producto/${product.slug}`,
+          href: productPath(product.slug),
           title: product.title,
           brand: product.brand,
           // "Desde" only when the price is the lowest of several shops.

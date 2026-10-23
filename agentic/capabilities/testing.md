@@ -38,6 +38,8 @@ Integration workers get fixed `AUTH_SECRET` and `SITE_URL` (`http://127.0.0.1:30
 
 `e2e/admin.spec.ts` is serial and creates its admin with `docker compose run --rm -T --no-deps app create-admin` (stdin: email, then password; the fixed e2e admin is defined in that spec). A re-run ends that admin's sessions, so no other spec may use the account. It needs `AUTH_SECRET` and `SITE_URL` in the container: without them the sign-in answers unavailable and the spec throws a hint. To run it on an old `.env` without editing it: export `AUTH_SECRET` (32+ chars) and `SITE_URL=http://127.0.0.1:<APP_PORT>` in the shell, run `docker compose up -d --build --wait`, run playwright with the same exports, then `docker compose up -d app` in a clean shell.
 
+E2E canonical, robots and sitemap checks read the `baseURL` origin, which equals `SITE_URL` in `.env` (the app container reads it); demo data makes the indexable side e2e-unreachable, so it lives in `integration/indexable.test.ts`.
+
 Umami answers 307 at `/`. Assert 200 on `/api/heartbeat`, and on `/` only through a client that follows redirects. Host port 3000 may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
 Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`.
@@ -78,6 +80,8 @@ matching test, and it should be one that would fail if the rule broke:
   scans the source so the visibility flags, `fetch(`, `node:fs`, `@/db` in
   pages and `/ 100` stay out of places they do not belong.
 
+- **Sitemap and robots seam.** `seams.test.ts` `isSitemapOrRobotsFile` covers metadata files, route handlers under `sitemap.xml/` and `sitemaps/`, and `src/server/catalogue/sitemap*.ts`, and asserts at least 5 files so it cannot go vacuous.
+
 - **Demo notice.** Any e2e that reads the first paragraph of `main` on a demo product or category page must skip `p[role=note]`.
 
 Never call a live affiliate network in a test. Import from local fixture feed
@@ -109,6 +113,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - A Playwright `request` fixture keeps a cookie jar: after a successful sign-in the next POST carries the session and the sign-in page redirects to `/admin`. Use `playwright.request.newContext` per post when proving a refusal. Chromium ignores a `route.continue` override of the `Origin` header, so prove the Origin check with a raw multipart POST to `/admin/acceso` built from the page's hidden `$ACTION_*` inputs, with a control post from the site origin.
 - A server-only module imported in a vitest page-module call (`await import(path)` then call `default` with `{params, searchParams}` promises) works under the existing alias; real `next/navigation` `redirect()` throws an error whose digest is `NEXT_REDIRECT;replace;<url>;307;` and needs no mock.
 - Better Auth under vitest: `vi.useFakeTimers({ toFake: ['Date'] })` moves session expiry correctly (it compares in JS), `pg` still works. Compile the CLI inside the test (`node node_modules/typescript/bin/tsc -p tsconfig.cli.json` in `beforeAll`) before spawning `dist/cli/*.js` with `--conditions=react-server`, so a stale `dist` cannot pass.
+- S6.2 tests: sitemap routes are called directly (`GET` from `sitemap.xml/route` and `sitemaps/[file]/route`, with `params` as a Promise; `SITE_URL` comes from `test-database-env.ts`, `vi.stubEnv('SITE_URL','')` gives the 503 path); the 10,000-product fixture is one `generate_series` insert in `sitemap-performance.test.ts`.
 - Also in `tests/support`: `pg-error.ts`, `page-checks.ts`, `messages.ts`.
 - `expectLocalScriptsAndLinks(page, { allowHrefs })` lets exact hrefs through (legal pages pass the `mailto:` and `https://www.aepd.es`); `expectLegalFooter(page)` asserts the contentinfo landmark, three exact hrefs and labels, no `p` or heading. Legal content components render in unit tests with `createTranslator` from `use-intl/core` and the real messages; the owner fake values are in `tests/unit/owner-config.test.ts` and `legal-pages.test.ts`.
 - React components render in the unit project with `renderToStaticMarkup` from

@@ -7,9 +7,11 @@ import { DemoNotice } from '@/components/DemoNotice';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
 import { ProductDetails, type ProductDetail } from '@/components/ProductDetails';
-import { getSiteName } from '@/config/site';
+import { getPublicOrigin, getSiteName } from '@/config/site';
+import { productPath } from '@/server/catalogue/paths';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
+import { pageSeo } from '@/server/catalogue/seo';
 import { goPath } from '@/server/clicks/go-path';
 import { formatEuroCents } from '@/server/money';
 
@@ -28,6 +30,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   return {
     title: t('metaTitle', { title: product.title, siteName: getSiteName() }),
     description: t('metaDescription', { title: product.title }),
+    ...pageSeo(getPublicOrigin(), productPath(product.slug), product.indexable),
   };
 }
 

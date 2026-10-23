@@ -1,13 +1,21 @@
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { CategoryTree } from '@/components/CategoryTree';
-import { getSiteName } from '@/config/site';
+import { getPublicOrigin, getSiteName } from '@/config/site';
 import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
+import { categoryPath } from '@/server/catalogue/paths';
+import { pageSeo } from '@/server/catalogue/seo';
 
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
+
+// The home page is always indexable; the title and description come from the root layout.
+export function generateMetadata(): Metadata {
+  return pageSeo(getPublicOrigin(), '/', true);
+}
 
 export default async function HomePage() {
   const [t, groups] = await Promise.all([getTranslations('Home'), getPublicCategoryTree()]);
@@ -26,12 +34,12 @@ export default async function HomePage() {
           <CategoryTree
             groups={groups.map((group) => ({
               key: group.slug,
-              href: `/categoria/${group.slug}`,
+              href: categoryPath(group.slug),
               name: group.name,
               count: t('productCount', { count: group.productCount }),
               children: group.children.map((child) => ({
                 key: child.slug,
-                href: `/categoria/${child.slug}`,
+                href: categoryPath(child.slug),
                 name: child.name,
                 count: t('productCount', { count: child.productCount }),
               })),

@@ -9,7 +9,11 @@ type Context = { params: Promise<{ offer: string }> };
 
 /** Every response of this route is built here, so a header added later goes in one place. */
 function respond(result: GoResult): Response {
-  const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
+  // A redirect endpoint is never a page: keep it out of every index.
+  const headers: Record<string, string> = {
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex, nofollow',
+  };
   switch (result.kind) {
     case 'redirect':
       return new Response(null, { status: 302, headers: { ...headers, Location: result.location } });
