@@ -264,10 +264,10 @@ test.describe('signing in and out', () => {
     await expect(page.getByTestId('admin-sign-out')).toHaveText(admin.Chrome.signOut);
     await expect(page.getByRole('contentinfo')).toHaveCount(0);
 
-    // Nothing in the menu leads nowhere: only live link is the shell's own home.
+    // Nothing in the menu leads nowhere: the live links are the shell's own home and the shops page.
     const nav = page.getByTestId('admin-nav');
-    expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual(['/admin']);
-    for (const label of [admin.Nav.feeds, admin.Nav.categories, admin.Nav.products, admin.Nav.review]) {
+    expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual(['/admin', '/admin/tiendas']);
+    for (const label of [admin.Nav.categories, admin.Nav.products, admin.Nav.review]) {
       await expect(nav.getByText(label)).toBeVisible();
       await expect(nav.getByRole('link', { name: label })).toHaveCount(0);
     }

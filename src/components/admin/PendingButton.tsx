@@ -12,6 +12,8 @@ export type PendingButtonProps = {
   /** The filled sign-in button spans its form column. */
   fullWidth?: boolean;
   testId?: string;
+  /** An accessible name that begins with `label` and adds what it acts on. Not used while pending. */
+  ariaLabel?: string;
 };
 
 /**
@@ -19,7 +21,7 @@ export type PendingButtonProps = {
  * pending it swaps the label, greys out and ignores a second press; it is
  * aria-disabled and not disabled, so it stays in the focus order.
  */
-export function PendingButton({ variant, label, pendingLabel, fullWidth, testId }: PendingButtonProps) {
+export function PendingButton({ variant, label, pendingLabel, fullWidth, testId, ariaLabel }: PendingButtonProps) {
   const { pending } = useFormStatus();
   const className = [
     styles.button,
@@ -33,6 +35,7 @@ export function PendingButton({ variant, label, pendingLabel, fullWidth, testId 
     <button
       type="submit"
       className={className}
+      aria-label={pending ? undefined : ariaLabel}
       aria-disabled={pending || undefined}
       onClick={(event) => {
         if (pending) event.preventDefault();

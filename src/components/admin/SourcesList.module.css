@@ -1,0 +1,10 @@
+/* The list column is capped so a name and its button stay close at 1280 wide. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 48rem;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}

@@ -1,0 +1,26 @@
+.tag {
+  display: inline-block;
+  padding: 0.125rem var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.approved {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+.notApproved {
+  border-color: var(--color-muted);
+  color: var(--color-muted);
+}
+
+.paused {
+  border-style: dashed;
+  border-color: var(--color-text);
+  color: var(--color-text);
+}

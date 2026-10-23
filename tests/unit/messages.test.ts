@@ -330,7 +330,8 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
   });
 
   it('uses no ICU placeholder the pages do not pass', () => {
-    const allowed = new Set(['siteName', 'hours']);
+    // Admin.Sources (US-2.3) passes the counts, the shop name and the feed id and network its page formats.
+    const allowed = new Set(['siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText']);
     for (const [key, value] of leaves(admin)) {
       for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {
         expect(allowed.has(match[1]), `Admin.${key} names {${match[1]}}`).toBe(true);

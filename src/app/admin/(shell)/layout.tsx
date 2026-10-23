@@ -37,11 +37,11 @@ export default async function ShellLayout({ children }: { children: React.ReactN
       <AdminNav
         label={chrome('navLabel')}
         comingSoon={nav('comingSoon')}
-        // Only the shell exists, so "Inicio" is the current page. The other
-        // entries have no destination yet and render as placeholders (AC 25).
+        // The nav marks the current entry from the path. Entries without a
+        // destination yet render as placeholders (AC 25).
         items={[
-          { key: 'home', label: nav('home'), href: '/admin', current: true },
-          { key: 'feeds', label: nav('feeds') },
+          { key: 'home', label: nav('home'), href: '/admin' },
+          { key: 'feeds', label: nav('feeds'), href: '/admin/tiendas' },
           { key: 'categories', label: nav('categories') },
           { key: 'products', label: nav('products') },
           { key: 'review', label: nav('review') },
