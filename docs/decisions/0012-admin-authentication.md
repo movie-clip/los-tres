@@ -102,3 +102,12 @@ SameSite=Strict. `trustedOrigins` and the base URL are `SITE_URL`.
   unaffected.
 - SameSite=Strict means a link to `/admin` from another site arrives anonymous
   and lands on sign-in. Accepted for a handful of admins.
+
+## Note, 2026-10-23 (S6.2)
+
+`SITE_URL` also serves as the public origin for canonical links, the sitemap and
+the `Sitemap:` line of `robots.txt` (owner ruling, S6.2). This adds no setting.
+In production it equals the browser origin anyway, so before a public deploy it
+must be the public https origin. When unset, public pages still work, without a
+canonical or a `Sitemap:` line, and the sitemap answers 503. The decision above
+is otherwise unchanged.

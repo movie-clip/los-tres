@@ -129,6 +129,24 @@ until both are set. That e2e creates its admin, `e2e-admin@example.test`, in the
 development database through `create-admin`. **S2.1 is password-only: do not
 deploy the admin area before S2.2 adds a second factor** (0012).
 
+**Search engines (S6.2).** `SITE_URL` is also the public origin of canonical
+links, the sitemap and the `Sitemap:` line of `/robots.txt`; **before any public
+deploy it must be the public https origin**, or all of them point at
+`127.0.0.1`. When it is unset, public pages still work but carry no canonical,
+`/robots.txt` has no `Sitemap:` line and the sitemap answers 503.
+
+- `/sitemap.xml` is an index of `/sitemaps/paginas.xml` (home and category pages)
+  and `/sitemaps/productos-<n>.xml` (5,000 products per file). It lists a
+  product only if it is public and has at least one offer from a non-demo feed;
+  a category only if its subtree holds such a product. No `lastmod`.
+- Demo-only products and categories are `noindex` and carry no canonical.
+- Canonical keeps only `?pagina=<n>` for n above 1; any other query parameter,
+  including any future filter, is dropped from it.
+- `/robots.txt` disallows `/go/`, `/api/` and `/buscar` (reserved for search;
+  the search story must use that path). It does not mention the admin area,
+  which sends its own noindex signals. `/go/<offer>` also answers
+  `X-Robots-Tag: noindex, nofollow`.
+
 | Purpose | Command | Needs |
 |---|---|---|
 | lint | `npm run lint` (`eslint .`) | nothing |
