@@ -144,9 +144,9 @@ describe('PrivacyContent', () => {
     expect(html).toMatch(/\(<a[^>]*href="https:\/\/www\.aepd\.es"[^>]*>www\.aepd\.es<\/a>\)/);
   });
 
-  it('renders the three data lead-ins in <strong> and no ** marker', () => {
+  it('renders the two data lead-ins in <strong> and no ** marker', () => {
     const html = privacy();
-    expect(count(html, '<strong>')).toBe(3);
+    expect(count(html, '<strong>')).toBe(2);
     expect(text(html)).not.toContain('**');
   });
 

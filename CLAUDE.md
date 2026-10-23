@@ -38,14 +38,14 @@ line here is the owner's call: propose it and stop.
 - **App:** one Next.js app in TypeScript, server-rendered, `es-ES` copy in
   message files (0001)
 - **Data:** PostgreSQL with Drizzle ORM; search in PostgreSQL (0002)
-- **Delivery:** Docker Compose (app, db, umami), local first, then an EU VPS (0004)
+- **Delivery:** Docker Compose (app, db), local first, then an EU VPS (0004)
 - **Gate:** ESLint, `tsc`, Vitest, Playwright (0006)
 - **Data source:** affiliate network feeds only, imported by a manual
   `import-feeds` command or admin button; no scraping (0007)
 - **Matching:** EAN, then brand + normalised part number; conflicts to an admin
   queue (0008)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
-  cookieless Umami; no ads (0009)
+  no ads (0009); no traffic analytics for now (0014)
 - **Admin sign-in:** Better Auth 1.7.12 used as a library, server-stored
   sessions, no cookie before sign-in (0012)
 - **Styling:** CSS Modules, co-located `*.module.css`; `globals.css` keeps the
@@ -60,8 +60,8 @@ integration check run it. A story is not done until it exits 0.
 
 First run on a fresh clone: `npm ci`, `npm run env:init`,
 `npm run test:e2e:install`. The gate also needs Docker running and a free host
-port for each published service (app, db, Umami); if one is taken, set
-`APP_PORT`, `DB_HOST_PORT` or `UMAMI_PORT` in `.env` to change the host port.
+port for each published service (app on 3010, db on 5433); if one is taken, set
+`APP_PORT` or `DB_HOST_PORT` in `.env` (and `SITE_URL` to match `APP_PORT`) to change the host port.
 
 After `npm run env:init`, fill in the owner identity in `.env` for the legal
 pages: `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS` and `CONTACT_EMAIL` are
@@ -75,13 +75,13 @@ gate, `migrate`, `seed` and `import-feeds` still work, and
 To load the demo data and see the demo product page (which carries the demo
 notice, and a footer linking the three legal pages), continue with:
 
-1. `npm run stack:up`: builds and starts `app`, `db` and `umami`. The app
+1. `npm run stack:up`: builds and starts `app` and `db`. The app
    container migrates the database on every start and, when `SEED_DEMO_DATA` is
    `true`, seeds the demo shops, feeds and categories.
 2. `docker compose run --rm app import-feeds`: the first import, which creates
    the demo products and offers. Seeding loads no products; this does.
-3. Open `http://127.0.0.1:3000/producto/demo-filtro-de-aceite-oc-1234`
-   (replace `3000` with `APP_PORT` if you changed it). It lists two shops,
+3. Open `http://127.0.0.1:3010/producto/demo-filtro-de-aceite-oc-1234`
+   (replace `3010` with `APP_PORT` if you changed it). It lists two shops,
    cheapest first. Running step 2 again changes nothing but prices and dates.
 
 `SEED_DEMO_DATA` in `.env` turns the start-up seed on when it is exactly `true`
@@ -177,7 +177,7 @@ Helpers:
 - `npm run env:init`: create `.env` with generated secrets; exits 1 and changes
   nothing if `.env` already exists. Never commit `.env`.
 - `npm run db:up`: start the `db` service and wait until healthy.
-- `npm run stack:up`: build and start `app`, `db` and `umami`, and wait until healthy.
+- `npm run stack:up`: build and start `app` and `db`, and wait until healthy.
 - `npm run stack:down`: stop the Compose stack (the database volume is kept).
 - `npm run test:e2e:install`: install the Playwright chromium browser.
 - `npm run dev`: Next.js dev server on the host; `npm run build`: production build.

@@ -42,7 +42,7 @@ Actions in `src/app/admin` are tested by importing them with `next/headers` mock
 
 E2E canonical, robots and sitemap checks read the `baseURL` origin, which equals `SITE_URL` in `.env` (the app container reads it); demo data makes the indexable side e2e-unreachable, so it lives in `integration/indexable.test.ts`.
 
-Umami answers 307 at `/`. Assert 200 on `/api/heartbeat`, and on `/` only through a client that follows redirects. Host port 3000 may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
+The default host port is 3010 and may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
 Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`.
 

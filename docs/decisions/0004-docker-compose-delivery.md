@@ -16,7 +16,6 @@ Services:
 |---|---|
 | `app` | the Next.js app; also runs `import-feeds` (`docker compose run app import-feeds`) |
 | `db` | PostgreSQL, data on a named volume |
-| `umami` | cookieless, self-hosted traffic analytics (0009) |
 
 There is no scheduler. Imports run when someone starts them, from the command
 line or from the admin area's "Import now" button.

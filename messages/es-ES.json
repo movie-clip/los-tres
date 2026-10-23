@@ -82,7 +82,6 @@
     "cookiesBody": "{siteName} no instala cookies ni tecnologías similares en el navegador de los visitantes. Por eso no verás ningún aviso de cookies.",
     "dataHeading": "Qué datos registramos cuando visitas el sitio",
     "dataClicks": "<b>Clics hacia las tiendas.</b> Cuando pulsas el enlace a una tienda, registramos la oferta, la tienda, el producto, la hora y la página desde la que pulsaste. No registramos tu dirección IP, tu navegador ni ningún identificador tuyo. Lo usamos para saber qué ofertas interesan y para cuadrar las cuentas con las redes de afiliación.",
-    "dataStats": "<b>Estadísticas de visitas.</b> Usamos Umami, una herramienta de analítica instalada en nuestro propio servidor, que funciona sin cookies y no guarda direcciones IP. Registra la página visitada, la página de procedencia, el tipo de navegador, sistema operativo y dispositivo, el idioma y el país. Solo consultamos cifras agregadas, y estos datos no se comparten con terceros.",
     "dataLogs": "<b>Registros del servidor.</b> Los registros técnicos del servidor no guardan direcciones IP ni datos del navegador.",
     "dataBasis": "Con estos datos no podemos identificarte. La base jurídica es nuestro interés legítimo en conocer el uso del sitio y en gestionar la afiliación (artículo 6.1.f del Reglamento General de Protección de Datos, RGPD).",
     "leavingHeading": "Al salir hacia una tienda",
