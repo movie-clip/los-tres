@@ -37,7 +37,9 @@ Listing components: `ProductCard`, `ProductGrid`, `Pagination`, `CategoryEmpty` 
 
 The root layout is `html` and `body` only. The public header and footer come from `src/app/PublicChrome.tsx`, used by `src/app/(public)/layout.tsx` and by `src/app/not-found.tsx` (which sits outside that layout). Admin screens draw their own `AdminHeader` and never show them.
 
-Admin UI is `src/components/admin/` (`AdminHeader`, `AdminNav`, `TextField`, `PendingButton`, `AdminNotice`, `ErrorBlock`, `AdminMessage`), presentational, imports nothing from `src/server`. A server action reaches a component as a prop (`AdminHeader.signOut.action`). A stateful form that calls an action lives beside its page (`src/app/admin/acceso/SignInForm.tsx`).
+Admin UI is `src/components/admin/` (`AdminHeader`, `AdminNav`, `TextField`, `PendingButton`, `AdminNotice`, `ErrorBlock`, `AdminMessage`, `ActionButton`, `StatusTag`, `ConfirmPanel`, `SourceRow`, `ShopGroup`, `SourcesList`, `SourcesPage`), presentational. A server action reaches a component as a prop (`AdminHeader.signOut.action`). A stateful form that calls an action lives beside its page (`src/app/admin/acceso/SignInForm.tsx`). Client rows that call a server action (`SourceRow`) receive it as a prop from the page and may `import type` from `src/server/admin/sources` and from the route's `actions.ts` under `src/app` (a server action's state type); a component never imports a runtime value from `src/server`.
+
+Reusing a button look in a non-submit button: `composes: button outlined from './PendingButton.module.css'` in the new module, no copied rules (`ActionButton.module.css`).
 
 `src/app/admin/error.tsx` is a client component and cannot read configuration or messages: `src/app/admin/layout.tsx` fills `AdminFallbackProvider` with finished strings and `error.tsx` reads them with `useAdminFallback()`.
 
@@ -70,6 +72,9 @@ Working-copy files are CRLF on Windows (autocrlf): edit existing files with the 
 - Messages with rich tags (`<b>`, `<email>`, `<aepd>`) are rendered with `t.rich` and tag functions from `legalRichTags`; owner values enter as ICU values and are escaped. The owner's identity is read only in the `page.tsx` of `aviso-legal` and `privacidad` via `getOwnerIdentity()`.
 - Admin copy is the nested `Admin` namespace (`Admin.Chrome`, `Admin.SignIn`, ...), read with `getTranslations('Admin.SignIn')`. A client form receives its strings as a `labels` prop from the page; no `NextIntlClientProvider`.
 - A `useActionState` form resets uncontrolled fields after the action. Return the typed value in the state and set `defaultValue` from it: the email survives, the password clears.
+- A client row cannot call next-intl: the page precomputes every string for both states of the row (tag, button names, confirm, done, error) and passes them as `labels`. A count that can reach four digits is formatted in the page with `Intl.NumberFormat(LOCALE, { useGrouping: 'always' })` and passed as an ICU value, because es-ES drops the separator on four digits.
+- A row that opens an inline panel keeps `openedFor` (the action state it was opened in) and derives `confirming = openedFor === state`, so any new result closes it without setState in an effect.
+- A client component that calls a server action through `useActionState` wraps it in try/catch: a transport failure rejects the promise and would reach `error.tsx`. Return a failed state, and rethrow an error whose digest starts with `NEXT_REDIRECT` so the sign-in redirect still navigates.
 - A Next route built from `robots.ts` with `force-dynamic` shows as dynamic in the build and reads `SITE_URL` per request; confirmed by running one build against two env values.
 - Listing pages read `?pagina` through `parsePageParam`, call `notFound()` on a null read, link page 1 as the clean path with no `?pagina=1`, and use plain `<a>` (not `next/link`) for card and pagination links.
 

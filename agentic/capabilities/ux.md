@@ -122,6 +122,14 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin signed in | run the `CLAUDE.md` § Commands `create-admin` command for the e2e admin in `tests/e2e/admin.spec.ts` (credentials are in that file), then sign in with a Playwright script at `/admin/acceso` |
 | admin submitting | `page.route` delays the POST to `/admin/acceso*` |
 | admin 404 | `/admin/no-existe` (signed in: the admin 404; anonymous: redirect to sign-in) |
+| admin shops and feeds page | sign in as the e2e admin, open `/admin/tiendas` at 390 and 1280 wide; re-approve every demo shop and feed you disable, or the e2e import finds no approved feed |
+| admin shops and feeds, paused feed and shop note | press "Desactivar tienda" on a demo shop and confirm; its approved feed reads "Aprobado, en pausa" |
+| admin shops and feeds, confirm open | press any "Desactivar …" button |
+| admin shops and feeds, pending | `page.route` delays the action POST by 1.5 s, then press |
+| admin shops and feeds, failed (transport) | `page.route` fulfils the action POST (header `next-action`) with a 500; the page stays and the row shows the error block "No se ha podido guardar el cambio" |
+| admin shops and feeds, failed (returned) | `page.route` fulfils the action POST with a `text/x-component` body `0:{a:$@1,f:'',b:<buildId>}` then `1:{status:failed,kind:feed,id:1}` |
+| admin shops and feeds, session expired | clear cookies in the context, then press a button; expect `/admin/acceso?aviso=sesion` with the notice |
+| admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
 | demo notice | shown on the demo product, `/categoria/filtros`, `?pagina=2`, `/categoria/escobillas-y-bombillas`; absent on home, the empty category, 404 and the legal pages |
 
 Any state this table cannot produce (one offer, a missing image, the longest
