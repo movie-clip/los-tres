@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<products>
+  <product><id>M-1</id><title>Uno</title><price>1.00</price><url>https://shop-m.example/1</url></product>
+  <product><id>M-2</id><title>Dos</title><price>2.00</price><url>https://shop-m.example/2</url></prod>
+</products>

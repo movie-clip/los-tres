@@ -5,7 +5,7 @@ import { FeedNotRegisteredError, formatImportReport, importFeeds } from '@/serve
 
 import { allOffers, allProducts, insertFeed, insertShop } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
-import { readFeedFixture } from '../support/feeds';
+import { bytesOf, readFeedFixture } from '../support/feeds';
 import { stubNetworkOff } from '../support/network-off';
 
 let fetchStub: ReturnType<typeof stubNetworkOff>;
@@ -26,7 +26,7 @@ afterAll(async () => {
 
 describe('registered source (guardrail 2, 0007)', () => {
   it('throws FeedNotRegisteredError for a feed id that is not a row and reads nothing', async () => {
-    const readSource = vi.fn(async () => readFeedFixture('ean-first.csv'));
+    const readSource = vi.fn(async () => bytesOf(readFeedFixture('ean-first.csv')));
     await expect(importFeeds(getDb(), { feedId: 999_999, deps: { readSource } })).rejects.toBeInstanceOf(
       FeedNotRegisteredError,
     );
@@ -38,7 +38,7 @@ describe('registered source (guardrail 2, 0007)', () => {
   it('reports an existing but unapproved feed as skipped not_approved without reading it', async () => {
     const shop = await insertShop();
     const feedId = await insertFeed(shop.id, { url: 'ean-first.csv', isApproved: false });
-    const readSource = vi.fn(async () => readFeedFixture('ean-first.csv'));
+    const readSource = vi.fn(async () => bytesOf(readFeedFixture('ean-first.csv')));
 
     const report = await importFeeds(getDb(), { feedId, deps: { readSource } });
 
@@ -55,7 +55,7 @@ describe('registered source (guardrail 2, 0007)', () => {
     const approved = await insertFeed(shop.id, { url: 'ean-first.csv', isApproved: true });
     const other = await insertShop();
     await insertFeed(other.id, { url: 'ean-second.csv', isApproved: false });
-    const readSource = vi.fn(async (feed: { url: string }) => readFeedFixture(feed.url));
+    const readSource = vi.fn(async (feed: { url: string }) => bytesOf(readFeedFixture(feed.url)));
 
     const report = await importFeeds(getDb(), { deps: { readSource } });
 
@@ -66,7 +66,7 @@ describe('registered source (guardrail 2, 0007)', () => {
   it('serves an https feed through the injected reader, passing the feed row and not a free URL', async () => {
     const shop = await insertShop();
     const feedId = await insertFeed(shop.id, { url: 'https://feeds.example/f.csv' });
-    const readSource = vi.fn(async () => readFeedFixture('ean-first.csv'));
+    const readSource = vi.fn(async () => bytesOf(readFeedFixture('ean-first.csv')));
 
     const report = await importFeeds(getDb(), { deps: { readSource } });
 

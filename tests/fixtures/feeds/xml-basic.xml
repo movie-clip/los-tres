@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product>
+    <id>A-1</id>
+    <title>Fixture Alpha Filtro</title>
+    <brand>MarcaUno</brand>
+    <part_number>PN 100</part_number>
+    <ean>2000000000046</ean>
+    <price>10.00</price>
+    <currency>EUR</currency>
+    <url>https://shop-a.example/p/A-1</url>
+    <description>Descripcion alpha</description>
+  </product>
+  <product>
+    <id>A-2</id>
+    <title>Fixture Beta Taladro</title>
+    <brand>MarcaDos</brand>
+    <part_number>PN 200</part_number>
+    <ean>2000000000053</ean>
+    <price>20.50</price>
+    <currency>EUR</currency>
+    <url>https://shop-a.example/p/A-2</url>
+  </product>
+</products>

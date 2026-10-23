@@ -15,6 +15,12 @@ const OPTIONAL_COLUMNS = [
   'category',
 ] as const;
 
+/**
+ * Every column name, required first. An XML record is handed to `validateRow`
+ * as cells in exactly this order, with this list as its header.
+ */
+export const CANONICAL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS] as const;
+
 type RequiredColumn = (typeof REQUIRED_COLUMNS)[number];
 type ColumnName = RequiredColumn | (typeof OPTIONAL_COLUMNS)[number];
 

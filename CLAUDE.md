@@ -50,6 +50,8 @@ line here is the owner's call: propose it and stop.
   sessions, no cookie before sign-in (0012)
 - **Styling:** CSS Modules, co-located `*.module.css`; `globals.css` keeps the
   variables and reset (0011)
+- **Feed formats:** CSV or XML, plain or gzip, streamed; XML parsed by `sax`
+  1.6.1 in strict mode (0013)
 
 ## Commands
 
@@ -156,7 +158,7 @@ deploy it must be the public https origin**, or all of them point at
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and categories; no products; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
-| import feeds | `npm run import-feeds` (imports every approved feed and prints counts and rejected rows; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
+| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |

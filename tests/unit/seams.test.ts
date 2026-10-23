@@ -93,6 +93,25 @@ describe('seams (guardrails 1, 2, 4)', () => {
     expect(found).toEqual([]);
   });
 
+  // Deliberate (issue #29, XML and gzip feeds): two new single-source rules join
+  // the fetch and fs rules above, which are unchanged. Decompression lives in
+  // decode.ts alone, so the inflated-size cap (512 MiB) cannot be bypassed by a
+  // second inflate path; the XML parser lives in xml.ts alone, so its strict
+  // mode, DOCTYPE refusal and cell cap hold for every XML read.
+  it('imports node:zlib only in src/server/importer/decode.ts', () => {
+    const zlib = /from\s+['"](node:)?zlib['"]|require\(\s*['"](node:)?zlib['"]\s*\)|import\(\s*['"](node:)?zlib['"]\s*\)/;
+    expect(offenders(zlib, (file) => file === 'src/server/importer/decode.ts')).toEqual([]);
+    const decode = sources().find(({ file }) => file === 'src/server/importer/decode.ts')?.code ?? '';
+    expect(decode).toMatch(zlib);
+  });
+
+  it('imports the XML parser (sax) only in src/server/importer/xml.ts', () => {
+    const parser = /from\s+['"](sax|saxes|fast-xml-parser|xml2js|htmlparser2|@xmldom\/xmldom)(\/[^'"]*)?['"]|require\(\s*['"](sax|saxes|fast-xml-parser|xml2js)['"]\s*\)/;
+    expect(offenders(parser, (file) => file === 'src/server/importer/xml.ts')).toEqual([]);
+    const xml = sources().find(({ file }) => file === 'src/server/importer/xml.ts')?.code ?? '';
+    expect(xml).toMatch(/from\s+['"]sax['"]/);
+  });
+
   it('imports the database from no page or component (a route handler may)', () => {
     const database = /from\s+['"](@\/db\/|(\.\.\/)+db\/)/;
     const found = sources()
