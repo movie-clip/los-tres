@@ -141,3 +141,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - [ ] Tests assert the contract, not the implementation
 - [ ] Any runner, fixture or command convention you established written as a
       `pack_corrections` entry for this file
+- [ ] The local stack left as you found it: containers you started stopped,
+      `.env` and compose state you changed restored, test data you created
+      (admin accounts, imported feeds) deleted unless a spec's fixture or
+      Playwright `globalSetup` owns it; anything you could not undo named in `risks`

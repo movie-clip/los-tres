@@ -113,7 +113,7 @@ commands and the test runner.
 
 | Lane | Agent | Pack | Owns |
 |---|---|---|---|
-| recon | `scout` | — | read-only exploration of what already exists in the repo |
+| recon | `scout`; `reviewer` (CHECK) | — | read-only exploration of what already exists in the repo |
 | product | `producer` | `product.md` | MVP scope, which change this is, where "no" lives |
 | story | `story-author` | — | drafts a ticketed story when a slice needs one |
 | ux | `designer` (UX) | `ux.md` | the flow, screens, states, copy and design system a change commits to, before the tech lead plans it. Edits no repo file |
