@@ -76,8 +76,8 @@ same five without numbers, so a cited number resolves to exactly one rule.
 
 A price-comparison site in and for Spain, in the family of hotline.ua, with
 Autodoc as the design reference. Each product has one page listing the shops
-that sell it, sorted by price, with an affiliate link out. The MVP covers auto
-parts and consumables, and power and hand tools. Los Tres sells nothing
+that sell it, sorted by price, with an affiliate link out. The MVP covers car
+maintenance basics: engine oil and oil, air, fuel and cabin filters. Los Tres sells nothing
 itself: there is no cart, checkout, payment or seller account. The target is an
 **MVP, not feature parity.** The owner runs an admin area that controls which
 feeds, products and offers the public sees (guardrail 1).
@@ -115,11 +115,11 @@ commands and the test runner.
 |---|---|---|---|
 | recon | `scout`; `reviewer` (CHECK) | — | read-only exploration of what already exists in the repo |
 | product | `producer` | `product.md` | MVP scope, which change this is, where "no" lives |
-| story | `story-author` | — | drafts a ticketed story when a slice needs one |
+| story | `producer` (STORY) | — | drafts a ticketed story when a slice needs one |
 | ux | `designer` (UX) | `ux.md` | the flow, screens, states, copy and design system a change commits to, before the tech lead plans it. Edits no repo file |
 | design | `tech-lead` (DESIGN) | `architecture.md` | stack proposals, the frontend/backend contract, the lane split |
-| backend | `backend-engineer` | `backend.md` | server code, data schema and migrations (non-test) |
-| frontend | `frontend-engineer` | `frontend.md` | the public catalogue and the admin UI (non-test) |
+| backend | `engineer` | `backend.md` | server code, data schema and migrations (non-test) |
+| frontend | `engineer` | `frontend.md` | the public catalogue and the admin UI (non-test) |
 | test | `test-engineer` | `testing.md` | test files and test infrastructure |
 | docs | `docs-engineer` | `docs.md` | `docs/**` and `CLAUDE.md` § Stack / § Commands, and — at close-out only — `agentic/capabilities/**` when applying `pack-corrections.md` |
 | integration | `tech-lead` (INTEGRATION) | `architecture.md` | engineering gate: PASS / CHANGES_REQUESTED |
