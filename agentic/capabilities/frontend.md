@@ -1,6 +1,6 @@
 # Capability pack: frontend — project `los-tres`
 
-For the `frontend-engineer` lane. The public catalogue (search, category and
+For the `frontend` lane (`engineer`). The public catalogue (search, category and
 product pages) and the admin area.
 
 Slice A set the layout and i18n conventions below. Conventions for later

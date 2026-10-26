@@ -1,6 +1,6 @@
 # Capability pack: backend — project `los-tres`
 
-For the `backend-engineer` lane. Server code, the data schema and migrations.
+For the `backend` lane (`engineer`). Server code, the data schema and migrations.
 
 Slices A and B set the layout, delivery and migration conventions below. Route
 shape is still to be written by the slice that adds one, through

@@ -44,9 +44,9 @@ categories, working the matching queue. Dense and fast beats pretty there.
 | Path | What lives there | Owner |
 |---|---|---|
 | `docs/design/system.md` | the design system: principles, tokens (colour, type, spacing), components and their states, copy voice | `docs-engineer` at close-out, copied from your approved `Design system` section |
-| `src/app/globals.css` | the tokens as CSS custom properties, and the reset | `frontend-engineer`, built to `system.md` |
-| `src/components/*.module.css` | component styles | `frontend-engineer` |
-| `messages/es-ES.json` | every user-facing string | `frontend-engineer`, from your spec's copy |
+| `src/app/globals.css` | the tokens as CSS custom properties, and the reset | `engineer` (frontend), built to `system.md` |
+| `src/components/*.module.css` | component styles | `engineer` (frontend) |
+| `messages/es-ES.json` | every user-facing string | `engineer` (frontend), from your spec's copy |
 
 You edit no repo file. Read `docs/design/system.md` first on every order; when
 it does not exist yet, the system is whatever `globals.css` holds. When the doc
