@@ -41,9 +41,9 @@ line here is the owner's call: propose it and stop.
 - **Delivery:** Docker Compose (app, db), local first, then an EU VPS (0004)
 - **Gate:** ESLint, `tsc`, Vitest, Playwright (0006)
 - **Data source:** affiliate network feeds only, imported by a manual
-  `import-feeds` command or admin button; no scraping (0007)
-- **Matching:** EAN, then brand + normalised part number; conflicts to an admin
-  queue (0008)
+  `import-feeds` command (an admin button is deferred); no scraping (0007)
+- **Matching:** EAN, then brand + normalised part number; on a conflict the
+  offer stays its own product, the admin queue is deferred (0008)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   no ads (0009); no traffic analytics for now (0014)
 - **Admin sign-in:** Better Auth 1.7.12 used as a library, server-stored
