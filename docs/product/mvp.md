@@ -52,10 +52,10 @@ the owner can change it without a code change.
   habitáculo. Other spare parts, tyres and the power and hand tools vertical
   are out of the MVP.
 - **Categories:** this tree is fixed and seeded in code (S4.0); changing it is
-  a code change, and there is no admin tree editor. Each feed category is mapped once by the admin to one of ours. Products from
-  unmapped feed categories wait in an admin queue. Products from an unmapped
-  feed category are not public until the admin maps the category (owner
-  ruling, 2026-10-17).
+  a code change, and there is no admin tree editor. Each feed category is
+  mapped once by the admin to one of the five (S4.2). Products from an
+  unmapped feed category are not public until the admin maps the category
+  (owner ruling, 2026-10-17).
 - **No vehicle fitment.** Auto parts are found by part number, EAN or text. If
   a feed carries fitment text, it is shown as text and nothing more.
 
@@ -79,9 +79,9 @@ the owner can change it without a code change.
 
 Offers from different feeds are matched to one product by **EAN first**, then by
 **brand + manufacturer part number** with spaces, dashes and dots removed and
-upper-cased. If the EAN and the brand disagree, the offer goes to a review queue
-instead of merging; the review queue itself is deferred until after the
-prototype. There is no merge or split in the MVP (owner ruling, 2026-10-26).
+upper-cased. If the EAN and the brand disagree, the offer is not merged and
+stays its own product; an admin review queue for these is deferred until after
+the prototype. There is no merge or split in the MVP (owner ruling, 2026-10-26).
 Decision 0008 holds the detail.
 
 ## Search and browsing
@@ -126,11 +126,11 @@ and the backup passphrase are kept in a password manager plus an offline copy
 ## Feed import
 
 - A **separate import command**, `import-feeds`, reads each approved feed (CSV
-  or XML from the network's URL). It checks every row and writes an import
-  report the admin can read.
-- **It is not scheduled.** It runs when someone starts it, either from the
-  command line or from an **"Import now"** button in the admin area (per feed,
-  or all feeds). Both run the same code.
+  or XML from the network's URL). It checks every row and prints counts and
+  rejected rows.
+- **It is not scheduled.** It runs when someone starts it from the command
+  line (all feeds, or one with `--feed`). An "Import now" button with stored
+  reports in the admin area is deferred.
 - One broken feed never stops the others, and an import never takes the site
   down.
 - An offer missing from a feed's latest successful import is removed.
@@ -155,7 +155,7 @@ and the backup passphrase are kept in a password manager plus an offline copy
 
 Only offers from an **admin-approved feed** are public. Products from an
 approved feed publish automatically once their feed category is mapped; until
-then they wait in the admin queue and are not public. The admin can hide any product or offer,
+then they are not public. The admin can hide any product or offer,
 and a hidden item is never public.
 
 ## Outgoing clicks
@@ -211,7 +211,8 @@ real-data stories (S3.1, S3.3, S3.5, S4.2, S7.1, S2.4, S9.4) come up.
 Infrastructure, hardening and the items listed below as deferred are closed on
 the board and will be recreated when needed.
 
-Deferred until after the prototype (kept on the board, labelled `deferred`):
+Deferred until after the prototype (closed on the board as not planned, to be
+recreated when needed):
 going live on a VPS over HTTPS (S9.1), backups (S9.2),
 performance at 10k products (S10.1), feed URL encryption (S10.3), the
 TOTP second factor (S2.2), Search Console, payee registration and network
