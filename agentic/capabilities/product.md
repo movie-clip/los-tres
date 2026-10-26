@@ -33,8 +33,8 @@ memory of marketplaces: there are no sellers, orders or payments here.
 
 ## Shaping the MVP
 
-The product is a hotline.ua-style price comparison for auto parts and
-consumables and for power and hand tools, fed by affiliate network feeds. Your
+The product is a hotline.ua-style price comparison for car maintenance
+basics (engine oil and oil, air, fuel and cabin filters), fed by affiliate network feeds. Your
 job is to cut, not to collect.
 
 - **The core loop is: a feed is approved and imported, a visitor finds a
