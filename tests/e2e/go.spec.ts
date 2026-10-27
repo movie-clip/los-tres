@@ -69,7 +69,7 @@ test.describe('/go/<offer> (S1.1)', () => {
     // The cheaper offer is listed first.
     expect(DEMO_SHARED.offers[0].shopName).toBe('Tienda Demo Dos');
     const shopRequest = page.waitForRequest(
-      (req) => new URL(req.url()).hostname === 'tienda-demo-dos.example',
+      (req) => new URL(req.url()).hostname === DEMO_SHOP_HOSTS[1],
     );
 
     await page.getByTestId('offer-go').first().click();

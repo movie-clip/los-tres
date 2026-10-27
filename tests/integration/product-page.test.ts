@@ -61,6 +61,7 @@ describe('getPublicProductBySlug shape (C-11)', () => {
       ean: '2000000000015',
       description: 'Texto plano',
       offers: [{ offerId, shopName: 'Tienda Forma', priceCents: 1999, priceUpdatedAt: updated }],
+      categorySlug: 'categoria-de-prueba',
       demoOnly: false,
       indexable: true,
     } satisfies PublicProductPage);

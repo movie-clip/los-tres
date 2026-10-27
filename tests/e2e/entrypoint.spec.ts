@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 
 import { expect, test } from '@playwright/test';
 
+import { DEMO_COUNTS } from '../fixtures/demo';
+
 // The image's verb dispatcher, through `docker compose run` (not `sh`, which is
 // not reliably on the Windows host). `--no-deps` because the stack is already
 // up. Serial: the import runs twice and the second must see the first.
@@ -41,12 +43,14 @@ test.describe('app image entrypoint', () => {
   test('import-feeds run twice: the second run creates nothing', () => {
     const first = composeRun('import-feeds');
     expect(first.status).toBe(0);
-    expect(first.stdout).toMatch(/^total: feeds=2 imported=2 skipped=0 failed=0$/m);
+    expect(first.stdout).toContain(
+      `total: feeds=${DEMO_COUNTS.feeds} imported=${DEMO_COUNTS.feeds} skipped=0 failed=0`,
+    );
 
     const second = composeRun('import-feeds');
     expect(second.status).toBe(0);
     const feedLines = second.stdout.split('\n').filter((line) => line.startsWith('feed '));
-    expect(feedLines).toHaveLength(2);
+    expect(feedLines).toHaveLength(DEMO_COUNTS.feeds);
     for (const line of feedLines) {
       expect(line).toContain('products_created=0');
       expect(line).toContain('offers_created=0');

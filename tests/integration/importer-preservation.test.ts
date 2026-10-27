@@ -43,9 +43,9 @@ describe('admin decisions survive seed and import (TD-21)', () => {
     const [product] = await getDb().select().from(products).where(eq(products.slug, DEMO_SHARED.slug));
     expect(feed.isApproved).toBe(false);
     expect(product.isHidden).toBe(true);
-    // The disabled feed is not even in the run; the other feed still imports.
+    // The disabled feed is not even in the run; the other feeds still import.
     expect(report.feeds.map((row) => row.feedId)).not.toContain(feed.id);
-    expect(report.feeds).toHaveLength(1);
+    expect(report.feeds).toHaveLength(DEMO_COUNTS.feeds - 1);
     expect(await getPublicProductBySlug(DEMO_SHARED.slug)).toBeNull();
   });
 

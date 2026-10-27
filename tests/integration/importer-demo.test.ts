@@ -33,6 +33,25 @@ afterAll(async () => {
   await closeDb();
 });
 
+const FEEDS = [
+  { name: 'Tienda Demo Uno', ...DEMO_FEED_ROWS.uno },
+  { name: 'Tienda Demo Dos', ...DEMO_FEED_ROWS.dos },
+  { name: 'Tienda Demo Tres', ...DEMO_FEED_ROWS.tres },
+  { name: 'Tienda Demo Cuatro', ...DEMO_FEED_ROWS.cuatro },
+];
+
+// The exact report text of a first run (everything created) or a second (every offer updated).
+function reportLines(ids: number[], run: 'first' | 'second'): string {
+  const lines = FEEDS.map((feed, index) => {
+    const counts =
+      run === 'first'
+        ? `products_created=${feed.productsCreated} offers_created=${feed.rows} offers_updated=0`
+        : `products_created=0 offers_created=0 offers_updated=${feed.rows}`;
+    return `feed ${ids[index]} "${feed.name}": imported rows=${feed.rows} ${counts} rejected=0`;
+  });
+  return [...lines, `total: feeds=${FEEDS.length} imported=${FEEDS.length} skipped=0 failed=0`].join('\n');
+}
+
 async function feedId(url: string): Promise<number> {
   const [row] = await getDb().select({ id: feeds.id }).from(feeds).where(eq(feeds.url, url));
   return row.id;
@@ -43,7 +62,7 @@ async function feedId(url: string): Promise<number> {
 describe('import-feeds on the shipped demo data (brief acceptance)', () => {
   it('first run: the demo products and offers, nothing rejected, and the exact report lines', async () => {
     await seedDemoData(getDb());
-    const [uno, dos] = [await feedId(DEMO_FEED_URLS[0]), await feedId(DEMO_FEED_URLS[1])];
+    const ids = await Promise.all(DEMO_FEED_URLS.map(feedId));
 
     const report = await importFeeds(getDb());
 
@@ -51,19 +70,13 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     expect(await allOffers()).toHaveLength(DEMO_COUNTS.offers);
     expect(report.feeds.flatMap((feed) => feed.rejected)).toEqual([]);
     expect(importExitCode(report)).toBe(0);
-    expect(formatImportReport(report)).toBe(
-      [
-        `feed ${uno} "Tienda Demo Uno": imported rows=${DEMO_FEED_ROWS.uno} products_created=${DEMO_FEED_ROWS.uno} offers_created=${DEMO_FEED_ROWS.uno} offers_updated=0 rejected=0`,
-        `feed ${dos} "Tienda Demo Dos": imported rows=${DEMO_FEED_ROWS.dos} products_created=${DEMO_FEED_ROWS.dosProductsCreated} offers_created=${DEMO_FEED_ROWS.dos} offers_updated=0 rejected=0`,
-        'total: feeds=2 imported=2 skipped=0 failed=0',
-      ].join('\n'),
-    );
+    expect(formatImportReport(report)).toBe(reportLines(ids, 'first'));
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
   it('second run duplicates nothing: counts unchanged, every offer updated', async () => {
     await seedDemoData(getDb());
-    const [uno, dos] = [await feedId(DEMO_FEED_URLS[0]), await feedId(DEMO_FEED_URLS[1])];
+    const ids = await Promise.all(DEMO_FEED_URLS.map(feedId));
     await importFeeds(getDb());
     const productsBefore = await allProducts();
 
@@ -71,13 +84,7 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
 
     expect(await allProducts()).toEqual(productsBefore);
     expect(await allOffers()).toHaveLength(DEMO_COUNTS.offers);
-    expect(formatImportReport(report)).toBe(
-      [
-        `feed ${uno} "Tienda Demo Uno": imported rows=${DEMO_FEED_ROWS.uno} products_created=0 offers_created=0 offers_updated=${DEMO_FEED_ROWS.uno} rejected=0`,
-        `feed ${dos} "Tienda Demo Dos": imported rows=${DEMO_FEED_ROWS.dos} products_created=0 offers_created=0 offers_updated=${DEMO_FEED_ROWS.dos} rejected=0`,
-        'total: feeds=2 imported=2 skipped=0 failed=0',
-      ].join('\n'),
-    );
+    expect(formatImportReport(report)).toBe(reportLines(ids, 'second'));
   });
 
   it('re-running refreshes price_updated_at to the run start even when no price changed', async () => {
@@ -129,8 +136,6 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
       'UNO-002': 4990,
       'UNO-005': 650,
       'UNO-004': 1590,
-      'UNO-101': 555,
-      'UNO-124': 1935,
       'DOS-100': 1149,
       'DOS-101': 2999,
       'DOS-102': 8900,

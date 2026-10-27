@@ -40,14 +40,19 @@ async function counts() {
 }
 
 describe('seedDemoData (C-18, TD-21, TD-22)', () => {
-  it('loads the demo network, two shops, two feeds and the mappings, and no product', async () => {
+  it('loads the demo network, the demo shops, their feeds and the mappings, and no product', async () => {
     const report = await seedDemoData(getDb());
-    expect(report).toMatchObject({ networks: 1, shops: 2, feeds: 2, categoryMappings: DEMO_COUNTS.categoryMappings });
+    expect(report).toMatchObject({
+      networks: 1,
+      shops: DEMO_COUNTS.shops,
+      feeds: DEMO_COUNTS.feeds,
+      categoryMappings: DEMO_COUNTS.categoryMappings,
+    });
     expect(report).not.toHaveProperty('categories');
     expect(await counts()).toEqual({
       networks: 1,
-      shops: 2,
-      feeds: 2,
+      shops: DEMO_COUNTS.shops,
+      feeds: DEMO_COUNTS.feeds,
       categories: FIXED_CATEGORY_COUNT,
       categoryMappings: DEMO_COUNTS.categoryMappings,
       products: 0,
@@ -157,7 +162,7 @@ describe('seed scope (guardrail 1)', () => {
     const approvedShops = await getDb().select().from(shops).where(eq(shops.isApproved, true));
     expect(approvedShops.map((row) => row.slug).sort()).toEqual(DEMO_SHOPS.map((shop) => shop.slug).sort());
     const approvedFeeds = await getDb().select().from(feeds).where(eq(feeds.isApproved, true));
-    expect(approvedFeeds).toHaveLength(2);
+    expect(approvedFeeds).toHaveLength(DEMO_COUNTS.feeds);
     expect(approvedFeeds.every((row) => row.isDemo)).toBe(true);
     const [still] = await getDb().select().from(shops).where(eq(shops.slug, 'tienda-externa'));
     expect(still.isApproved).toBe(false);

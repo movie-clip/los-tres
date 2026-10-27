@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_NO_BRAND, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
+import { DEMO_FOUR_OFFERS, DEMO_NO_BRAND, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
 import { loadEnv } from '../support/env';
 import { dateMessagePattern, icuPlural, normaliseSpaces } from '../support/messages';
 import {
@@ -39,11 +39,12 @@ test.describe('product page /producto/<slug> (C-13)', () => {
       messages.Product.metaTitle.replace('{title}', DEMO_SHARED.title).replace('{siteName}', siteName),
     );
 
-    // A placeholder stands where the image goes.
+    // The square carries the drawing of the product's own category, labelled as an illustration.
     await expect(page.locator('div[role="img"]')).toHaveAttribute(
       'aria-label',
-      messages.Product.imagePlaceholder,
+      messages.Product.imageByCategory[DEMO_SHARED.categorySlug],
     );
+    await expect(page.locator('div[role="img"] svg[data-testid="category-illustration"]')).toHaveCount(1);
 
     // brand, part number and EAN as dt/dd pairs.
     const terms = await page.locator('dl dt').allTextContents();
@@ -74,6 +75,30 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     for (const updated of await text(page, 'offer-updated')) {
       expect(updated).toMatch(datePattern);
     }
+    await close();
+  });
+
+  test('lists the four-shop product with four rows, cheapest first, and its category label', async ({
+    request,
+    browser,
+  }) => {
+    const response = await request.get(path(DEMO_FOUR_OFFERS.slug));
+    expect(response.status()).toBe(200);
+    const { page, close } = await openRawHtml(browser, await response.text());
+
+    await expect(page.getByTestId('offer-row')).toHaveCount(DEMO_FOUR_OFFERS.offers.length);
+    await expect(page.getByTestId('shop-count')).toHaveText(
+      icuPlural(messages.Product.shopCount, DEMO_FOUR_OFFERS.offers.length),
+    );
+    expect(await text(page, 'offer-shop')).toEqual(DEMO_FOUR_OFFERS.offers.map((offer) => offer.shopName));
+    const cents = (await text(page, 'offer-price')).map((value) =>
+      Number(value.replace(/[^\d,]/g, '').replace(',', '.')) * 100,
+    );
+    expect(cents.map(Math.round)).toEqual(DEMO_FOUR_OFFERS.offers.map((offer) => offer.priceCents));
+    await expect(page.locator('div[role="img"]')).toHaveAttribute(
+      'aria-label',
+      messages.Product.imageByCategory[DEMO_FOUR_OFFERS.categorySlug],
+    );
     await close();
   });
 

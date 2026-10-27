@@ -44,7 +44,14 @@ describe('getPublicCategoryPage shape (C-3)', () => {
       pageCount: 1,
       productCount: 1,
       products: [
-        { slug: 'filtro-a', title: 'Filtro A', brand: 'MarcaX', lowestPriceCents: 1149, offerCount: 2 },
+        {
+          slug: 'filtro-a',
+          title: 'Filtro A',
+          brand: 'MarcaX',
+          lowestPriceCents: 1149,
+          offerCount: 2,
+          categorySlug: 'filtros',
+        },
       ],
       demoOnly: false,
       indexable: true,
