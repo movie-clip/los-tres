@@ -140,6 +140,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
   content truncates it if the build raises: read, build, then write. Pass
   `encoding='utf-8'`; the default is cp1252.
 - A long Bash heredoc containing apostrophes failed to parse: use Write.
+- `tests/unit/styles.test.ts` (S11.1, #242) scans every css file under `src`, comments included, for `box-shadow`, `transition`, `transform`, `animation`, `100vw`, raw colours outside `:root` and a `var(--x)` with no `:root` definition; its pure helpers are exercised on in-memory CSS. Never name a variable `module` in a test: `@next/next/no-assign-module-variable` fails lint.
 - A Bash command holding several heredocs with apostrophes inside TypeScript strings failed to parse (exit 2, nothing ran): write test files with Write and run edit scripts from the scratchpad.
 
 ## Definition of done for this lane
