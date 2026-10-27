@@ -14,6 +14,7 @@ const card: ProductCardProps = {
   href: '/producto/uno',
   title: 'Filtro de aceite',
   brand: 'MarcaX',
+  spec: null,
   priceFrom: 'Desde',
   price: '11,49 €',
   shopCount: '2 tiendas',

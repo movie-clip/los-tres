@@ -130,6 +130,16 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
     expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
   });
 
+  it.each(['Category.brandChipLabel', 'Category.brandChipSelectedLabel'])(
+    'writes %s with an ICU plural on the count',
+    (key) => {
+      const message = lookup(key) as string;
+      expect(message).toMatch(/\{count, plural,/);
+      expect(message).toMatch(/one\s*\{[^}]*#[^}]*\}/);
+      expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
+    },
+  );
+
   it('puts no price and no mention of shipping in the copy', () => {
     const product = collectStrings((messages as Record<string, unknown>).Product).join(' | ');
     expect(product).not.toMatch(/\d+[.,]\d{2}\s*€/);
@@ -151,6 +161,20 @@ describe('messages/es-ES.json Category namespace (S5.1)', () => {
     'Category.priceFrom',
     'Category.emptyHeading',
     'Category.emptyBody',
+    'Category.brandGroupLabel',
+    'Category.brandAll',
+    'Category.brandChipLabel',
+    'Category.brandChipSelectedLabel',
+    'Category.brandMore',
+    'Category.sortLabel',
+    'Category.sortSubmit',
+    'Category.sortPriceAsc',
+    'Category.sortPriceDesc',
+    'Category.sortName',
+    'Category.specRef',
+    'Category.noMatchHeading',
+    'Category.noMatchBody',
+    'Category.noMatchAction',
   ])('has a non-empty string at %s', (key) => {
     const value = lookup(key);
     expect(typeof value).toBe('string');
@@ -166,6 +190,10 @@ describe('messages/es-ES.json Category namespace (S5.1)', () => {
     expect(lookup('Category.pageIndicator')).toContain('{pages}');
     expect(lookup('Category.summaryPaged')).toContain('{page}');
     expect(lookup('Category.summaryPaged')).toContain('{pages}');
+    expect(lookup('Category.brandChipLabel')).toContain('{brand}');
+    expect(lookup('Category.brandChipSelectedLabel')).toContain('{brand}');
+    expect(lookup('Category.brandMore')).toContain('{count}');
+    expect(lookup('Category.specRef')).toContain('{partNumber}');
   });
 
   it.each(['Category.summary', 'Category.summaryPaged'])(

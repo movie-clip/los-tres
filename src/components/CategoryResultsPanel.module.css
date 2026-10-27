@@ -1,0 +1,35 @@
+/* A white card on the canvas, like the product card. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+/* The hairline sits under the brand group and only when there is one. */
+.brands {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Count left, sort right, both bottom aligned. With no room the sort wraps under
+   the count and sits at the start of its own line. No media query. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+/* A paragraph inside .page is muted by globals.css; the count is not. */
+.panel .count {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}

@@ -1,0 +1,73 @@
+/* The label sits above a row of the select and the button; the row wraps, so at
+   200% zoom the button drops under the select and nothing is clipped. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.label {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.select {
+  flex: 1 1 12rem;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-md);
+}
+
+.select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* The secondary button: white, ink outline; hover fills ink, pressed fills amber. */
+.button {
+  box-sizing: border-box;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.button:hover,
+.button:focus-visible {
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.button:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
