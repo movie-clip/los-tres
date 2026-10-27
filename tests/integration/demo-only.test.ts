@@ -111,7 +111,7 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: true }, { isDemo: true }]);
     await productWith('b', category.id, [{ isDemo: true }]);
-    const page = await getPublicCategoryPage('filtros', 1);
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
     expect(page?.products).toHaveLength(2);
     expect(page?.demoOnly).toBe(true);
   });
@@ -120,18 +120,18 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: true }]);
     await productWith('b', category.id, [{ isDemo: true }, { isDemo: false }]);
-    expect((await getPublicCategoryPage('filtros', 1))?.demoOnly).toBe(false);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc'))?.demoOnly).toBe(false);
   });
 
   it('is false when every offer is real', async () => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: false }]);
-    expect((await getPublicCategoryPage('filtros', 1))?.demoOnly).toBe(false);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc'))?.demoOnly).toBe(false);
   });
 
   it('is false for an empty category, not vacuously true', async () => {
     await insertCategory({ slug: 'vacia' });
-    const page = await getPublicCategoryPage('vacia', 1);
+    const page = await getPublicCategoryPage('vacia', 1, null, 'price-asc');
     expect(page?.products).toEqual([]);
     expect(page?.demoOnly).toBe(false);
   });
@@ -139,7 +139,7 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
   it('is false when the only product has no visible offer left', async () => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('oculta', category.id, [{ isDemo: true, hidden: true }]);
-    const page = await getPublicCategoryPage('filtros', 1);
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
     expect(page?.products).toEqual([]);
     expect(page?.demoOnly).toBe(false);
   });
@@ -151,7 +151,7 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
   ])('ignores a real offer that is %s: still true', async (_name, flag) => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: true }, { isDemo: false, ...flag }]);
-    const page = await getPublicCategoryPage('filtros', 1);
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
     expect(page?.products[0].offerCount).toBe(1);
     expect(page?.demoOnly).toBe(true);
   });
@@ -163,13 +163,13 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
   ])('ignores a demo offer that is %s: still false', async (_name, flag) => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: false }, { isDemo: true, ...flag }]);
-    expect((await getPublicCategoryPage('filtros', 1))?.demoOnly).toBe(false);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc'))?.demoOnly).toBe(false);
   });
 
   it('never exposes the demo flag on a card', async () => {
     const category = await insertCategory({ slug: 'filtros' });
     await productWith('a', category.id, [{ isDemo: true }]);
-    const page = await getPublicCategoryPage('filtros', 1);
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
     for (const card of page?.products ?? []) {
       expect(Object.keys(card)).not.toContain('allDemo');
       expect(Object.keys(card)).not.toContain('isDemo');
@@ -192,8 +192,8 @@ describe('getPublicCategoryPage demoOnly (S9.3)', () => {
     const real = await insertProduct({ slug: 'z-real', title: 'Z real', categoryId: category.id });
     await insertOffer({ productId: real.id, feedId: await feed(false), priceCents: 5000 });
 
-    const first = await getPublicCategoryPage('filtros', 1);
-    const second = await getPublicCategoryPage('filtros', 2);
+    const first = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
+    const second = await getPublicCategoryPage('filtros', 2, null, 'price-asc');
     expect(first?.products).toHaveLength(CATEGORY_PAGE_SIZE);
     expect(first?.demoOnly).toBe(true);
     expect(second?.products.map((card) => card.slug)).toEqual(['z-real']);

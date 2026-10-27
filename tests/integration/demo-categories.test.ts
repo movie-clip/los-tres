@@ -53,16 +53,16 @@ describe('demo data categories (AC 23, AC 24)', () => {
   it.each(Object.entries(DEMO_CATEGORY_COUNTS))(
     'category %s holds %d public products across its subtree',
     async (slug, count) => {
-      const page = await getPublicCategoryPage(slug, 1);
+      const page = await getPublicCategoryPage(slug, 1, null, 'price-asc');
       expect(page?.productCount).toBe(count);
     },
   );
 
   it('shows products in the root only through its children', async () => {
-    const rootPage = await getPublicCategoryPage(ROOT, 1);
+    const rootPage = await getPublicCategoryPage(ROOT, 1, null, 'price-asc');
     let childTotal = 0;
     for (const child of FIXED_CATEGORY_TREE.children) {
-      childTotal += (await getPublicCategoryPage(child.slug, 1))?.productCount ?? 0;
+      childTotal += (await getPublicCategoryPage(child.slug, 1, null, 'price-asc'))?.productCount ?? 0;
     }
     expect(rootPage?.productCount).toBe(childTotal);
     // No product is assigned to the root itself.
@@ -74,13 +74,13 @@ describe('demo data categories (AC 23, AC 24)', () => {
   it('pages the root: 24 per page, the rest on the last, cheapest first', async () => {
     const pageCount = Math.ceil(DEMO_CATEGORY_COUNTS[ROOT] / 24);
     const pages = [];
-    for (let number = 1; number <= pageCount; number += 1) pages.push(await getPublicCategoryPage(ROOT, number));
+    for (let number = 1; number <= pageCount; number += 1) pages.push(await getPublicCategoryPage(ROOT, number, null, 'price-asc'));
     const [first] = pages;
     expect(first).toMatchObject({ pageCount, productCount: DEMO_CATEGORY_COUNTS[ROOT] });
     expect(pages.map((page) => page?.products.length)).toEqual(
       pages.map((_page, index) => Math.min(24, DEMO_CATEGORY_COUNTS[ROOT] - index * 24)),
     );
-    expect(await getPublicCategoryPage(ROOT, pageCount + 1)).toBeNull();
+    expect(await getPublicCategoryPage(ROOT, pageCount + 1, null, 'price-asc')).toBeNull();
     expect(first?.products[0]).toMatchObject({
       slug: DEMO_CHEAPEST.slug,
       title: DEMO_CHEAPEST.title,
@@ -95,8 +95,8 @@ describe('demo data categories (AC 23, AC 24)', () => {
     const leaves = new Map<string, string>();
     for (const [leaf, productSlug] of Object.entries(DEMO_ILLUSTRATED)) leaves.set(productSlug, leaf);
     const cards = [
-      ...((await getPublicCategoryPage(ROOT, 1))?.products ?? []),
-      ...((await getPublicCategoryPage(ROOT, 2))?.products ?? []),
+      ...((await getPublicCategoryPage(ROOT, 1, null, 'price-asc'))?.products ?? []),
+      ...((await getPublicCategoryPage(ROOT, 2, null, 'price-asc'))?.products ?? []),
     ];
     expect(new Set(cards.map((card) => card.categorySlug)).size).toBeGreaterThanOrEqual(2);
     for (const [productSlug, leaf] of leaves) {
@@ -108,7 +108,7 @@ describe('demo data categories (AC 23, AC 24)', () => {
 
   it('gives a leaf page cards that carry that leaf slug', async () => {
     for (const leaf of Object.keys(DEMO_ILLUSTRATED)) {
-      const cards = (await getPublicCategoryPage(leaf, 1))?.products ?? [];
+      const cards = (await getPublicCategoryPage(leaf, 1, null, 'price-asc'))?.products ?? [];
       expect(cards.length).toBeGreaterThan(0);
       expect(cards.every((card) => card.categorySlug === leaf)).toBe(true);
     }
@@ -131,7 +131,7 @@ describe('demo data categories (AC 23, AC 24)', () => {
   });
 
   it('shows the shared filter with its cheaper shop price and two shops', async () => {
-    const page = await getPublicCategoryPage('filtros-de-aceite', 1);
+    const page = await getPublicCategoryPage('filtros-de-aceite', 1, null, 'price-asc');
     const card = page?.products.find((c) => c.slug === DEMO_SHARED.slug);
     expect(card).toMatchObject({
       lowestPriceCents: DEMO_SHARED.offers[0].priceCents,
@@ -140,13 +140,13 @@ describe('demo data categories (AC 23, AC 24)', () => {
   });
 
   it('carries the product without a brand and the 100-character title', async () => {
-    const oil = (await getPublicCategoryPage(DEMO_NO_BRAND.categorySlug, 1))?.products.find(
+    const oil = (await getPublicCategoryPage(DEMO_NO_BRAND.categorySlug, 1, null, 'price-asc'))?.products.find(
       (card) => card.slug === DEMO_NO_BRAND.slug,
     );
     expect(oil).toMatchObject({ slug: DEMO_NO_BRAND.slug, brand: null, lowestPriceCents: DEMO_NO_BRAND.priceCents });
     const all = [
-      ...((await getPublicCategoryPage(ROOT, 1))?.products ?? []),
-      ...((await getPublicCategoryPage(ROOT, 2))?.products ?? []),
+      ...((await getPublicCategoryPage(ROOT, 1, null, 'price-asc'))?.products ?? []),
+      ...((await getPublicCategoryPage(ROOT, 2, null, 'price-asc'))?.products ?? []),
     ];
     const long = all.find((card) => card.title === DEMO_LONG_TITLE.title);
     expect(long?.title).toHaveLength(100);
@@ -154,12 +154,12 @@ describe('demo data categories (AC 23, AC 24)', () => {
   });
 
   it('keeps the fuel filter category empty and the page answerable', async () => {
-    expect(await getPublicCategoryPage('filtros-de-combustible', 1)).toMatchObject({
+    expect(await getPublicCategoryPage('filtros-de-combustible', 1, null, 'price-asc')).toMatchObject({
       productCount: 0,
       pageCount: 1,
       products: [],
     });
-    expect(await getPublicCategoryPage('filtros-de-combustible', 2)).toBeNull();
+    expect(await getPublicCategoryPage('filtros-de-combustible', 2, null, 'price-asc')).toBeNull();
   });
 
   it.each([DEMO_UNMAPPED_CATEGORY, DEMO_UNMAPPED_EMPTY, DEMO_DRILL, DEMO_WRENCHES])(
@@ -172,7 +172,7 @@ describe('demo data categories (AC 23, AC 24)', () => {
       expect(await getPublicProductBySlug(slug)).toBeNull();
       for (const category of Object.keys(DEMO_CATEGORY_COUNTS)) {
         for (const page of [1, 2, 3]) {
-          const listing = await getPublicCategoryPage(category, page);
+          const listing = await getPublicCategoryPage(category, page, null, 'price-asc');
           expect(listing?.products.map((card) => card.slug) ?? []).not.toContain(slug);
         }
       }

@@ -71,7 +71,7 @@ describe('category capture and assignment (AC 5, AC 7)', () => {
     await insertCategoryMapping(feedId, 'Filtros', filtros.id);
     await run(feedId);
 
-    const listing = await getPublicCategoryPage('filtros', 1);
+    const listing = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
     expect(listing?.products.map((card) => card.title).sort()).toEqual(['Mixto Espacios', 'Mixto Filtro mapeado']);
     const unmapped = await productBySlug('mixto-sin-mapa');
     expect(unmapped).toBeDefined();
@@ -175,8 +175,8 @@ describe('first mapped wins and is never cleared (OD-F, D-3)', () => {
     expect(products[0].categoryId).toBe(catA.id);
     expect(await allOffers()).toHaveLength(2);
     // The product is in one category only, so it is on one category page only.
-    expect((await getPublicCategoryPage('categoria-a', 1))?.productCount).toBe(1);
-    expect((await getPublicCategoryPage('categoria-b', 1))?.productCount).toBe(0);
+    expect((await getPublicCategoryPage('categoria-a', 1, null, 'price-asc'))?.productCount).toBe(1);
+    expect((await getPublicCategoryPage('categoria-b', 1, null, 'price-asc'))?.productCount).toBe(0);
   });
 
   it('follows import order, not feed id: the feed imported first decides', async () => {
@@ -252,7 +252,7 @@ describe('a mapping never overrides the admin (guardrail 1)', () => {
     await run(feedId);
 
     expect((await allProducts())[0]).toMatchObject({ categoryId: category.id, isHidden: true });
-    expect((await getPublicCategoryPage('uno', 1))?.productCount).toBe(0);
+    expect((await getPublicCategoryPage('uno', 1, null, 'price-asc'))?.productCount).toBe(0);
   });
 
   it('keeps the product non-public when its feed is disabled after the import', async () => {
@@ -260,11 +260,11 @@ describe('a mapping never overrides the admin (guardrail 1)', () => {
     const category = await insertCategory({ slug: 'uno' });
     await insertCategoryMapping(feedId, 'Cat Uno', category.id);
     await run(feedId);
-    expect((await getPublicCategoryPage('uno', 1))?.productCount).toBe(1);
+    expect((await getPublicCategoryPage('uno', 1, null, 'price-asc'))?.productCount).toBe(1);
 
     await getDb().update(feeds).set({ isApproved: false }).where(eq(feeds.id, feedId));
 
-    expect((await getPublicCategoryPage('uno', 1))?.productCount).toBe(0);
+    expect((await getPublicCategoryPage('uno', 1, null, 'price-asc'))?.productCount).toBe(0);
     expect(await getPublicProductBySlug((await allProducts())[0].slug)).toBeNull();
   });
 
@@ -276,6 +276,6 @@ describe('a mapping never overrides the admin (guardrail 1)', () => {
     await insertCategoryMapping(feedId, 'Cat Uno', category.id);
     await run(feedId);
     expect((await allOffers())[0].isHidden).toBe(true);
-    expect((await getPublicCategoryPage('uno', 1))?.productCount).toBe(0);
+    expect((await getPublicCategoryPage('uno', 1, null, 'price-asc'))?.productCount).toBe(0);
   });
 });

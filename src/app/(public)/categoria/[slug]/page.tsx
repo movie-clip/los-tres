@@ -10,6 +10,7 @@ import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
+import { parseBrandParam, parseSortParam } from '@/server/catalogue/category-query';
 import { parsePageParam } from '@/server/catalogue/page-param';
 import { categoryPath, productPath } from '@/server/catalogue/paths';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -24,7 +25,11 @@ const load = cache(getPublicCategoryPage);
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ pagina?: string | string[] }>;
+  searchParams: Promise<{
+    pagina?: string | string[];
+    marca?: string | string[];
+    orden?: string | string[];
+  }>;
 };
 
 export async function generateMetadata({
@@ -32,8 +37,13 @@ export async function generateMetadata({
   searchParams,
 }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { pagina } = await searchParams;
-  const category = await load(slug, parsePageParam(pagina));
+  const { pagina, marca, orden } = await searchParams;
+  const category = await load(
+    slug,
+    parsePageParam(pagina),
+    parseBrandParam(marca),
+    parseSortParam(orden),
+  );
   if (category === null) return {};
   const t = await getTranslations('Category');
   const values = { category: category.name, page: category.page, siteName: getSiteName() };
@@ -46,8 +56,13 @@ export async function generateMetadata({
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { slug } = await params;
-  const { pagina } = await searchParams;
-  const category = await load(slug, parsePageParam(pagina));
+  const { pagina, marca, orden } = await searchParams;
+  const category = await load(
+    slug,
+    parsePageParam(pagina),
+    parseBrandParam(marca),
+    parseSortParam(orden),
+  );
   if (category === null) notFound();
 
   const [t, tProduct, tNotFound, tDemo] = await Promise.all([
