@@ -402,3 +402,662 @@ for (const viewport of [
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// S11.4: brand chips, sort form, spec line, no-match state (02-ux § Checks).
+// Brands come from the demo import: filtros-de-aire has six brands of two
+// products each, the root has fifteen, aceite-de-motor has seven.
+// ---------------------------------------------------------------------------
+
+const AIR = 'filtros-de-aire';
+const OIL = 'aceite-de-motor';
+const MANY_BRANDS = 15;
+const VISIBLE_CHIPS = 8;
+/** Brand of the root list that sits outside the first 8 chips (2 products). */
+const LATE_BRAND = { slug: 'total', label: 'Total' };
+const listing = (slug: string, query = '') => `/categoria/${slug}${query}`;
+const brandChips = (page: Page) => page.getByTestId('brand-chip');
+const chipCount = async (chip: Locator): Promise<number> => {
+  const label = (await chip.getAttribute('aria-label')) ?? '';
+  const found = /: (\d+) producto/.exec(label);
+  if (found === null) throw new Error(`no count in aria-label: ${label}`);
+  return Number(found[1]);
+};
+const chipBrand = async (chip: Locator): Promise<string> =>
+  ((await chip.getAttribute('aria-label')) ?? '').split(':')[0];
+const parsePrice = (text: string): number =>
+  Number(normaliseSpaces(text).replace(/[^\d,]/g, '').replace(',', '.'));
+const cardTitles = (page: Page) => page.getByTestId('card-title').allTextContents();
+const cardPrices = async (page: Page) =>
+  (await page.getByTestId('card-price').allTextContents()).map(parsePrice);
+const stripScripts = (html: string) => html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+
+test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
+  test('check 1: the chips, the count and the sort sit in one panel between the IVA note and the first card', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR));
+    const panel = page.getByTestId('category-panel');
+    await expect(panel).toHaveCount(1);
+    await expect(panel.getByTestId('brand-chips')).toHaveCount(1);
+    await expect(panel.getByTestId('category-summary')).toHaveCount(1);
+    await expect(panel.getByTestId('category-sort')).toHaveCount(1);
+
+    const note = await page.getByText(messages.Product.vatIncluded, { exact: true }).boundingBox();
+    const box = await panel.boundingBox();
+    const firstCard = await page.getByTestId('category-card').first().boundingBox();
+    expect(note!.y).toBeLessThan(box!.y);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(firstCard!.y);
+  });
+
+  test('check 1: the panel is white on the canvas, not bare controls', async ({ page }) => {
+    await page.goto(listing(AIR));
+    const panelBackground = await page
+      .getByTestId('category-panel')
+      .evaluate((node) => getComputedStyle(node).backgroundColor);
+    const canvas = await page.locator('body').evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(panelBackground).toBe('rgb(255, 255, 255)');
+    expect(panelBackground).not.toBe(canvas);
+  });
+
+  test('check 2: the first chip is "Todas las marcas" and is the one selected on the unfiltered page', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR));
+    const group = page.getByTestId('brand-chips');
+    await expect(group.getByRole('link').first()).toHaveAttribute('data-testid', 'brand-chip-all');
+    await expect(page.getByTestId('brand-chip-all')).toHaveText(messages.Category.brandAll);
+    await expect(page.getByTestId('brand-chip-all')).toHaveAttribute('aria-current', 'true');
+    await expect(group.locator('[aria-current="true"]')).toHaveCount(1);
+    await expect(group.getByText(messages.Category.brandGroupLabel, { exact: true })).toBeVisible();
+    await expect(group.getByRole('list', { name: messages.Category.brandGroupLabel })).toHaveCount(1);
+  });
+
+  test('check 3: each chip count equals the cards after pressing it, and the chip counts add up to the category', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR));
+    const n = await brandChips(page).count();
+    expect(n).toBe(6);
+    let total = 0;
+    for (let index = 0; index < n; index += 1) {
+      await page.goto(listing(AIR));
+      const chip = brandChips(page).nth(index);
+      const expected = await chipCount(chip);
+      const brand = await chipBrand(chip);
+      total += expected;
+      await expect(chip).toContainText(brand);
+      await chip.click();
+      await expect(page.getByTestId('category-card')).toHaveCount(expected);
+      await expect(page.getByTestId('category-summary')).toHaveText(summaryText(expected));
+      for (const cardBrand of await page.getByTestId('card-brand').allTextContents()) {
+        expect(cardBrand).toBe(brand);
+      }
+    }
+    expect(total).toBe(DEMO_CATEGORY_COUNTS[AIR]);
+  });
+
+  test('check 4: ?marca=bosch selects the Bosch chip, lists only Bosch and carries no pagina', async ({ page }) => {
+    await page.goto(listing(AIR, '?marca=bosch'));
+    const selected = page.getByTestId('brand-chips').locator('[aria-current="true"]');
+    await expect(selected).toHaveCount(1);
+    await expect(selected).toHaveAttribute('data-testid', 'brand-chip');
+    expect(await chipBrand(selected)).toBe('Bosch');
+    expect(await selected.getAttribute('aria-label')).toContain(
+      messages.Category.brandChipSelectedLabel.split('. ')[1],
+    );
+    const cards = await page.getByTestId('category-card').count();
+    expect(cards).toBeGreaterThan(0);
+    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(cards));
+    expect(await page.getByTestId('card-brand').allTextContents()).toEqual(Array(cards).fill('Bosch'));
+    expect(new URL(page.url()).searchParams.has('pagina')).toBe(false);
+    await expect(page.getByTestId('brand-chip-all')).not.toHaveAttribute('aria-current', 'true');
+  });
+
+  test('check 5: pressing the selected chip returns to the clean unfiltered URL', async ({ page }) => {
+    await page.goto(listing(AIR, '?marca=bosch'));
+    await page.getByTestId('brand-chips').locator('[aria-current="true"]').click();
+    await expect(page).toHaveURL(new RegExp(`${listing(AIR)}$`));
+    await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[AIR]);
+  });
+
+  test('check 5: "Todas las marcas" drops the brand and keeps the sort', async ({ page }) => {
+    await page.goto(listing(AIR, '?marca=bosch&orden=nombre'));
+    await page.getByTestId('brand-chip-all').click();
+    await expect(page).toHaveURL(new RegExp(`${listing(AIR, '\\?orden=nombre')}$`));
+  });
+
+  test('check 6: the root shows 8 chips and "Más marcas (7)", which holds the other 7', async ({ page }) => {
+    await page.goto(listing(ROOT));
+    const more = page.getByTestId('brand-more');
+    await expect(more).toHaveCount(1);
+    await expect(more.locator('summary')).toContainText(
+      messages.Category.brandMore.replace('{count}', String(MANY_BRANDS - VISIBLE_CHIPS)),
+    );
+    await expect(brandChips(page)).toHaveCount(MANY_BRANDS);
+    await expect(page.getByTestId('brand-chips').locator('> ul > li > a[data-testid="brand-chip"]')).toHaveCount(
+      VISIBLE_CHIPS,
+    );
+    await expect(more.getByTestId('brand-chip')).toHaveCount(MANY_BRANDS - VISIBLE_CHIPS);
+    // Closed until pressed: the overflow chips are not visible, then are.
+    await expect(more).not.toHaveAttribute('open', '');
+    await expect(more.getByTestId('brand-chip').first()).toBeHidden();
+    await more.locator('summary').click();
+    await expect(more.getByTestId('brand-chip').first()).toBeVisible();
+    await expect(more.getByTestId('brand-chip')).toHaveCount(MANY_BRANDS - VISIBLE_CHIPS);
+  });
+
+  test('check 7: a selected brand outside the first 8 opens "Más marcas" with its chip visible', async ({ page }) => {
+    await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
+    const more = page.getByTestId('brand-more');
+    await expect(more).toHaveAttribute('open', '');
+    const selected = more.locator('[aria-current="true"]');
+    await expect(selected).toBeVisible();
+    expect(await chipBrand(selected)).toBe(LATE_BRAND.label);
+  });
+
+  test('check 7: a selected brand in the first 8 leaves "Más marcas" closed', async ({ page }) => {
+    await page.goto(listing(ROOT, '?marca=bosch'));
+    await expect(page.getByTestId('brand-more')).not.toHaveAttribute('open', '');
+  });
+
+  test('check 8: a category with 7 brands shows no "Más marcas" control', async ({ page }) => {
+    await page.goto(listing(OIL));
+    await expect(brandChips(page)).toHaveCount(7);
+    await expect(page.getByTestId('brand-more')).toHaveCount(0);
+  });
+
+  test('the brand count in each chip is the same number the chip name carries on the root', async ({ page }) => {
+    await page.goto(listing(ROOT));
+    await page.getByTestId('brand-more').locator('summary').click();
+    let total = 0;
+    for (const chip of await brandChips(page).all()) total += await chipCount(chip);
+    // Every demo product has a brand except the one without, so the chips cover all but that one.
+    expect(total).toBe(DEMO_CATEGORY_COUNTS[ROOT] - 1);
+  });
+
+  test('a chip keeps the current sort and drops the page', async ({ page }) => {
+    await page.goto(listing(ROOT, '?orden=precio-desc&pagina=2'));
+    const href = await brandChips(page).first().getAttribute('href');
+    const url = new URL(href as string, 'http://x.test');
+    expect(url.searchParams.get('orden')).toBe('precio-desc');
+    expect(url.searchParams.has('pagina')).toBe(false);
+    expect(url.searchParams.get('marca')).not.toBeNull();
+    // Params in the fixed order marca, orden.
+    expect([...url.searchParams.keys()]).toEqual(['marca', 'orden']);
+  });
+});
+
+test.describe('category sort form (S11.4, 02-ux checks 9 to 15)', () => {
+  test('check 9 and 10: label, select and submit show with JavaScript off, with the three options in order', async ({
+    request,
+    browser,
+  }) => {
+    const { page, close } = await openRawHtml(browser, await (await request.get(listing(AIR))).text());
+    await expect(page.getByLabel(messages.Category.sortLabel)).toHaveCount(1);
+    await expect(page.getByTestId('category-sort-submit')).toHaveText(messages.Category.sortSubmit);
+    const select = page.getByTestId('category-sort-select');
+    expect(await select.locator('option').allTextContents()).toEqual([
+      messages.Category.sortPriceAsc,
+      messages.Category.sortPriceDesc,
+      messages.Category.sortName,
+    ]);
+    expect(await select.locator('option').evaluateAll((nodes) => nodes.map((n) => (n as HTMLOptionElement).value))).toEqual(
+      ['precio-asc', 'precio-desc', 'nombre'],
+    );
+    await expect(select).toHaveValue('precio-asc');
+    await close();
+  });
+
+  test('check 9: label, select and button are visible at 390 and 1280', async ({ page }) => {
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(listing(AIR));
+      await expect(page.getByText(messages.Category.sortLabel, { exact: true })).toBeVisible();
+      await expect(page.getByTestId('category-sort-select')).toBeVisible();
+      await expect(page.getByTestId('category-sort-submit')).toBeVisible();
+    }
+  });
+
+  test('checks 11 and 25: with JavaScript off, Precio de mayor a menor reloads dearest first, sets no cookie and requests no /go', async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+    const page = await context.newPage();
+    const requested: string[] = [];
+    page.on('request', (req) => requested.push(req.url()));
+
+    await page.goto(listing(AIR));
+    const ascending = await cardPrices(page);
+    expect(ascending).toEqual([...ascending].sort((a, b) => a - b));
+
+    await page.getByTestId('category-sort-select').selectOption({ label: messages.Category.sortPriceDesc });
+    await page.getByTestId('category-sort-submit').click();
+
+    await expect(page).toHaveURL(/\/categoria\/filtros-de-aire\?orden=precio-desc$/);
+    await expect(page.getByTestId('category-sort-select')).toHaveValue('precio-desc');
+    const descending = await cardPrices(page);
+    expect(descending).toHaveLength(DEMO_CATEGORY_COUNTS[AIR]);
+    expect(descending).toEqual([...descending].sort((a, b) => b - a));
+    expect(descending[0]).toBe(Math.max(...ascending));
+
+    // The control worked with no script, and used no cookie and no click link.
+    expect(await context.cookies()).toEqual([]);
+    expect(requested.filter((url) => new URL(url).pathname.startsWith('/go/'))).toEqual([]);
+    await context.close();
+  });
+
+  test('check 11: the no-JS form keeps working back to the default, and ?orden=precio-asc renders as the default', async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+    const page = await context.newPage();
+    await page.goto(listing(AIR, '?orden=precio-desc'));
+    await page.getByTestId('category-sort-select').selectOption({ label: messages.Category.sortPriceAsc });
+    await page.getByTestId('category-sort-submit').click();
+    await expect(page).toHaveURL(/orden=precio-asc$/);
+    const prices = await cardPrices(page);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
+    await expect(page.getByTestId('category-sort-select')).toHaveValue('precio-asc');
+    await context.close();
+  });
+
+  test('check 12: Nombre lists titles in alphabetical order, accents and case ignored', async ({ page }) => {
+    await page.goto(listing(OIL, '?orden=nombre'));
+    await expect(page.getByTestId('category-sort-select')).toHaveValue('nombre');
+    const titles = await cardTitles(page);
+    expect(titles).toHaveLength(DEMO_CATEGORY_COUNTS[OIL]);
+    const collator = new Intl.Collator('und', { sensitivity: 'base' });
+    expect(titles).toEqual([...titles].sort((a, b) => collator.compare(a, b)));
+    // The order differs from the price order, so the sort did something.
+    await page.goto(listing(OIL));
+    expect(await cardTitles(page)).not.toEqual(titles);
+  });
+
+  test('check 13: sorting while a brand is selected keeps the brand chip and the brand cards (no JS)', async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+    const page = await context.newPage();
+    await page.goto(listing(AIR, '?marca=bosch'));
+    const before = (await cardTitles(page)).sort();
+    await page.getByTestId('category-sort-select').selectOption({ label: messages.Category.sortName });
+    await page.getByTestId('category-sort-submit').click();
+
+    const url = new URL(page.url());
+    expect(url.searchParams.get('marca')).toBe('bosch');
+    expect(url.searchParams.get('orden')).toBe('nombre');
+    expect(url.searchParams.has('pagina')).toBe(false);
+    await expect(page.getByTestId('brand-chips').locator('[aria-current="true"]')).toHaveCount(1);
+    expect(await chipBrand(page.getByTestId('brand-chips').locator('[aria-current="true"]'))).toBe('Bosch');
+    expect((await cardTitles(page)).sort()).toEqual(before);
+    await context.close();
+  });
+
+  test('check 13: a chip pressed while a sort is chosen keeps the sort', async ({ page }) => {
+    await page.goto(listing(AIR, '?orden=precio-desc'));
+    await brandChips(page).first().click();
+    expect(new URL(page.url()).searchParams.get('orden')).toBe('precio-desc');
+    await expect(page.getByTestId('category-sort-select')).toHaveValue('precio-desc');
+  });
+
+  test('check 14: changing the sort on page 2 lands on page 1 with no pagina', async ({ page }) => {
+    await page.goto(listing(ROOT, '?pagina=2'));
+    await expect(page.getByTestId('pagination-indicator')).toContainText('2');
+    await page.getByTestId('category-sort-select').selectOption({ label: messages.Category.sortName });
+    await page.getByTestId('category-sort-submit').click();
+    await expect(page).toHaveURL(/orden=nombre/);
+    expect(new URL(page.url()).searchParams.has('pagina')).toBe(false);
+    await expect(page.getByTestId('pagination-indicator')).toHaveText(
+      messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(rootPages)),
+    );
+  });
+
+  test('check 14: pressing a chip on page 2 lands on page 1 with no pagina', async ({ page }) => {
+    await page.goto(listing(ROOT, '?pagina=2'));
+    await brandChips(page).first().click();
+    expect(new URL(page.url()).searchParams.has('pagina')).toBe(false);
+    await expect(page.getByTestId('pagination-indicator')).toHaveCount(0);
+  });
+
+  test('check 15 (the part the demo can reach): the pagination links of a sorted root keep orden, in the fixed order', async ({
+    page,
+  }) => {
+    await page.goto(listing(ROOT, '?orden=nombre'));
+    await expect(page.getByTestId('pagination-next')).toHaveAttribute('href', listing(ROOT, '?orden=nombre&pagina=2'));
+    await page.getByTestId('pagination-next').click();
+    await expect(page.getByTestId('pagination-prev')).toHaveAttribute('href', listing(ROOT, '?orden=nombre'));
+    await expect(page.getByTestId('category-sort-select')).toHaveValue('nombre');
+  });
+
+  test('a sorted root walks every page without repeating a product, for each sort', async ({ request, browser }) => {
+    for (const orden of ['precio-asc', 'precio-desc', 'nombre']) {
+      const titles: string[] = [];
+      for (let index = 1; index <= rootPages; index += 1) {
+        const query = `?orden=${orden}${index > 1 ? `&pagina=${index}` : ''}`;
+        const { page, close } = await openRawHtml(browser, await (await request.get(listing(ROOT, query))).text());
+        titles.push(...(await cardTitles(page)));
+        await close();
+      }
+      expect(titles, orden).toHaveLength(rootCount);
+      expect(new Set(titles).size, orden).toBe(rootCount);
+    }
+  });
+
+  test('the price sorts are exact mirrors of each other over the whole root (ties aside)', async ({ request, browser }) => {
+    const pricesOf = async (orden: string) => {
+      const out: number[] = [];
+      for (let index = 1; index <= rootPages; index += 1) {
+        const query = `?orden=${orden}${index > 1 ? `&pagina=${index}` : ''}`;
+        const { page, close } = await openRawHtml(browser, await (await request.get(listing(ROOT, query))).text());
+        out.push(...(await cardPrices(page)));
+        await close();
+      }
+      return out;
+    };
+    const asc = await pricesOf('precio-asc');
+    const desc = await pricesOf('precio-desc');
+    expect(asc).toEqual([...asc].sort((a, b) => a - b));
+    expect(desc).toEqual([...asc].reverse());
+  });
+});
+
+test.describe('category spec line and cards (S11.4, 02-ux checks 19 to 21)', () => {
+  test('check 19: a product with a part number shows "Ref. <number>" and one without shows no spec line', async ({
+    page,
+  }) => {
+    await page.goto(listing(OIL_FILTERS));
+    const withPart = cardWithTitle(page, DEMO_SHARED.title);
+    await expect(withPart.getByTestId('card-spec')).toHaveText(
+      messages.Category.specRef.replace('{partNumber}', DEMO_SHARED.partNumber),
+    );
+
+    await page.goto(listing(DEMO_NO_BRAND.categorySlug));
+    const without = cardWithTitle(page, DEMO_NO_BRAND.title);
+    await expect(without.getByTestId('card-spec')).toHaveCount(0);
+    expect(await without.innerText()).not.toMatch(/Ref\.|null|undefined/);
+  });
+
+  test('check 19: every spec line on the root is "Ref. " plus text, and the title sits above it', async ({ page }) => {
+    await page.goto(listing(ROOT));
+    const specs = await page.getByTestId('card-spec').allTextContents();
+    expect(specs.length).toBeGreaterThan(0);
+    for (const spec of specs) expect(spec).toMatch(/^Ref\. \S/);
+    const first = page.getByTestId('category-card').filter({ has: page.getByTestId('card-spec') }).first();
+    const title = await first.getByTestId('card-title').boundingBox();
+    const spec = await first.getByTestId('card-spec').boundingBox();
+    expect(spec!.y).toBeGreaterThan(title!.y);
+  });
+
+  test('check 20: a one-shop card shows no "Desde" and "1 tienda", a multi-shop card shows "Desde"', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR));
+    const multi = page
+      .getByTestId('category-card')
+      .filter({ has: page.locator(`a[href="/producto/${DEMO_FOUR_OFFERS.slug}"]`) });
+    await expect(multi.getByTestId('card-price-from')).toHaveText(messages.Category.priceFrom);
+    const single = page.getByTestId('category-card').filter({ has: page.getByText(icuPlural(messages.Product.shopCount, 1), { exact: true }) });
+    expect(await single.count()).toBeGreaterThan(0);
+    await expect(single.first().getByTestId('card-price-from')).toHaveCount(0);
+  });
+
+  test('check 21: the card with no brand has no brand element, and the 100-character title stays inside its card', async ({
+    page,
+  }) => {
+    await page.goto(listing(DEMO_NO_BRAND.categorySlug));
+    const card = cardWithTitle(page, DEMO_NO_BRAND.title);
+    await expect(card.getByTestId('card-brand')).toHaveCount(0);
+
+    for (const target of rootPageUrls) {
+      await page.goto(target);
+      const long = cardWithTitle(page, DEMO_LONG_TITLE.title.slice(0, 40));
+      if ((await long.count()) === 0) continue;
+      const cardBox = await long.first().boundingBox();
+      const titleBox = await long.first().getByTestId('card-title').boundingBox();
+      const priceBox = await long.first().getByTestId('card-price').boundingBox();
+      expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height);
+      expect(priceBox!.y + priceBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height);
+      return;
+    }
+    throw new Error('the long-title demo product was not on any root page');
+  });
+});
+
+test.describe('category no-match, malformed parameters and empty states (S11.4, 02-ux checks 22 to 25, 28)', () => {
+  test('check 22: an unknown brand answers 200 with the panel, 0 productos, no sort and the no-match message', async ({
+    page,
+    context,
+  }) => {
+    const response = await page.goto(listing(AIR, '?marca=no-existe'));
+    expect(response?.status()).toBe(200);
+    await expect(page.getByTestId('category-panel')).toBeVisible();
+    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(0));
+    await expect(page.getByTestId('category-sort')).toHaveCount(0);
+    await expect(page.getByTestId('category-card')).toHaveCount(0);
+    await expect(page.getByTestId('pagination')).toHaveCount(0);
+    await expect(page.getByTestId('brand-chips').locator('[aria-current="true"]')).toHaveCount(0);
+    const empty = page.getByTestId('category-empty');
+    await expect(empty).toContainText(messages.Category.noMatchHeading);
+    await expect(empty).toContainText(messages.Category.noMatchBody);
+    await expect(empty.getByTestId('category-empty-action')).toHaveText(messages.Category.noMatchAction);
+    expect(await context.cookies()).toEqual([]);
+  });
+
+  test('check 22: the "Quitar el filtro" button leads to the clean category URL, keeping a chosen sort', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR, '?marca=no-existe'));
+    await expect(page.getByTestId('category-empty-action')).toHaveAttribute('href', listing(AIR));
+    await page.getByTestId('category-empty-action').click();
+    await expect(page).toHaveURL(new RegExp(`${listing(AIR)}$`));
+    await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[AIR]);
+
+    await page.goto(listing(AIR, '?marca=no-existe&orden=nombre'));
+    await expect(page.getByTestId('category-empty-action')).toHaveAttribute('href', listing(AIR, '?orden=nombre'));
+  });
+
+  test('check 22: the brand text from the URL is never echoed in the page', async ({ request }) => {
+    const marker = 'zz-marca-marcador';
+    const response = await request.get(listing(AIR, `?marca=${marker}`));
+    expect(response.status()).toBe(200);
+    expectNoSetCookie(response);
+    expect(stripScripts(await response.text())).not.toContain(marker);
+  });
+
+  test('check 22: no-match on page 2 is a 404, and a brand past its last page is a 404', async ({ request }) => {
+    expect((await request.get(listing(AIR, '?marca=no-existe&pagina=2'))).status()).toBe(404);
+    // Bosch fits one page in filtros-de-aire.
+    expect((await request.get(listing(AIR, '?marca=bosch&pagina=2'))).status()).toBe(404);
+  });
+
+  test('check 22: a filter on a category with no products still shows the plain empty state, not no-match', async ({
+    page,
+  }) => {
+    await page.goto(listing(EMPTY_LEAF, '?marca=bosch'));
+    await expect(page.getByTestId('category-empty')).toContainText(messages.Category.emptyHeading);
+    await expect(page.getByTestId('category-empty')).not.toContainText(messages.Category.noMatchHeading);
+    await expect(page.getByTestId('category-empty-action')).toHaveCount(0);
+    await expect(page.getByTestId('category-panel')).toHaveCount(0);
+  });
+
+  for (const [name, query] of [
+    ['?marca=!!', '?marca=!!'],
+    ['?marca=BOSCH (upper case)', '?marca=BOSCH'],
+    ['?marca= (empty)', '?marca='],
+    ['?marca=a&marca=b (repeated)', '?marca=bosch&marca=mahle'],
+    ['?orden=zzz', '?orden=zzz'],
+    ['?orden=price-desc (the code name)', '?orden=price-desc'],
+    ['?orden=a&orden=b (repeated)', '?orden=nombre&orden=precio-desc'],
+    ['both malformed', '?marca=!!&orden=zzz'],
+  ] as const) {
+    test(`check 23: ${name} renders the default list as if unset`, async ({ request, browser }) => {
+      const response = await request.get(listing(AIR, query), { maxRedirects: 0 });
+      expect(response.status()).toBe(200);
+      expectNoSetCookie(response);
+      const { page, close } = await openRawHtml(browser, await response.text());
+      await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[AIR]);
+      await expect(page.getByTestId('category-empty')).toHaveCount(0);
+      await expect(page.getByTestId('category-sort-select')).toHaveValue('precio-asc');
+      await expect(page.getByTestId('brand-chip-all')).toHaveAttribute('aria-current', 'true');
+      const prices = await cardPrices(page);
+      expect(prices).toEqual([...prices].sort((a, b) => a - b));
+      await close();
+    });
+  }
+
+  test('check 24: the empty category has no panel, chips, count or sort', async ({ page }) => {
+    await page.goto(listing(EMPTY_LEAF));
+    await expect(page.getByTestId('category-empty')).toBeVisible();
+    for (const id of ['category-panel', 'brand-chips', 'brand-chip', 'category-sort', 'category-summary']) {
+      await expect(page.getByTestId(id), id).toHaveCount(0);
+    }
+  });
+
+  test('check 28: a demo category carries no canonical and is noindex, on ?marca= and ?orden= as on the bare URL', async ({
+    request,
+    browser,
+  }) => {
+    for (const query of ['', '?marca=bosch', '?orden=nombre', '?marca=bosch&orden=nombre', '?marca=no-existe']) {
+      const response = await request.get(listing(AIR, query));
+      expect(response.status(), query).toBe(200);
+      const { page, close } = await openRawHtml(browser, await response.text());
+      await expect(page.locator('link[rel="canonical"]'), query).toHaveCount(0);
+      await expect(page.locator('meta[name="robots"]'), query).toHaveAttribute('content', /noindex/);
+      await close();
+    }
+  });
+});
+
+test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 27)', () => {
+  test('check 27: Tab goes chips in order, then the select, the button, then the cards, each with a visible ring', async ({
+    page,
+  }) => {
+    await page.goto(listing(AIR));
+    const order: string[] = [];
+    const ringOf = () =>
+      page.evaluate(() => {
+        const node = document.activeElement as HTMLElement;
+        // A card link draws its ring on the stretched ::after box, around the whole card.
+        const own = getComputedStyle(node);
+        const style = own.outlineStyle === 'none' ? getComputedStyle(node, '::after') : own;
+        return {
+          id: node.getAttribute('data-testid') ?? node.tagName,
+          width: parseFloat(style.outlineWidth),
+          outline: style.outlineStyle,
+        };
+      });
+    await page.getByTestId('brand-chip-all').focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const stops = 1 + 6 + 1 + 1 + 1; // all, six chips, select, button, first card title
+    for (let index = 0; index < stops; index += 1) {
+      const ring = await ringOf();
+      order.push(ring.id);
+      expect(ring.outline, `${ring.id} at stop ${index}`).not.toBe('none');
+      expect(ring.width, `${ring.id} at stop ${index}`).toBeGreaterThanOrEqual(3);
+      if (index < stops - 1) await page.keyboard.press('Tab');
+    }
+    expect(order).toEqual([
+      'brand-chip-all',
+      ...Array(6).fill('brand-chip'),
+      'category-sort-select',
+      'category-sort-submit',
+      'card-title',
+    ]);
+  });
+
+  test.describe('at 390 wide', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    for (const [name, query] of [
+      ['unfiltered', ''],
+      ['filtered', '?marca=bosch'],
+      ['no-match', '?marca=no-existe'],
+    ] as const) {
+      test(`check 26: the ${name} page does not scroll sideways`, async ({ page }) => {
+        await page.goto(listing(AIR, query));
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
+
+    test('check 26: the open overflow of the root does not scroll sideways', async ({ page }) => {
+      await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
+      await expect(page.getByTestId('brand-more')).toHaveAttribute('open', '');
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+
+    test('check 26: chips, select and buttons are at least 44px high', async ({ page }) => {
+      await page.goto(listing(AIR));
+      const controls: Locator[] = [
+        page.getByTestId('brand-chip-all'),
+        ...(await brandChips(page).all()),
+        page.getByTestId('category-sort-select'),
+        page.getByTestId('category-sort-submit'),
+      ];
+      for (const control of controls) {
+        const box = await control.boundingBox();
+        expect(box!.height, (await control.textContent())?.trim()).toBeGreaterThanOrEqual(44);
+      }
+      await page.goto(listing(ROOT));
+      const summary = (await page.getByTestId('brand-more').locator('summary').boundingBox())!;
+      expect(summary.height).toBeGreaterThanOrEqual(44);
+      await page.goto(listing(AIR, '?marca=no-existe'));
+      expect((await page.getByTestId('category-empty-action').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    });
+
+    test('check 18: one column and the row card', async ({ page }) => {
+      await page.goto(listing(AIR));
+      const xs = new Set<number>();
+      for (const card of await page.getByTestId('category-card').all()) xs.add(Math.round((await card.boundingBox())!.x));
+      expect(xs.size).toBe(1);
+      // Row card: the tile sits left of the title, on the same band.
+      const first = page.getByTestId('category-card').first();
+      const tile = (await first.getByTestId('card-tile').boundingBox())!;
+      const title = (await first.getByTestId('card-title').boundingBox())!;
+      expect(tile.x + tile.width).toBeLessThanOrEqual(title.x);
+    });
+  });
+
+  test.describe('at 768 wide', () => {
+    test.use({ viewport: { width: 768, height: 900 } });
+
+    test('check 18: two columns and the vertical card', async ({ page }) => {
+      await page.goto(listing(AIR));
+      const xs = new Set<number>();
+      for (const card of await page.getByTestId('category-card').all()) xs.add(Math.round((await card.boundingBox())!.x));
+      expect(xs.size).toBe(2);
+      const first = page.getByTestId('category-card').first();
+      const tile = (await first.getByTestId('card-tile').boundingBox())!;
+      const title = (await first.getByTestId('card-title').boundingBox())!;
+      expect(tile.y + tile.height).toBeLessThanOrEqual(title.y);
+    });
+  });
+
+  test.describe('at 1280 wide', () => {
+    test.use({ viewport: { width: 1280, height: 900 } });
+
+    test('check 17: three columns of equal width and prices on one baseline across a row', async ({ page }) => {
+      await page.goto(listing(ROOT));
+      const cards = await page.getByTestId('category-card').all();
+      const boxes = await Promise.all(cards.slice(0, 6).map((card) => card.boundingBox()));
+      const xs = [...new Set(boxes.map((box) => Math.round(box!.x)))];
+      expect(xs).toHaveLength(3);
+      const widths = new Set(boxes.map((box) => Math.round(box!.width)));
+      expect(widths.size).toBe(1);
+
+      const prices = await Promise.all(cards.slice(0, 3).map((card) => card.getByTestId('card-price').boundingBox()));
+      const ys = prices.map((box) => Math.round(box!.y + box!.height));
+      expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(1);
+    });
+  });
+});
