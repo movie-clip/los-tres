@@ -4,20 +4,20 @@ import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db/client';
 import { categories, feedCategoryMappings, feeds, networks, shops } from '../../db/schema';
-import { demoCategories, demoCategoryMappings, demoNetwork, demoShops } from './demo-data';
+import { demoCategoryMappings, demoNetwork, demoShops } from './demo-data';
 
 export type SeedReport = {
   networks: number;
   shops: number;
   feeds: number;
-  categories: number;
   categoryMappings: number;
 };
 
 /**
- * Loads the demo network, two demo shops with one demo feed each, the
- * category tree and each demo feed's category mappings. Loads no products: the
- * first import is manual (TD-22).
+ * Loads the demo network, two demo shops with one demo feed each and each demo
+ * feed's category mappings onto the fixed tree. Creates no category: the tree
+ * comes from `ensureFixedCategoryTree` at the end of migrate, and a missing
+ * fixed slug throws. Loads no products: the first import is manual (TD-22).
  *
  * Insert-only: every insert is `on conflict do nothing` on the natural key, so
  * running it again changes nothing and an admin's un-approve or hide survives a
@@ -30,7 +30,6 @@ export async function seedDemoData(db: Database): Promise<SeedReport> {
       networks: 0,
       shops: 0,
       feeds: 0,
-      categories: 0,
       categoryMappings: 0,
     };
 
@@ -70,34 +69,6 @@ export async function seedDemoData(db: Database): Promise<SeedReport> {
       report.feeds += insertedFeeds.length;
     }
 
-    for (const [position, root] of demoCategories.entries()) {
-      report.categories += (
-        await tx
-          .insert(categories)
-          .values({ slug: root.slug, name: root.name, position })
-          .onConflictDoNothing({ target: categories.slug })
-          .returning({ id: categories.id })
-      ).length;
-      const [parent] = await tx
-        .select({ id: categories.id })
-        .from(categories)
-        .where(eq(categories.slug, root.slug));
-      for (const [childPosition, child] of root.children.entries()) {
-        report.categories += (
-          await tx
-            .insert(categories)
-            .values({
-              slug: child.slug,
-              name: child.name,
-              parentId: parent.id,
-              position: childPosition,
-            })
-            .onConflictDoNothing({ target: categories.slug })
-            .returning({ id: categories.id })
-        ).length;
-      }
-    }
-
     for (const mapping of demoCategoryMappings) {
       const [feed] = await tx
         .select({ id: feeds.id })
@@ -107,7 +78,12 @@ export async function seedDemoData(db: Database): Promise<SeedReport> {
         .select({ id: categories.id })
         .from(categories)
         .where(eq(categories.slug, mapping.categorySlug));
-      if (!feed || !category) continue;
+      if (!feed) continue;
+      // The fixed tree comes from migrate, not from this seed: a missing slug
+      // means migrate has not run, so fail rather than seed a half state.
+      if (!category) {
+        throw new Error(`seed: fixed category missing: ${mapping.categorySlug}; run migrate first`);
+      }
       report.categoryMappings += (
         await tx
           .insert(feedCategoryMappings)
