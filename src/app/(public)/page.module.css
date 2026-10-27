@@ -1,28 +1,46 @@
+/* Full-bleed ink band under the header: a normal full-width block, no viewport
+   units. The hairline separates it from the header; the inner column matches `.page`. */
 .panel {
-  margin-bottom: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--color-link);
-  color: var(--color-bg);
+  border-top: 1px solid var(--color-on-ink-line);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.panelInner {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: clamp(2rem, 1.2rem + 3vw, 3.5rem) var(--gutter);
 }
 
 .title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  line-height: 1.2;
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
   overflow-wrap: anywhere;
+}
+
+/* The short amber bar under the title: an empty pseudo-element, no text. */
+.title::after {
+  content: '';
+  display: block;
+  width: 3rem;
+  height: var(--space-0);
+  margin: var(--space-2) 0;
+  background: var(--color-accent);
 }
 
 /* Two classes: `.page p` (0,1,1) would otherwise grey the tagline. */
 .panel .tagline {
   margin: 0;
-  color: var(--color-bg);
+  color: var(--color-on-ink-muted);
   font-size: var(--text-md);
 }
 
 .sectionTitle {
   margin: 0 0 var(--space-2);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
 }

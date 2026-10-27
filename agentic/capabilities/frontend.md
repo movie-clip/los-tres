@@ -47,6 +47,10 @@ Reusing a button look in a non-submit button: `composes: button outlined from '.
 
 `body` is a flex column with `body > main { flex: 1 0 auto; width: 100% }` in `globals.css` so the footer sits at the bottom of short pages; `.page` centres with auto margins, which stops a flex item stretching, so any new full-width flex child of body needs an explicit width.
 
+Tokens live only in `src/app/globals.css` `:root`. No `*.module.css` writes a raw colour (hex, `rgb()`, `hsl()`), `box-shadow`, `transition`, `transform` or `animation`, and a comment in a module must not contain those words either, because the static guard reads comments (S11.1, #242; the owner ruled out shadows and motion). A chevron is a `clip-path` polygon on an empty `::after`, not a rotated border.
+
+The home `main` has no `.page`: the masthead section is full width and its inner div carries `max-width: var(--content-width)` and `padding-inline: var(--gutter)`; the rest of the page sits in a `div.page` (S11.1, #242). Never use `100vw` for a full-bleed band.
+
 A CSS Module file next to a component is imported as `styles` and typed by Next's `*.module.css` declaration. Class names are hashed in the HTML, so tests select by `data-testid` or role, never by class.
 
 Working-copy files are CRLF on Windows (autocrlf): edit existing files with the Edit tool and write new ones with Write. A heredoc containing an apostrophe in a comment fails the whole Bash command and writes nothing; use Write for files with prose comments.

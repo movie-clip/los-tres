@@ -118,6 +118,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | category, one card, no brand, single page | `/categoria/aceite-de-motor` |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
 | not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=3` (404) |
+| not found, double chrome | a 404 raised inside `(public)` (`/categoria/no-existe`, `/producto/no-existe`) renders the public header and footer twice (root `not-found.tsx` inside `(public)/layout.tsx`); an unknown top-level URL has single chrome. Pre-existing (seen in S11.1, #242), so report it as `SHOULD_FIX` until it is fixed |
 | old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
 | legal page, identity blank | `/aviso-legal` returns 500 with Next's default English error page |

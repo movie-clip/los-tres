@@ -1,7 +1,7 @@
-/* The border runs edge to edge; the links sit in the same column as the header. */
+/* The ink bar runs edge to edge; the links sit in the same column as the header. */
 .footer {
-  border-top: 1px solid var(--color-border);
   padding: var(--space-1) 0;
+  background: var(--color-ink);
 }
 
 .list {
@@ -10,7 +10,7 @@
   column-gap: var(--space-3);
   max-width: var(--content-width);
   margin: 0 auto;
-  padding: 0 var(--space-3);
+  padding: 0 var(--gutter);
   list-style: none;
 }
 
@@ -18,17 +18,18 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);
-  color: var(--color-link);
+  color: var(--color-on-ink);
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   text-decoration: none;
 }
 
-.link:hover {
+.link:hover,
+.link:active {
   text-decoration: underline;
 }
 
 .link:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
 }

@@ -1,9 +1,10 @@
-/* 18rem is the narrowest a group may get; the grid reflows with no media query. */
+/* 22rem is the narrowest a group may get; auto-fit lets a single group fill the
+   row. The grid reflows with no media query. */
 .groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
   align-items: start;
-  gap: var(--space-2);
+  gap: var(--grid-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -11,7 +12,7 @@
 
 .group {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--color-bg);
 }
 
@@ -20,37 +21,76 @@
   font-size: var(--text-md);
 }
 
+/* The tiles: they wrap by width, one column on a phone. */
 .rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  gap: var(--space-1);
   margin: 0;
-  padding: 0;
+  padding: 0 var(--card-padding) var(--card-padding);
   list-style: none;
 }
 
-/* Also separates the heading row from the first child. */
 .row {
-  border-top: 1px solid var(--color-border);
+  min-width: 0;
 }
 
-/* Name left, count right on the name's first baseline; a grid so the content
-   stays centred when the row is held up to the tap target. */
 .link {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
   align-content: center;
-  column-gap: var(--space-2);
-  min-height: var(--tap-target);
-  padding: var(--space-1) var(--space-2);
   color: var(--color-link);
   font-size: var(--text-md);
-  font-weight: 400;
-  line-height: 1.4;
+  line-height: var(--leading-snug);
   text-decoration: none;
 }
 
+/* Heading row: name, count and chevron on one line. The count stays on the
+   name's first baseline; the chevron is centred. */
 .headingLink {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--card-padding);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+/* Tile: name over count on the left, chevron on the right. */
+.row .link {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  min-height: 3.5rem;
   padding: var(--space-2);
-  font-weight: 700;
+  border: 1px solid var(--color-tile-bg);
+  border-radius: var(--radius-md);
+  background: var(--color-tile-bg);
+  font-weight: var(--weight-medium);
+}
+
+.row .link .name {
+  grid-column: 1;
+}
+
+.row .link .count {
+  grid-column: 1;
+}
+
+/* The chevron is a filled shape clipped from an empty box: decorative, no text. */
+.link::after {
+  content: '';
+  grid-column: -2 / -1;
+  grid-row: 1;
+  align-self: center;
+  width: 0.5rem;
+  height: 0.875rem;
+  background: var(--color-ink);
+  clip-path: polygon(0 0, 35% 0, 100% 50%, 35% 100%, 0 100%, 65% 50%);
+}
+
+.row .link::after {
+  grid-row: 1 / span 2;
 }
 
 .name {
@@ -58,14 +98,21 @@
 }
 
 .link:hover .name,
+.link:active .name,
 .link:focus-visible .name {
   text-decoration: underline;
+}
+
+.row .link:hover,
+.row .link:active {
+  border-color: var(--color-ink);
+  background: var(--color-chip-bg);
 }
 
 .count {
   color: var(--color-muted);
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   white-space: nowrap;
 }
 

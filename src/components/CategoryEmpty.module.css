@@ -1,14 +1,54 @@
+/* A white card on the canvas. */
+.empty {
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
 .heading {
   margin: 0 0 var(--space-1);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
 }
 
 .text {
   margin: 0 0 var(--space-2);
 }
 
+.empty .text:last-child {
+  margin-bottom: 0;
+}
+
+/* The home link looks like the secondary button; it stays inside its paragraph. */
+.home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.home:hover,
+.home:focus-visible {
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.home:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
 .home:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset);
 }

@@ -1,22 +1,90 @@
 :root {
+  color-scheme: light;
+
+  /* surfaces */
   --color-bg: #ffffff;
+  --color-canvas: #f4f5f7;
+  --color-ink: #15181d;
+  --color-chip-bg: #e9ebef;
+  --color-chip-text: #3b414a;
+  --color-tile-bg: #f4f5f7;
+
+  /* text */
   --color-text: #1a1a1a;
   --color-muted: #555555;
-  --color-border: #e2e2e2;
-  --color-link: #0b5cad;
+  --color-on-ink: #ffffff;
+  --color-on-ink-muted: #c5cad3;
+  --color-price: #15181d;
+
+  /* lines */
+  --color-border: #dcdfe4;
+  --color-border-strong: #7d838e;
+  --color-on-ink-line: #2d323a;
+
+  /* the one accent */
+  --color-accent: #ffb800;
+  --color-accent-hover: #f0a800;
+  --color-accent-active: #d99a00;
+  --color-accent-edge: #a06e00;
+  --color-on-accent: #15181d;
+
+  /* links and focus: ink, so there is no second hue */
+  --color-link: var(--color-ink);
+  --color-focus: var(--color-ink);
+
+  /* state colours: text colour, then its tint */
+  --color-success: #17603a;
+  --color-success-bg: #e6f4ea;
+  --color-warning: #7a4a00;
+  --color-warning-bg: #fff3d1;
+  --color-danger: #a8201a;
+  --color-danger-bg: #fdeceb;
+  --color-info: #0b5cad;
+  --color-info-bg: #e7f0fa;
+  --color-disabled-bg: #e4e6ea;
+  --color-disabled-text: #6b717b;
+
+  /* spacing */
+  --space-0: 0.25rem;
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
   --space-4: 3rem;
+  --gutter: clamp(1rem, 0.4rem + 2.4vw, 1.5rem);
+  --page-pad-block: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  --card-padding: clamp(1rem, 0.5rem + 2vw, 1.5rem);
+  --grid-gap: clamp(1rem, 0.6rem + 1.6vw, 1.5rem);
   --content-width: 64rem;
-  --radius: 0.5rem;
   --tap-target: 2.75rem;
-  --focus-ring: 3px solid var(--color-link);
+
+  /* radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-pill: 999px;
+  --radius: var(--radius-md);
+
+  /* focus */
+  --focus-ring: 3px solid var(--color-focus);
+  --focus-ring-on-ink: 3px solid var(--color-accent);
+  --focus-offset: 2px;
+
+  /* type */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --text-sm: 0.875rem;
   --text-md: 1rem;
   --text-lg: 1.25rem;
   --text-xl: 2rem;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --text-price: 1.5rem;
+  --text-title: clamp(1.5rem, 1.1rem + 1.6vw, 2rem);
+  --text-display: clamp(2rem, 1.5rem + 2.2vw, 2.75rem);
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-body: 1.5;
+  --weight-regular: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
+  --tracking-tight: -0.01em;
 }
 
 *,
@@ -35,10 +103,10 @@ body {
   flex-direction: column;
   min-height: 100vh;
   margin: 0;
-  background: var(--color-bg);
+  background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-sans);
-  line-height: 1.5;
+  line-height: var(--leading-body);
 }
 
 body > main {
@@ -53,7 +121,7 @@ a {
 .page {
   max-width: var(--content-width);
   margin: 0 auto;
-  padding: var(--space-4) var(--space-3);
+  padding: var(--page-pad-block) var(--gutter);
 }
 
 .page p {

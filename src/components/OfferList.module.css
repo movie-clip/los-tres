@@ -1,56 +1,96 @@
+/* A white panel. Rows are separated by a top border; the first row's border
+   also closes the heading block. */
 .offers {
-  margin-top: var(--space-4);
+  min-width: 0;
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
 }
 
 .heading {
   margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+/* The count and VAT lines carry no extra margin between them. */
+.offers p {
+  margin: 0;
 }
 
 .list {
   margin: var(--space-2) 0 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--color-border);
 }
 
 .row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
-  align-items: baseline;
+  align-items: center;
   padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
 }
 
 .shop {
-  flex: 1 1 12rem;
-  font-weight: 600;
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
 }
 
 .price {
-  font-size: 1.25rem;
-  font-weight: 700;
+  color: var(--color-price);
+  font-size: var(--text-price);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  text-align: right;
   white-space: nowrap;
 }
 
+/* The primary button: amber fill, ink label, a thin darker edge. Hover and
+   pressed change fill and border colour only, never size. */
 .go {
   display: inline-flex;
+  flex: 1 1 14rem;
   align-items: center;
-  min-height: 2.75rem;
-  padding: 0 var(--space-2);
-  background: var(--color-link);
-  color: var(--color-bg);
-  font-weight: 600;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-accent-edge);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+  text-align: center;
   text-decoration: none;
 }
 
-.go:hover,
+.go:hover {
+  background: var(--color-accent-hover);
+}
+
+.go:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent-active);
+}
+
 .go:focus-visible {
-  text-decoration: underline;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .updated {
   flex: 1 1 100%;
   color: var(--color-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
 }
