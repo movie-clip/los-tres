@@ -50,6 +50,8 @@ A raw-HTML "value never appears" assertion must strip `<script>` blocks first: N
 
 Listing e2e select only by the `data-testid` values of the design contract; the category name is read by `getByRole` heading level 1. Category pages are server pages: parse `request().get` HTML with `openRawHtml` for JS-off checks.
 
+Category listing (S11.4): integration tests call `getPublicCategoryPage(slug, page, brand, sort)` and set `products.brandNormalised` and `partNumber` themselves (`insertListedProduct` sets neither; the local helper `listBranded` in `category-page.test.ts` does it). Canonical on `?marca=`/`?orden=` is proven by importing `generateMetadata` from `src/app/(public)/categoria/[slug]/page` in an integration test with `vi.mock('next-intl/server', () => ({ getTranslations: async () => (key) => key }))`; `SITE_URL` comes from `test-database-env.ts`.
+
 Product JSON-LD e2e reads the raw `request.get` HTML with a regex over script tags (expect one match) and `JSON.parse`, then `openRawHtml` for the selector and the visible-price comparison; selector `script[type="application/ld+json"][data-testid="product-jsonld"]`.
 
 Expected site name and copy come from `SITE_NAME` in `.env` and `messages/es-ES.json`, never a literal. Raw server HTML is parsed by `page.setContent` in a context with `javaScriptEnabled: false`, not by an HTML parser dependency.
@@ -145,6 +147,9 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - A Python script that opens a file with `open(p,'wb')` before building the
   content truncates it if the build raises: read, build, then write. Pass
   `encoding='utf-8'`; the default is cp1252.
+- Category e2e demo facts (after one import): `filtros-de-aire` has 6 brands of 2 products, `aceite-de-motor` 7, the root 15 (8 chips plus "Más marcas (7)"; `total` is outside the first 8); no demo brand has more than one page on the root, so a brand's pagination is not e2e-reachable. `DEMO_NO_BRAND` has no part number (no spec line); `DEMO_SHARED` has "OC 1234".
+- A JS-off interaction (form submit) uses `browser.newContext({ javaScriptEnabled: false, baseURL })`, not `openRawHtml`, which is for static HTML only. A ring drawn on a stretched link is on `::after`: read `getComputedStyle(node, '::after')` when the element's own outline is none.
+- `sed -i` in Git Bash strips CRs from CRLF test files; use Edit or a Python read/replace/write with `newline=''`.
 - A long Bash heredoc containing apostrophes failed to parse: use Write.
 - `tests/unit/styles.test.ts` (S11.1, #242) scans every css file under `src`, comments included, for `box-shadow`, `transition`, `transform`, `animation`, `100vw`, raw colours outside `:root` and a `var(--x)` with no `:root` definition; its pure helpers are exercised on in-memory CSS. Never name a variable `module` in a test: `@next/next/no-assign-module-variable` fails lint.
 - A Bash command holding several heredocs with apostrophes inside TypeScript strings failed to parse (exit 2, nothing ran): write test files with Write and run edit scripts from the scratchpad.

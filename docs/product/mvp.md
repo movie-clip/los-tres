@@ -87,7 +87,7 @@ Decision 0008 holds the detail.
 ## Search and browsing
 
 - Free-text search in PostgreSQL that also matches EAN and part numbers.
-- Category pages list products; filters (brand, price, shop) are deferred.
+- Category pages list products as a card grid with sort (price ascending, price descending, name) and a brand filter; price and shop filters are deferred.
 - Product pages are server-rendered with schema.org `Product` / `AggregateOffer`
   structured data, so Google can show prices in its results.
 
@@ -218,7 +218,7 @@ performance at 10k products (S10.1), feed URL encryption (S10.3), the
 TOTP second factor (S2.2), Search Console, payee registration and network
 review requirements. Also deferred on 2026-10-26: the admin import button
 and reports (S3.2), per-shop link patterns (S3.6), the matching review queue
-(S7.2), brand aliases (S7.3), category filters (S5.3), product images (S8.1),
+(S7.2), brand aliases (S7.3), price and shop filters (S5.3; brand filter and sort shipped in S11.4), product images (S8.1),
 price history (S8.3), the no-offers page (S8.4), feed attributes (S8.6) and
 click counts (S1.3).
 
