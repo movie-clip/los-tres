@@ -110,13 +110,15 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 |---|---|
 | a product with offers | `/producto/demo-filtro-de-aceite-oc-1234` (demo data, two shops) |
 | not found | `/producto/no-existe` |
-| home, populated | `/` |
+| home, populated | `/` (four of the five children are populated, so the five-row home is not producible; report not checked) |
 | home, no category has products | not producible without wiping the demo database; report not checked unless a separate empty database is available |
-| category, two pages | `/categoria/filtros` (26 products, 2 pages) |
-| category, last page | `/categoria/filtros?pagina=2` (2 cards) |
-| category, one card, no brand, single page | `/categoria/escobillas-y-bombillas` |
-| category, empty (200) | `/categoria/aceites-y-lubricantes` |
-| not found | `/categoria/no-existe` and `/categoria/filtros?pagina=3` (404) |
+| category, two pages | `/categoria/mantenimiento-del-coche` (the root, 27 products, 2 pages) |
+| category, last page | `/categoria/mantenimiento-del-coche?pagina=2` (3 cards) |
+| category, one page of 24 | `/categoria/filtros-de-aire` |
+| category, one card, no brand, single page | `/categoria/aceite-de-motor` |
+| category, empty (200) | `/categoria/filtros-de-combustible` |
+| not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=3` (404) |
+| old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
 | legal page, identity blank | `/aviso-legal` returns 500 with Next's default English error page |
 | admin signed in | run the `CLAUDE.md` § Commands `create-admin` command for the e2e admin in `tests/e2e/admin.spec.ts` (credentials are in that file), then sign in with a Playwright script at `/admin/acceso` |
@@ -130,7 +132,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, failed (returned) | `page.route` fulfils the action POST with a `text/x-component` body `0:{a:$@1,f:'',b:<buildId>}` then `1:{status:failed,kind:feed,id:1}` |
 | admin shops and feeds, session expired | clear cookies in the context, then press a button; expect `/admin/acceso?aviso=sesion` with the notice |
 | admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
-| demo notice | shown on the demo product, `/categoria/filtros`, `?pagina=2`, `/categoria/escobillas-y-bombillas`; absent on home, the empty category, 404 and the legal pages |
+| demo notice | shown on the demo product, `/categoria/mantenimiento-del-coche`, `?pagina=2`, `/categoria/aceite-de-motor`; absent on home, the empty category, 404 and the legal pages |
 
 Any state this table cannot produce (one offer, a missing image, the longest
 title, a product with no offers) is reported as `not checked` with the reason. Never mark

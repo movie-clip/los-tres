@@ -23,7 +23,7 @@ Open `.env` and fill in:
 
 - `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS`, `CONTACT_EMAIL`: needed only for
   the legal pages (`/aviso-legal`, `/privacidad`); any test values work locally.
-- Check `SEED_DEMO_DATA=true` (loads demo shops, feeds and categories).
+- Check `SEED_DEMO_DATA=true` (loads demo shops, feeds and feed-category mappings).
 - Check `AUTH_SECRET` and `SITE_URL=http://127.0.0.1:3010` are present (needed
   for the admin area).
 
@@ -36,11 +36,15 @@ npm run stack:up
 ```
 
 Builds and starts `app` and `db`, and waits until they are healthy.
-The app migrates the database and seeds the demo data on start.
+The app migrates the database and seeds the demo data on start. Migrating
+also creates the fixed category tree (`Mantenimiento del coche` and its five
+children), with or without demo data, and removes the old demo categories
+from a database that still has them.
 
 ## 3. Load demo products
 
-Seeding creates no products; the first feed import does:
+Seeding creates no categories and no products (categories come from migrate);
+the first feed import creates the products:
 
 ```sh
 docker compose run --rm app import-feeds
@@ -87,7 +91,7 @@ npm run stack:down        # keeps the database volume
 
 ```sh
 npm run db:up             # only the database
-npm run db:migrate
+npm run db:migrate        # also creates the fixed category tree
 npm run db:seed
 npm run import-feeds
 npm run dev               # Next.js dev server on http://localhost:3000 (Next default)

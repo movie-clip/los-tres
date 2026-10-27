@@ -77,7 +77,7 @@ notice, and a footer linking the three legal pages), continue with:
 
 1. `npm run stack:up`: builds and starts `app` and `db`. The app
    container migrates the database on every start and, when `SEED_DEMO_DATA` is
-   `true`, seeds the demo shops, feeds and categories.
+   `true`, seeds the demo shops, feeds and feed-category mappings.
 2. `docker compose run --rm app import-feeds`: the first import, which creates
    the demo products and offers. Seeding loads no products; this does.
 3. Open `http://127.0.0.1:3010/producto/demo-filtro-de-aceite-oc-1234`
@@ -156,8 +156,8 @@ deploy it must be the public https origin**, or all of them point at
 | unit tests | `npm run test:unit` (`vitest run --project unit`) | nothing, no database |
 | integration tests | `npm run test:integration` (`vitest run --project integration`) | `npm run db:up` |
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
-| migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`) | `npm run db:up`, `.env` |
-| seed | `npm run db:seed` (demo network, shops, feeds and categories; no products; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
+| migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts`; every migrate path does this, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
+| seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
 | import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
