@@ -92,6 +92,41 @@
   outline-offset: var(--focus-offset);
 }
 
+/* Below 14rem (a 390 phone at 200% zoom): the row has no room for the drawing,
+   the text and the chevron side by side. Stack the drawing above the text, put
+   the chevron beside the count, and let the count wrap. */
+@media (max-width: 14rem) {
+  .link {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    row-gap: var(--space-1);
+  }
+
+  .art {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .name {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  .count {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: center;
+    white-space: normal;
+  }
+
+  .link::after {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
 /* From 40rem: a vertical card. Drawing on top, the name (it may take two
    lines), then the count and chevron on one pinned bottom row. */
 @media (min-width: 40rem) {
