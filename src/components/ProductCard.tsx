@@ -1,3 +1,4 @@
+import { CategoryIllustration, type IllustrationKey } from './CategoryIllustration';
 import styles from './ProductCard.module.css';
 
 export type ProductCardProps = {
@@ -12,6 +13,8 @@ export type ProductCardProps = {
   price: string;
   /** Formatted shop count, for example "2 tiendas". */
   shopCount: string;
+  /** The product's own leaf category drawing. Null renders the same tile, empty. */
+  illustration: IllustrationKey | null;
 };
 
 /**
@@ -26,19 +29,27 @@ export function ProductCard({
   priceFrom,
   price,
   shopCount,
+  illustration,
 }: ProductCardProps) {
   return (
     <li className={styles.card} data-testid="category-card">
-      <h2 className={styles.title}>
-        <a href={href} className={styles.link} data-testid="card-title">
-          {title}
-        </a>
-      </h2>
-      {brand !== null ? (
-        <span className={styles.brand} data-testid="card-brand">
-          {brand}
+      <div className={styles.head}>
+        <span className={styles.tile} aria-hidden="true" data-testid="card-tile">
+          {illustration ? <CategoryIllustration illustration={illustration} /> : null}
         </span>
-      ) : null}
+        <div className={styles.text}>
+          <h2 className={styles.title}>
+            <a href={href} className={styles.link} data-testid="card-title">
+              {title}
+            </a>
+          </h2>
+          {brand !== null ? (
+            <span className={styles.brand} data-testid="card-brand">
+              {brand}
+            </span>
+          ) : null}
+        </div>
+      </div>
       <div className={styles.footer}>
         <span className={styles.priceGroup}>
           {priceFrom !== null ? (

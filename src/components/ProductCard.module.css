@@ -17,6 +17,29 @@
   cursor: pointer;
 }
 
+/* The category tile leads the title and brand. It is always present, empty for
+   an unknown category, so a row of cards never shifts. 3.5rem is this
+   component's own size, not a global token. */
+.head {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.tile {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-chip-bg);
+}
+
+.text {
+  min-width: 0;
+}
+
 .title {
   display: -webkit-box;
   margin: 0;

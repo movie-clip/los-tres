@@ -1,3 +1,4 @@
+import type { IllustrationKey } from './CategoryIllustration';
 import { ImagePlaceholder } from './ImagePlaceholder';
 import styles from './ProductDetails.module.css';
 
@@ -10,6 +11,8 @@ export type ProductDetail = {
 export type ProductDetailsProps = {
   title: string;
   imageLabel: string;
+  /** The product's own leaf category drawing; null keeps the plain grey square. */
+  illustration: IllustrationKey | null;
   /** Only the details that exist: a missing one is left out by the caller. */
   details: ProductDetail[];
   /** Plain text. Rendered as a text node, never as HTML. */
@@ -17,10 +20,16 @@ export type ProductDetailsProps = {
 };
 
 /** The product heading, image placeholder, identifying details and description. Display strings only. */
-export function ProductDetails({ title, imageLabel, details, description }: ProductDetailsProps) {
+export function ProductDetails({
+  title,
+  imageLabel,
+  illustration,
+  details,
+  description,
+}: ProductDetailsProps) {
   return (
     <section className={styles.details}>
-      <ImagePlaceholder label={imageLabel} />
+      <ImagePlaceholder label={imageLabel} illustration={illustration} />
       <div className={styles.text}>
         <h1 className={styles.title}>{title}</h1>
         {details.length > 0 ? (
