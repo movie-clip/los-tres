@@ -31,6 +31,8 @@ export type CategoryProductCard = {
    * shows as offers.length.
    */
   offerCount: number;
+  /** categories.slug of the product's own category; never null for a public product. */
+  categorySlug: string;
 };
 
 export type PublicCategoryPage = {
@@ -117,14 +119,16 @@ export async function getPublicCategoryPage(
       brand: products.brand,
       lowestPriceCents: lowestPrice,
       offerCount: sql<number>`count(*)::int`,
+      categorySlug: categories.slug,
       allDemo: sql<boolean>`bool_and(${feeds.isDemo})`,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))
     .innerJoin(feeds, eq(offers.feedId, feeds.id))
     .innerJoin(shops, eq(feeds.shopId, shops.id))
+    .innerJoin(categories, eq(products.categoryId, categories.id))
     .where(and(visibleProductWhere(), visibleOfferWhere(), inSubtree(category.id)))
-    .groupBy(products.id)
+    .groupBy(products.id, categories.id)
     .orderBy(asc(lowestPrice), asc(products.id))
     .limit(CATEGORY_PAGE_SIZE)
     .offset((page - 1) * CATEGORY_PAGE_SIZE);
@@ -141,6 +145,7 @@ export async function getPublicCategoryPage(
       brand: row.brand,
       lowestPriceCents: row.lowestPriceCents,
       offerCount: row.offerCount,
+      categorySlug: row.categorySlug,
     })),
     demoOnly: rows.length > 0 && rows.every((row) => row.allDemo),
     indexable,
