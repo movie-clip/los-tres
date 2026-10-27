@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
+import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import { DEMO_CATEGORY_COUNTS, DEMO_CATEGORY_NAMES } from '../fixtures/demo';
 import { loadEnv } from '../support/env';
 import { icuPlural } from '../support/messages';
@@ -65,7 +66,7 @@ test.describe('home page (C-7)', () => {
     expectNoForeignOrigin(requested, new URL(baseURL as string).origin);
   });
 
-  test('lists the demo tree in position order, with counts and links to category pages', async ({
+  test('lists the fixed tree: one root with its populated children in position order', async ({
     request,
     browser,
   }) => {
@@ -74,47 +75,52 @@ test.describe('home page (C-7)', () => {
     const { page, close } = await openRawHtml(browser, await response.text());
 
     const groups = page.getByTestId('category-group');
-    await expect(groups).toHaveCount(2);
-    const first = groups.nth(0);
-    const second = groups.nth(1);
-    await expect(first.getByTestId('category-group-link')).toHaveAttribute('href', '/categoria/automovil');
-    await expect(first.getByTestId('category-group-link')).toContainText(DEMO_CATEGORY_NAMES.automovil);
-    await expect(first.getByTestId('category-group-count')).toHaveText(
-      icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS.automovil),
-    );
-    await expect(second.getByTestId('category-group-link')).toHaveAttribute(
+    await expect(groups).toHaveCount(1);
+    const group = groups.nth(0);
+    await expect(group.getByTestId('category-group-link')).toHaveAttribute(
       'href',
-      '/categoria/herramientas',
+      `/categoria/${FIXED_CATEGORY_TREE.slug}`,
     );
-    await expect(second.getByTestId('category-group-count')).toHaveText(
-      icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS.herramientas),
+    await expect(group.getByTestId('category-group-link')).toContainText(FIXED_CATEGORY_TREE.name);
+    await expect(group.getByTestId('category-group-count')).toHaveText(
+      icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS['mantenimiento-del-coche']),
     );
 
-    // Filtros comes before Escobillas y bombillas; both are rows of Automóvil.
-    const rows = first.getByTestId('category-row-link');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toHaveAttribute('href', '/categoria/filtros');
-    await expect(rows.nth(0)).toContainText(DEMO_CATEGORY_NAMES.filtros);
-    await expect(rows.nth(1)).toHaveAttribute('href', '/categoria/escobillas-y-bombillas');
-    await expect(rows.nth(1)).toContainText(DEMO_CATEGORY_NAMES['escobillas-y-bombillas']);
-    await expect(first.getByTestId('category-row-count').nth(0)).toHaveText(
-      icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS.filtros),
+    // Position order, with the empty child (filtros-de-combustible) left out.
+    const populated = FIXED_CATEGORY_TREE.children.filter(
+      (child) => DEMO_CATEGORY_COUNTS[child.slug] > 0,
     );
-    await expect(first.getByTestId('category-row-count').nth(1)).toHaveText(
-      icuPlural(messages.Home.productCount, 1),
-    );
+    expect(populated.length).toBeGreaterThan(0);
+    expect(populated.length).toBeLessThan(FIXED_CATEGORY_TREE.children.length);
+    const rows = group.getByTestId('category-row-link');
+    await expect(rows).toHaveCount(populated.length);
+    const counts = group.getByTestId('category-row-count');
+    for (const [index, child] of populated.entries()) {
+      await expect(rows.nth(index)).toHaveAttribute('href', `/categoria/${child.slug}`);
+      await expect(rows.nth(index)).toContainText(child.name);
+      await expect(counts.nth(index)).toHaveText(
+        icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS[child.slug]),
+      );
+    }
 
     // Never a zero count.
-    expect(await page.getByTestId('category-tree').textContent()).not.toMatch(/0 producto/);
+    expect(await page.getByTestId('category-tree').textContent()).not.toMatch(/0 producto/);
     await expectLocalScriptsAndLinks(page);
     await close();
   });
 
-  test('leaves out an empty demo category that still answers 200 at its own page', async ({
+  test('names car maintenance on the home page, not tools or spare parts', async ({ request }) => {
+    const html = await (await request.get('/')).text();
+    expect(html).toContain(messages.Home.tagline);
+    expect(html.toLowerCase()).not.toContain('herramientas');
+    expect(html.toLowerCase()).not.toContain('recambios');
+  });
+
+  test('leaves out the empty fixed category that still answers 200 at its own page', async ({
     request,
     page,
   }) => {
-    const slug = 'aceites-y-lubricantes';
+    const slug = 'filtros-de-combustible';
     expect(DEMO_CATEGORY_COUNTS[slug]).toBe(0);
 
     const home = await request.get('/');
@@ -141,7 +147,7 @@ test.describe('home page (C-7)', () => {
         count: node.querySelector('span:last-child')?.textContent ?? '',
       })),
     );
-    expect(entries.length).toBeGreaterThanOrEqual(4);
+    expect(entries.length).toBeGreaterThanOrEqual(2);
 
     for (const { href, count } of entries) {
       expect(href).toMatch(/^\/categoria\/[a-z0-9-]+$/);

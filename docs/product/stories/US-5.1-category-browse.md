@@ -13,7 +13,7 @@ Ruled: decision D-1 (2026-10-20), "approve, defaults". Every decision OD-A to OD
 - **OD-A. Subcategory depth.** Default assumed: a category page includes products from every descendant at any depth (the tree is about 30 categories, so it is shallow). Alternative: direct children only.
 - **OD-B. Sort order.** Default assumed: lowest visible price first, ties broken stably so a page never reshuffles between requests. Alternatives: alphabetical by title, or most offers first.
 - **OD-C. Page size.** Default assumed: 24 products per page. Needs a number.
-- **OD-D. URL shape.** Default assumed: `/categoria/<slug>` with the page as a `?pagina=<n>` query parameter, mirroring the existing `/producto/<slug>`. The slug is the category's stable slug (S4.1 keeps it stable on rename).
+- **OD-D. URL shape.** Default assumed: `/categoria/<slug>` with the page as a `?pagina=<n>` query parameter, mirroring the existing `/producto/<slug>`. The slug is the category's stable slug (the tree is fixed by S4.0, decision 0015, and its slugs are frozen).
 - **OD-E. Out-of-range or invalid page number.** Default assumed: a page number below 1 or not a number shows page 1; a number beyond the last page answers 404.
 - **OD-F. Product mapped through two feeds to different categories.** When the same matched product arrives from two feeds whose categories map to different categories of ours, which one wins? Default assumed: the category follows the same shop ranking that decides product text (mvp.md § Product and offers); until S3.x ships the ranking, the earliest-imported assignment is kept. Alternative: the product appears in both.
 - **OD-G. Product with several feed categories where only some are mapped.** Default assumed: the product is public if at least one of its feed categories is mapped. Alternative: all must be mapped.
@@ -30,7 +30,7 @@ As a visitor, I open a category and see its products with the lowest price and t
 
 In: the product-to-category link and the feed-category mapping as data; the importer recording each product's feed category and assigning our category through the mapping; the rule that a product without a mapped category is not public; a server-rendered, paginated category page including subcategories; a product card; demo seed and demo feeds carrying categories and mappings.
 
-Out (later stories): home page and navigation (S5.2), filters (S5.3), search, the admin screens to edit the tree or the mapping (S4.1, S4.2; until then the mapping exists only through the demo seed), product images and placeholders (S8.1), the product page changes.
+Out (later stories): home page and navigation (S5.2), filters (S5.3), search, the admin screen to edit the mapping (S4.2; until then the mapping exists only through the demo seed). The tree itself is no longer editable: S4.0 fixed it in code and replaced the tree editor S4.1 (decision 0015), product images and placeholders (S8.1), the product page changes.
 
 ## Acceptance criteria
 

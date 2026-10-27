@@ -3,6 +3,8 @@
 // demo/feeds use the GS1 internal-use prefix 200 so they cannot collide with a
 // real product.
 
+import type { FixedCategorySlug } from '../../db/category-tree';
+
 export const demoNetwork = { slug: 'demo', name: 'Red demo' } as const;
 
 export const demoShops = [
@@ -10,49 +12,38 @@ export const demoShops = [
   { slug: 'tienda-demo-dos', name: 'Tienda Demo Dos', feedFile: 'tienda-demo-dos.csv' },
 ] as const;
 
-/** Two roots with children, in display order. */
-export const demoCategories = [
-  {
-    slug: 'automovil',
-    name: 'Automóvil',
-    children: [
-      { slug: 'aceites-y-lubricantes', name: 'Aceites y lubricantes' },
-      { slug: 'filtros', name: 'Filtros' },
-      { slug: 'escobillas-y-bombillas', name: 'Escobillas y bombillas' },
-    ],
-  },
-  {
-    slug: 'herramientas',
-    name: 'Herramientas',
-    children: [
-      { slug: 'herramientas-electricas', name: 'Herramientas eléctricas' },
-      { slug: 'herramientas-manuales', name: 'Herramientas manuales' },
-    ],
-  },
-] as const;
-
 /**
  * Each demo feed's own category strings, deliberately different per shop, and
- * the category they map to. A feed category absent here (Jardín > Cortacésped,
- * or an empty cell) stays unmapped, so its product is not public. No mapping
- * points at `aceites-y-lubricantes`: it is the empty demo category.
+ * the fixed category they map to (the tree itself is `FIXED_CATEGORY_TREE`; the
+ * seed creates no category). A feed category absent here (Bricolaje > Taladros,
+ * Herramienta manual, Jardín > Cortacésped, or an empty cell) stays unmapped,
+ * so its product is not public. No mapping points at `filtros-de-combustible`:
+ * it is the empty demo category.
  */
 export const demoCategoryMappings = [
-  { feedFile: 'tienda-demo-uno.csv', feedCategory: 'Recambios > Filtros', categorySlug: 'filtros' },
   {
     feedFile: 'tienda-demo-uno.csv',
-    feedCategory: 'Recambios > Iluminación',
-    categorySlug: 'escobillas-y-bombillas',
+    feedCategory: 'Recambios > Filtros de aceite',
+    categorySlug: 'filtros-de-aceite',
   },
   {
     feedFile: 'tienda-demo-uno.csv',
-    feedCategory: 'Bricolaje > Taladros',
-    categorySlug: 'herramientas-electricas',
+    feedCategory: 'Recambios > Filtros de aire',
+    categorySlug: 'filtros-de-aire',
   },
-  { feedFile: 'tienda-demo-dos.csv', feedCategory: 'Filtros de aceite', categorySlug: 'filtros' },
   {
-    feedFile: 'tienda-demo-dos.csv',
-    feedCategory: 'Herramienta manual',
-    categorySlug: 'herramientas-manuales',
+    feedFile: 'tienda-demo-uno.csv',
+    feedCategory: 'Recambios > Filtros de habitáculo',
+    categorySlug: 'filtros-de-habitaculo',
   },
-] as const;
+  {
+    feedFile: 'tienda-demo-uno.csv',
+    feedCategory: 'Recambios > Aceites de motor',
+    categorySlug: 'aceite-de-motor',
+  },
+  { feedFile: 'tienda-demo-dos.csv', feedCategory: 'Filtros de aceite', categorySlug: 'filtros-de-aceite' },
+] as const satisfies readonly {
+  feedFile: string;
+  feedCategory: string;
+  categorySlug: FixedCategorySlug;
+}[];

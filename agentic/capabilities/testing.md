@@ -44,7 +44,7 @@ E2E canonical, robots and sitemap checks read the `baseURL` origin, which equals
 
 The default host port is 3010 and may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
-Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`.
+Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`. Home selects one `category-group` (the root) with `category-row` entries for the populated children only, in position order; an empty child has no row.
 
 Listing e2e select only by the `data-testid` values of the design contract; the category name is read by `getByRole` heading level 1. Category pages are server pages: parse `request().get` HTML with `openRawHtml` for JS-off checks.
 
@@ -97,7 +97,9 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 
 - `tests/support/catalogue.ts`: insert helpers whose defaults are the fully
   VISIBLE state, so a test sets only the one flag it is about. `insertProduct` defaults `categoryId` to a shared test category (`defaultCategoryId`, found by slug so it survives `resetDatabase`); pass `categoryId: null` for the unmapped state. `insertCategory({slug,name,parentId,position})`, `insertCategoryMapping` and `insertListedProduct` (a product with one visible offer per price) live in the same file.
-- Category feed fixtures are `tests/fixtures/feeds/category-*.csv` (mixed, ean-one/two/three, no-column); demo category expectations are `DEMO_CATEGORY_COUNTS` and friends in `tests/fixtures/demo.ts`, and `DEMO_COUNTS` carries `publicProducts` and `categoryMappings`.
+- Category feed fixtures are `tests/fixtures/feeds/category-*.csv` (mixed, ean-one/two/three, no-column); demo category expectations are `DEMO_CATEGORY_COUNTS` and `DEMO_CATEGORY_NAMES`, keyed by the six fixed slugs, in `tests/fixtures/demo.ts`, and `DEMO_COUNTS` carries `publicProducts` and `categoryMappings`. `DEMO_NO_BRAND` is the oil (`aceite-de-motor`); `DEMO_DRILL` and `DEMO_WRENCHES` are unmapped and never public; the paging dataset is the root (27, two pages) and `filtros-de-combustible` is the empty child.
+- `resetDatabase` re-ensures the fixed category tree (`ensureFixedCategoryTree`) after truncating, so tests must not assume an empty `categories` table or ids starting at 1: the six fixed categories take ids 1 to 6. Fixed slugs come from `FIXED_CATEGORY_TREE` in `src/db/category-tree.ts`; e2e specs import it by relative path. Never retype a fixed slug.
+- A migration SQL file is tested by reading it, splitting on `--> statement-breakpoint` and executing each statement with `sql.raw` against legacy rows (`tests/integration/fixed-category-tree.test.ts`, with `tests/unit/category-tree-constant.test.ts` as the template for pinning fixed reference data).
 - A malformed category slug needs no DB bypass, `categories.slug` has no check constraint; insert it directly. A parent cycle is built by inserting then updating `parent_id`.
 - `tests/support/feeds.ts`: `fixtureDeps`, where a feed row's `url` is the
   fixture file name, and `textDeps`. Local feed files live in
