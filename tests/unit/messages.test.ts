@@ -50,6 +50,11 @@ describe('messages/es-ES.json (C-8)', () => {
     'Home.heading',
     'Home.tagline',
     'Home.categoriesHeading',
+    'Home.searchLabel',
+    'Home.searchButton',
+    'Home.searchHint',
+    'Home.searchNotice',
+    'Home.allLink',
     'Home.productCount',
     'Home.emptyHeading',
     'Home.emptyBody',
@@ -62,8 +67,12 @@ describe('messages/es-ES.json (C-8)', () => {
     expect((value as string).trim().length).toBeGreaterThan(0);
   });
 
-  it.each(['Metadata.title', 'Home.heading'])('%s takes the {siteName} placeholder', (key) => {
-    expect(lookup(key)).toContain('{siteName}');
+  it('Metadata.title takes the {siteName} placeholder', () => {
+    expect(lookup('Metadata.title')).toContain('{siteName}');
+  });
+
+  it('Home.heading is the promise and takes no placeholder', () => {
+    expect(lookup('Home.heading')).not.toContain('{siteName}');
   });
 
   it('writes Home.productCount as an ICU plural with one and other branches', () => {

@@ -110,7 +110,8 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 |---|---|
 | a product with offers | `/producto/demo-filtro-de-aceite-oc-1234` (demo data, two shops) |
 | not found | `/producto/no-existe` |
-| home, populated | `/` (the home lists only categories that hold products, so the empty fuel category is not on it; four of the five children are populated, so the five-row home is not producible; report not checked) |
+| home, populated | `/` (the home lists only categories that hold products, so the empty fuel category is not on it; four of the five children are populated, so the five-tile home is not producible; report not checked) |
+| home, interim search submitted | `/?q=filtro` (the amber-ruled note under the form, empty field; interim until S5.4 moves the form to `/buscar`) |
 | home, no category has products | not producible without wiping the demo database; report not checked unless a separate empty database is available |
 | category, three pages | `/categoria/mantenimiento-del-coche` (the root, 50 products on 3 pages: 24, 24, 2) |
 | category, last page | `/categoria/mantenimiento-del-coche?pagina=3` (2 cards) |

@@ -1,0 +1,82 @@
+/* Sits on the ink band. 40rem is the search row width, 3.5rem the field and
+   button height: this component's own sizes, not global tokens. */
+.search {
+  max-width: 40rem;
+  margin-top: var(--space-3);
+}
+
+.form {
+  margin: 0;
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-on-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+}
+
+/* The field takes the remaining width. At a large zoom the button wraps below. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.input {
+  box-sizing: border-box;
+  flex: 1 1 12rem;
+  min-width: 0;
+  height: 3.5rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-lg);
+}
+
+.input:focus-visible,
+.button:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}
+
+/* The primary button: amber fill, ink label, a thin darker edge. Hover and
+   pressed change fill and border colour only, never size. */
+.button {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: 3.5rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-accent-edge);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-accent-hover);
+}
+
+.button:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent-active);
+}
+
+.notice {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-2);
+  border-left: 0.25rem solid var(--color-accent);
+  color: var(--color-on-ink);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}

@@ -44,7 +44,9 @@ E2E canonical, robots and sitemap checks read the `baseURL` origin, which equals
 
 The default host port is 3010 and may be taken, so never write a literal base URL: specs use the `baseURL` and `request` fixtures, and only `playwright.config.ts` computes it from `.env` (`appBaseUrl()` is gone).
 
-Home e2e selects by the S5.2 testids (`home-panel`, `category-tree`, `category-group[-link|-count]`, `category-row[-link|-count]`, `site-header-link`); the home count text is `icuPlural(messages.Home.productCount, n)`. Home selects one `category-group` (the root) with `category-row` entries for the populated children only, in position order; an empty child has no row.
+Home e2e selects `home-panel`, `home-search[-input|-button|-notice]`, `home-all-link`, `home-all-count`, `category-tiles`, `category-tile[-link|-name|-count]` and `site-header-link`; the home count text is `icuPlural(messages.Home.productCount, n)`. Demo state is four tiles (the empty fuel category has none, in position order); the five-tile and one-tile states are unit renders (S11.3).
+
+A raw-HTML "value never appears" assertion must strip `<script>` blocks first: Next puts the request URL (query included) in the inline flight payload, so the typed `q` is in the raw response even though app code never renders it.
 
 Listing e2e select only by the `data-testid` values of the design contract; the category name is read by `getByRole` heading level 1. Category pages are server pages: parse `request().get` HTML with `openRawHtml` for JS-off checks.
 

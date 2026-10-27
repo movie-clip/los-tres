@@ -4,9 +4,14 @@
     "description": "Compara precios de aceite de motor y de filtros de aceite, aire, combustible y habitáculo en las tiendas de España y elige la más barata."
   },
   "Home": {
-    "heading": "{siteName}",
-    "tagline": "Compara precios de aceite y filtros para tu coche en las tiendas de España.",
-    "categoriesHeading": "Categorías",
+    "heading": "Aceite y filtros para tu coche, al mejor precio",
+    "tagline": "Comparamos las tiendas de España para que elijas la más barata.",
+    "searchLabel": "Buscar un producto",
+    "searchButton": "Buscar",
+    "searchHint": "Por nombre, referencia o EAN",
+    "searchNotice": "La búsqueda por texto todavía no está disponible. Elige una categoría para ver sus productos.",
+    "categoriesHeading": "Elige una categoría",
+    "allLink": "Ver todo el catálogo",
     "productCount": "{count, plural, one {# producto} other {# productos}}",
     "emptyHeading": "Estamos preparando el catálogo",
     "emptyBody": "Todavía no hay productos que comparar. Vuelve pronto."
