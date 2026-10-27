@@ -3,16 +3,17 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: var(--space-2);
+  padding: var(--card-padding);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--color-bg);
   font-size: var(--text-md);
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
+/* Same 1px width, so nothing shifts: only the colour changes. */
 .card:hover {
-  border-color: var(--color-link);
+  border-color: var(--color-ink);
   cursor: pointer;
 }
 
@@ -21,8 +22,8 @@
   margin: 0;
   overflow: hidden;
   font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.4;
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -40,7 +41,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
 }
 
 .card:hover .link,
@@ -55,7 +56,7 @@
 
 .link:focus-visible::after {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset);
 }
 
 .brand {
@@ -88,11 +89,20 @@
 }
 
 .price {
-  font-size: var(--text-lg);
-  font-weight: 700;
+  color: var(--color-price);
+  font-size: var(--text-price);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
 }
 
+/* The shop count is a static chip: a pill carrying one fact. */
 .shops {
-  color: var(--color-muted);
+  padding: 0.125rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-chip-bg);
+  color: var(--color-chip-text);
   font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
 }

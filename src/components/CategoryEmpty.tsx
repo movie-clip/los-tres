@@ -15,7 +15,7 @@ export type CategoryEmptyProps = {
 /** The state of a category with no public products. Display strings only. */
 export function CategoryEmpty({ heading, body, homeLabel }: CategoryEmptyProps) {
   return (
-    <section data-testid="category-empty">
+    <section className={styles.empty} data-testid="category-empty">
       <h2 className={styles.heading}>{heading}</h2>
       <p className={styles.text}>{body}</p>
       {homeLabel === undefined ? null : (

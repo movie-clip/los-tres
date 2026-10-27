@@ -7,6 +7,7 @@
   margin-top: var(--space-3);
 }
 
+/* The secondary button: white, ink outline; hover fills ink, pressed fills amber. */
 .link {
   display: inline-flex;
   gap: calc(var(--space-1) / 2);
@@ -15,22 +16,30 @@
   min-width: var(--tap-target);
   min-height: var(--tap-target);
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-link);
-  color: var(--color-link);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-ink);
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   text-decoration: none;
 }
 
 .link:hover,
 .link:focus-visible {
-  background: var(--color-link);
-  color: var(--color-bg);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.link:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .link:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset);
 }
 
 .previous {
@@ -43,6 +52,7 @@
   grid-column: 2;
   grid-row: 1;
   padding: 0 calc(var(--space-1) / 2);
+  color: var(--color-text);
   text-align: center;
   white-space: nowrap;
 }

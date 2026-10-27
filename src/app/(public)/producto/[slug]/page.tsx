@@ -15,6 +15,8 @@ import { pageSeo } from '@/server/catalogue/seo';
 import { goPath } from '@/server/clicks/go-path';
 import { formatEuroCents } from '@/server/money';
 
+import styles from './page.module.css';
+
 export const dynamic = 'force-dynamic';
 
 // One database read per request, shared by generateMetadata and the page.
@@ -60,25 +62,27 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {jsonLd !== null && <JsonLd data={jsonLd} />}
       <main className="page">
         {product.demoOnly && <DemoNotice text={tDemo('body')} />}
-        <ProductDetails
-          title={product.title}
-          imageLabel={t('imagePlaceholder')}
-          details={details}
-          description={product.description}
-        />
-        <OfferList
-          heading={t('offersHeading')}
-          shopCount={t('shopCount', { count: product.offers.length })}
-          vatNote={t('vatIncluded')}
-          offers={product.offers.map((offer) => ({
-            key: String(offer.offerId),
-            shopName: offer.shopName,
-            price: formatEuroCents(offer.priceCents),
-            updated: t('priceUpdatedOn', { date: offer.priceUpdatedAt }),
-            goHref: goPath(offer.offerId),
-            goLabel: t('goToShop', { shopName: offer.shopName }),
-          }))}
-        />
+        <div className={styles.layout}>
+          <ProductDetails
+            title={product.title}
+            imageLabel={t('imagePlaceholder')}
+            details={details}
+            description={product.description}
+          />
+          <OfferList
+            heading={t('offersHeading')}
+            shopCount={t('shopCount', { count: product.offers.length })}
+            vatNote={t('vatIncluded')}
+            offers={product.offers.map((offer) => ({
+              key: String(offer.offerId),
+              shopName: offer.shopName,
+              price: formatEuroCents(offer.priceCents),
+              updated: t('priceUpdatedOn', { date: offer.priceUpdatedAt }),
+              goHref: goPath(offer.offerId),
+              goLabel: t('goToShop', { shopName: offer.shopName }),
+            }))}
+          />
+        </div>
       </main>
     </>
   );

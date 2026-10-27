@@ -2,13 +2,13 @@
   margin: 0 0 var(--space-3);
   padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-left: 0.25rem solid var(--color-link);
-  border-radius: var(--radius);
-  background: var(--color-bg);
+  border-left: 0.25rem solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
   color: var(--color-text);
   font-size: var(--text-md);
-  font-weight: 400;
-  line-height: 1.4;
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-snug);
 }
 
 /* `.page p` in globals.css is muted grey (0,1,1); this sentence is a warning, so it takes the full text colour. */
