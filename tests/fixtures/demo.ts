@@ -41,10 +41,10 @@ export const DEMO_WRENCHES = {
 
 /** Sold by Uno alone, no brand cell: the card renders no brand line. */
 export const DEMO_NO_BRAND = {
-  slug: 'demo-lampara-h7-12-v-55-w',
-  title: 'DEMO Lámpara H7 12 V 55 W',
+  slug: 'demo-aceite-de-motor-5w-30-1-l',
+  title: 'DEMO Aceite de motor 5W-30 1 L',
   priceCents: 650,
-  categorySlug: 'escobillas-y-bombillas',
+  categorySlug: 'aceite-de-motor',
 } as const;
 
 /** A 100-character title (UNO-004), to prove the card clamps instead of breaking the layout. */
@@ -66,25 +66,24 @@ export const DEMO_UNMAPPED_EMPTY = {
   title: 'DEMO Banco de trabajo plegable',
 } as const;
 
-/** 24 filler air filters FA-101..FA-124 (UNO-101..124), 5,55 EUR up in 0,60 steps. */
+/** 24 filler air filters FA-101..FA-124 (UNO-101..124), 5,55 EUR up in 0,60 steps; they fill filtros-de-aire. */
 export const DEMO_FILLER = { count: 24, firstTitle: 'DEMO Filtro de aire FA-101', firstPriceCents: 555 } as const;
 
-/** Public products per category subtree after one import (AC 9, 23). */
+/** Public products per category subtree after one import (AC 9, 23). Keys are the fixed tree slugs. */
 export const DEMO_CATEGORY_COUNTS = {
-  filtros: 26,
-  'escobillas-y-bombillas': 1,
-  'herramientas-electricas': 1,
-  'herramientas-manuales': 1,
-  'aceites-y-lubricantes': 0,
-  automovil: 27,
-  herramientas: 2,
+  'mantenimiento-del-coche': 27,
+  'aceite-de-motor': 1,
+  'filtros-de-aceite': 1,
+  'filtros-de-aire': 24,
+  'filtros-de-combustible': 0,
+  'filtros-de-habitaculo': 1,
 } as const;
 
-/** After one import: 31 products and 32 offers, of which 29 products are public. */
+/** After one import: 31 products and 32 offers, of which 27 products are public. */
 export const DEMO_COUNTS = {
   products: 31,
   offers: 32,
-  publicProducts: 29,
+  publicProducts: 27,
   feeds: 2,
   shops: 2,
   categoryMappings: 5,
@@ -93,11 +92,12 @@ export const DEMO_COUNTS = {
 /** Rows per demo feed file and what a first import creates from them. */
 export const DEMO_FEED_ROWS = { uno: 28, dos: 4, dosProductsCreated: 3 } as const;
 
-/** Display names of the seeded demo categories, by slug. */
+/** Display names of the fixed categories, by slug (a unit test keeps this equal to FIXED_CATEGORY_TREE). */
 export const DEMO_CATEGORY_NAMES = {
-  filtros: 'Filtros',
-  automovil: 'Automóvil',
-  herramientas: 'Herramientas',
-  'aceites-y-lubricantes': 'Aceites y lubricantes',
-  'escobillas-y-bombillas': 'Escobillas y bombillas',
+  'mantenimiento-del-coche': 'Mantenimiento del coche',
+  'aceite-de-motor': 'Aceite de motor',
+  'filtros-de-aceite': 'Filtros de aceite',
+  'filtros-de-aire': 'Filtros de aire',
+  'filtros-de-combustible': 'Filtros de combustible',
+  'filtros-de-habitaculo': 'Filtros de habitáculo',
 } as const;

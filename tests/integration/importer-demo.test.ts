@@ -12,6 +12,7 @@ import {
   DEMO_DRILL,
   DEMO_FEED_ROWS,
   DEMO_FEED_URLS,
+  DEMO_NO_BRAND,
   DEMO_SHARED,
   DEMO_WRENCHES,
 } from '../fixtures/demo';
@@ -108,12 +109,13 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     expect(page?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual(
       DEMO_SHARED.offers.map((offer) => [offer.shopName, offer.priceCents]),
     );
-    const single = await getPublicProductBySlug(DEMO_DRILL.slug);
-    expect(single?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual(
-      DEMO_DRILL.offers.map((offer) => [offer.shopName, offer.priceCents]),
-    );
-    const wrenches = await getPublicProductBySlug(DEMO_WRENCHES.slug);
-    expect(wrenches?.offers).toHaveLength(1);
+    // The drill and the wrenches map to no fixed category: imported, never public.
+    for (const unmapped of [DEMO_DRILL, DEMO_WRENCHES]) {
+      expect(await getPublicProductBySlug(unmapped.slug)).toBeNull();
+      expect((await allProducts()).find((row) => row.slug === unmapped.slug)?.categoryId).toBeNull();
+    }
+    const oil = await getPublicProductBySlug(DEMO_NO_BRAND.slug);
+    expect(oil?.offers.map((offer) => offer.priceCents)).toEqual([DEMO_NO_BRAND.priceCents]);
   });
 
   it('stores every price as the integer cents of the feed text', async () => {
@@ -125,7 +127,7 @@ describe('import-feeds on the shipped demo data (brief acceptance)', () => {
     expect(byExternalId).toMatchObject({
       'UNO-001': 1299,
       'UNO-002': 4990,
-      'UNO-003': 650,
+      'UNO-005': 650,
       'UNO-004': 1590,
       'UNO-101': 555,
       'UNO-124': 1935,

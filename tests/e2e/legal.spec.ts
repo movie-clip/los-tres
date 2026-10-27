@@ -30,8 +30,8 @@ test.describe('footer on every page (S9.3)', () => {
   const pages: [string, string, number][] = [
     ['home', '/', 200],
     ['product', `/producto/${DEMO_SHARED.slug}`, 200],
-    ['category', '/categoria/filtros', 200],
-    ['empty category', '/categoria/aceites-y-lubricantes', 200],
+    ['category', '/categoria/mantenimiento-del-coche', 200],
+    ['empty category', '/categoria/filtros-de-combustible', 200],
     ['not found', '/esta-pagina-no-existe', 404],
     ['funding', '/como-nos-financiamos', 200],
   ];
@@ -186,7 +186,7 @@ test.describe('demo notice (S9.3)', () => {
     await close();
   });
 
-  for (const route of ['/categoria/filtros', '/categoria/filtros?pagina=2']) {
+  for (const route of ['/categoria/mantenimiento-del-coche', '/categoria/mantenimiento-del-coche?pagina=2']) {
     test(`shows on ${route}, first in main`, async ({ request, browser }) => {
       const response = await request.get(route);
       expect(response.status()).toBe(200);
@@ -200,7 +200,7 @@ test.describe('demo notice (S9.3)', () => {
 
   for (const route of [
     '/',
-    '/categoria/aceites-y-lubricantes',
+    '/categoria/filtros-de-combustible',
     '/esta-pagina-no-existe',
     '/como-nos-financiamos',
   ]) {

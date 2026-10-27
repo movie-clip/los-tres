@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_DRILL, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
+import { DEMO_NO_BRAND, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
 import { loadEnv } from '../support/env';
 import { dateMessagePattern, icuPlural, normaliseSpaces } from '../support/messages';
 import {
@@ -78,15 +78,15 @@ test.describe('product page /producto/<slug> (C-13)', () => {
   });
 
   test('shows the one-shop wording for a product sold by a single shop', async ({ request, browser }) => {
-    const response = await request.get(path(DEMO_DRILL.slug));
+    const response = await request.get(path(DEMO_NO_BRAND.slug));
     expect(response.status()).toBe(200);
     expectNoSetCookie(response);
     const { page, close } = await openRawHtml(browser, await response.text());
 
-    await expect(page.locator('h1')).toHaveText(DEMO_DRILL.title);
+    await expect(page.locator('h1')).toHaveText(DEMO_NO_BRAND.title);
     await expect(page.getByTestId('shop-count')).toHaveText(icuPlural(messages.Product.shopCount, 1));
     await expect(page.getByTestId('offer-row')).toHaveCount(1);
-    expect(await text(page, 'offer-price')).toEqual(['49,90 €']);
+    expect(await text(page, 'offer-price')).toEqual(['6,50 €']);
     await close();
   });
 
@@ -217,14 +217,14 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     });
 
     test('a single-shop product has equal low and high prices', async ({ request }) => {
-      const html = await (await request.get(path(DEMO_DRILL.slug))).text();
+      const html = await (await request.get(path(DEMO_NO_BRAND.slug))).text();
       const found = scripts(html);
       expect(found).toHaveLength(1);
       const json = JSON.parse(found[0]);
-      expect(json.name).toBe(DEMO_DRILL.title);
+      expect(json.name).toBe(DEMO_NO_BRAND.title);
       expect(json.offers).toMatchObject({
-        lowPrice: '49.90',
-        highPrice: '49.90',
+        lowPrice: '6.50',
+        highPrice: '6.50',
         offerCount: 1,
         priceCurrency: 'EUR',
       });

@@ -11,6 +11,7 @@ import {
   DEMO_SHARED,
   DEMO_UNMAPPED_CATEGORY,
   DEMO_UNMAPPED_EMPTY,
+  DEMO_WRENCHES,
 } from '../fixtures/demo';
 import { loadEnv } from '../support/env';
 import { icuPlural, normaliseSpaces } from '../support/messages';
@@ -30,10 +31,14 @@ const siteName = (process.env.SITE_NAME ?? '').trim();
 
 const category = (slug: string, page?: number | string) =>
   `/categoria/${slug}${page === undefined ? '' : `?pagina=${page}`}`;
-const FILTROS = 'filtros';
+// The root holds every product of its five children: 27, so two pages. A leaf
+// holds one page at most (filtros-de-aire is exactly one full page of 24).
+const ROOT = 'mantenimiento-del-coche';
+const OIL_FILTERS = 'filtros-de-aceite';
+const EMPTY_LEAF = 'filtros-de-combustible';
 const PAGE_SIZE = 24;
-const filtrosCount = DEMO_CATEGORY_COUNTS.filtros;
-const filtrosPages = Math.ceil(filtrosCount / PAGE_SIZE);
+const rootCount = DEMO_CATEGORY_COUNTS[ROOT];
+const rootPages = Math.ceil(rootCount / PAGE_SIZE);
 
 const price = async (locator: Locator) => normaliseSpaces((await locator.textContent())?.trim() ?? '');
 const cardWithTitle = (page: Page, title: string) =>
@@ -47,16 +52,16 @@ const summaryText = (count: number, pageNumber?: number, pages?: number) =>
 
 test.describe('category page /categoria/<slug> (S5.1)', () => {
   test('server-renders the first page with JavaScript off and sets no cookie', async ({ request, browser }) => {
-    const response = await request.get(category(FILTROS));
+    const response = await request.get(category(ROOT));
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('text/html');
     expectNoSetCookie(response);
 
     const { page, close } = await openRawHtml(browser, await response.text());
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-ES');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES.filtros);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
     expect(await page.title()).toBe(
-      messages.Category.metaTitle.replace('{category}', DEMO_CATEGORY_NAMES.filtros).replace('{siteName}', siteName),
+      messages.Category.metaTitle.replace('{category}', DEMO_CATEGORY_NAMES[ROOT]).replace('{siteName}', siteName),
     );
     await expect(page.getByTestId('category-card')).toHaveCount(PAGE_SIZE);
     await expect(page.getByTestId('pagination')).toHaveCount(1);
@@ -66,13 +71,13 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   });
 
   test('summarises the count and the page, and states that prices include IVA', async ({ page }) => {
-    await page.goto(category(FILTROS));
-    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(filtrosCount, 1, filtrosPages));
+    await page.goto(category(ROOT));
+    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(rootCount, 1, rootPages));
     await expect(page.getByText(messages.Product.vatIncluded, { exact: true })).toHaveCount(1);
   });
 
   test('lists cards cheapest first with price in EUR, and no "from" label for a single shop', async ({ page }) => {
-    await page.goto(category(FILTROS));
+    await page.goto(category(ROOT));
     const first = page.getByTestId('category-card').first();
     await expect(first.getByTestId('card-title')).toHaveText(DEMO_FILLER.firstTitle);
     expect(await price(first.getByTestId('card-price'))).toBe('5,55 €');
@@ -87,7 +92,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   });
 
   test('shows the shared filter with "Desde", the lowest of two shops, and the plural count', async ({ page }) => {
-    await page.goto(category(FILTROS));
+    await page.goto(category(OIL_FILTERS));
     const card = cardWithTitle(page, DEMO_SHARED.title);
     await expect(card).toHaveCount(1);
     await expect(card.getByTestId('card-price-from')).toHaveText(messages.Category.priceFrom);
@@ -99,7 +104,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   });
 
   test('opens a product from its card and lands on that product page', async ({ page }) => {
-    await page.goto(category(FILTROS));
+    await page.goto(category(OIL_FILTERS));
     const card = cardWithTitle(page, DEMO_SHARED.title);
     await card.getByTestId('card-title').click();
     await expect(page).toHaveURL(new RegExp(`/producto/${DEMO_SHARED.slug}$`));
@@ -109,74 +114,92 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   test('page 2 holds the rest, with previous and no next, and previous goes back to the clean URL', async ({
     page,
   }) => {
-    await page.goto(category(FILTROS));
+    await page.goto(category(ROOT));
     await expect(page.getByTestId('pagination-prev')).toHaveCount(0);
     await expect(page.getByTestId('pagination-indicator')).toHaveText(
-      messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(filtrosPages)),
+      messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(rootPages)),
     );
     await expect(page.getByTestId('pagination-next')).toContainText(messages.Category.nextPage);
-    await expect(page.getByTestId('pagination-next')).toHaveAttribute('href', category(FILTROS, 2));
+    await expect(page.getByTestId('pagination-next')).toHaveAttribute('href', category(ROOT, 2));
 
     await page.getByTestId('pagination-next').click();
 
-    await expect(page).toHaveURL(new RegExp(`${category(FILTROS, 2).replace('?', '\\?')}$`));
-    await expect(page.getByTestId('category-card')).toHaveCount(filtrosCount - PAGE_SIZE);
-    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(filtrosCount, 2, filtrosPages));
+    await expect(page).toHaveURL(new RegExp(`${category(ROOT, 2).replace('?', '\\?')}$`));
+    await expect(page.getByTestId('category-card')).toHaveCount(rootCount - PAGE_SIZE);
+    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(rootCount, 2, rootPages));
     await expect(page.getByTestId('pagination-indicator')).toHaveText(
-      messages.Category.pageIndicator.replace('{page}', '2').replace('{pages}', String(filtrosPages)),
+      messages.Category.pageIndicator.replace('{page}', '2').replace('{pages}', String(rootPages)),
     );
     await expect(page.getByTestId('pagination-next')).toHaveCount(0);
     await expect(page.getByTestId('pagination-prev')).toContainText(messages.Category.previousPage);
-    await expect(page.getByTestId('pagination-prev')).toHaveAttribute('href', category(FILTROS));
+    await expect(page.getByTestId('pagination-prev')).toHaveAttribute('href', category(ROOT));
     expect(await page.title()).toBe(
       messages.Category.metaTitlePaged
-        .replace('{category}', DEMO_CATEGORY_NAMES.filtros)
+        .replace('{category}', DEMO_CATEGORY_NAMES[ROOT])
         .replace('{page}', '2')
         .replace('{siteName}', siteName),
     );
 
     await page.getByTestId('pagination-prev').click();
-    await expect(page).toHaveURL(new RegExp(`${category(FILTROS)}$`));
+    await expect(page).toHaveURL(new RegExp(`${category(ROOT)}$`));
     await expect(page.getByTestId('category-card')).toHaveCount(PAGE_SIZE);
   });
 
   test('page 2 continues the order of page 1 without repeating a product', async ({ request, browser }) => {
     const titles: string[] = [];
-    for (const target of [category(FILTROS), category(FILTROS, 2)]) {
+    for (const target of [category(ROOT), category(ROOT, 2)]) {
       const { page, close } = await openRawHtml(browser, await (await request.get(target)).text());
       titles.push(...(await page.getByTestId('card-title').allTextContents()));
       await close();
     }
-    expect(titles).toHaveLength(filtrosCount);
-    expect(new Set(titles).size).toBe(filtrosCount);
+    expect(titles).toHaveLength(rootCount);
+    expect(new Set(titles).size).toBe(rootCount);
   });
 
-  test('shows a product of a child category in its parent, and the roots hold nothing of their own', async ({
-    page,
-  }) => {
-    await page.goto(category('automovil'));
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES.automovil);
+  test('shows the products of every child under the root, which holds none of its own', async ({ page }) => {
+    await page.goto(category(ROOT));
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
     await expect(page.getByTestId('category-summary')).toContainText(
-      icuPlural(messages.Category.summary, DEMO_CATEGORY_COUNTS.automovil),
+      icuPlural(messages.Category.summary, rootCount),
     );
-    // The lamp lives in a child (escobillas-y-bombillas); it is the dearest-or-not among 27, so read both pages.
     const titles = await page.getByTestId('card-title').allTextContents();
-    await page.goto(category('automovil', 2));
+    await page.goto(category(ROOT, 2));
     titles.push(...(await page.getByTestId('card-title').allTextContents()));
+    expect(titles).toHaveLength(rootCount);
     expect(titles).toContain(DEMO_NO_BRAND.title);
     expect(titles).toContain(DEMO_SHARED.title);
-    expect(titles).toHaveLength(DEMO_CATEGORY_COUNTS.automovil);
+    expect(titles).toContain(DEMO_LONG_TITLE.title);
   });
 
-  test('shows the two tool products under the tools root and no pagination for one page', async ({ page }) => {
-    await page.goto(category('herramientas'));
-    await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS.herramientas);
-    await expect(page.getByTestId('category-summary')).toHaveText(
-      summaryText(DEMO_CATEGORY_COUNTS.herramientas),
-    );
+  test('counts a leaf on its own products only, below the root, with no pagination for one page', async ({
+    page,
+  }) => {
+    const slug = 'filtros-de-aire';
+    await page.goto(category(slug));
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES[slug]);
+    await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[slug]);
+    await expect(page.getByTestId('category-summary')).toHaveText(summaryText(DEMO_CATEGORY_COUNTS[slug]));
+    expect(DEMO_CATEGORY_COUNTS[slug]).toBeLessThan(rootCount);
     await expect(page.getByTestId('pagination')).toHaveCount(0);
-    await expect(page.getByTestId('card-title').filter({ hasText: DEMO_DRILL.title })).toHaveCount(1);
+    await expect(page.getByTestId('card-title').filter({ hasText: DEMO_FILLER.firstTitle })).toHaveCount(1);
   });
+
+  for (const slug of ['filtros', 'automovil', 'herramientas']) {
+    test(`the retired category /categoria/${slug} answers 404 with the not-found page and no redirect`, async ({
+      request,
+      page,
+      context,
+    }) => {
+      const response = await request.get(category(slug), { maxRedirects: 0 });
+      expect(response.status()).toBe(404);
+      expectNoSetCookie(response);
+      expect(await response.text()).toContain(messages.NotFound.heading);
+
+      await page.goto(category(slug));
+      await expect(page.getByRole('heading', { name: messages.NotFound.heading })).toBeVisible();
+      expect(await context.cookies()).toEqual([]);
+    });
+  }
 
   test('renders a product without a brand with no brand line', async ({ page }) => {
     await page.goto(category(DEMO_NO_BRAND.categorySlug));
@@ -191,7 +214,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     page,
     request,
   }) => {
-    const unmapped = [DEMO_UNMAPPED_CATEGORY, DEMO_UNMAPPED_EMPTY];
+    const unmapped = [DEMO_UNMAPPED_CATEGORY, DEMO_UNMAPPED_EMPTY, DEMO_DRILL, DEMO_WRENCHES];
     for (const slug of Object.keys(DEMO_CATEGORY_COUNTS)) {
       for (const pageNumber of [1, 2]) {
         const response = await page.goto(category(slug, pageNumber));
@@ -211,9 +234,9 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     page,
     context,
   }) => {
-    const response = await page.goto(category('aceites-y-lubricantes'));
+    const response = await page.goto(category(EMPTY_LEAF));
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES['aceites-y-lubricantes']);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_CATEGORY_NAMES[EMPTY_LEAF]);
     await expect(page.getByTestId('category-empty')).toBeVisible();
     await expect(page.getByTestId('category-empty')).toContainText(messages.Category.emptyHeading);
     await expect(page.getByTestId('category-empty')).toContainText(messages.Category.emptyBody);
@@ -224,7 +247,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   });
 
   test('answers 404 for page 2 of an empty category: it has exactly one page', async ({ request }) => {
-    const response = await request.get(category('aceites-y-lubricantes', 2));
+    const response = await request.get(category(EMPTY_LEAF, 2));
     expect(response.status()).toBe(404);
     expectNoSetCookie(response);
   });
@@ -249,8 +272,8 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   test('answers 404 past the last page, and for an absurdly large page, without a server error', async ({
     request,
   }) => {
-    for (const pageNumber of [filtrosPages + 1, 99, '9'.repeat(400)]) {
-      const response = await request.get(category(FILTROS, pageNumber));
+    for (const pageNumber of [rootPages + 1, 99, '9'.repeat(400)]) {
+      const response = await request.get(category(ROOT, pageNumber));
       expect(response.status(), String(pageNumber).slice(0, 12)).toBe(404);
       expectNoSetCookie(response);
     }
@@ -260,12 +283,12 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     test(`reads ?pagina=${JSON.stringify(value)} as page 1 at the same URL, without a redirect`, async ({
       request,
     }) => {
-      const response = await request.get(`${category(FILTROS)}?pagina=${encodeURIComponent(value)}`, {
+      const response = await request.get(`${category(ROOT)}?pagina=${encodeURIComponent(value)}`, {
         maxRedirects: 0,
       });
       expect(response.status()).toBe(200);
       expect(await response.text()).toContain(
-        messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(filtrosPages)),
+        messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(rootPages)),
       );
     });
   }
@@ -278,7 +301,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     const requested: string[] = [];
     page.on('request', (req) => requested.push(req.url()));
 
-    await page.goto(category(FILTROS));
+    await page.goto(category(ROOT));
     await expect(page.getByTestId('category-card').first()).toBeVisible();
     await page.getByTestId('pagination-next').click();
     await expect(page.getByTestId('pagination-prev')).toBeVisible();
@@ -298,7 +321,7 @@ for (const viewport of [
     test.use({ viewport: { width: viewport.width, height: viewport.height } });
 
     test('does not scroll sideways, with a 100-character title and a full grid', async ({ page }) => {
-      await page.goto(category(FILTROS));
+      await page.goto(category(ROOT));
       await page.getByTestId('category-card').first().waitFor();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -306,7 +329,7 @@ for (const viewport of [
       expect(overflow).toBeLessThanOrEqual(0);
 
       // The long-title card stays inside the viewport; the title is clamped, not stretched.
-      const all = [category(FILTROS), category(FILTROS, 2)];
+      const all = [category(ROOT), category(ROOT, 2)];
       let found = false;
       for (const target of all) {
         await page.goto(target);
@@ -323,7 +346,7 @@ for (const viewport of [
     });
 
     test('keeps the pagination links inside the viewport and at least 44px tall', async ({ page }) => {
-      await page.goto(category(FILTROS));
+      await page.goto(category(ROOT));
       const next = page.getByTestId('pagination-next');
       const nextBox = await next.boundingBox();
       expect(nextBox!.height).toBeGreaterThanOrEqual(44);
@@ -339,7 +362,7 @@ for (const viewport of [
     });
 
     test('keeps the empty state readable with no sideways scroll', async ({ page }) => {
-      await page.goto(category('aceites-y-lubricantes'));
+      await page.goto(category(EMPTY_LEAF));
       await expect(page.getByTestId('category-empty')).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

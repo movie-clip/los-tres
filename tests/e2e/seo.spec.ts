@@ -75,7 +75,7 @@ test.describe('robots.txt, sitemap and canonicals (S6.2)', () => {
   });
 
   test('marks a demo-only category page noindex and gives it no canonical', async ({ request, browser }) => {
-    const response = await request.get('/categoria/filtros');
+    const response = await request.get('/categoria/filtros-de-aire');
     expect(response.status()).toBe(200);
     const { page, close } = await openRawHtml(browser, await response.text());
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
