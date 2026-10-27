@@ -149,7 +149,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
 
     await page.getByTestId('pagination-next').click();
 
-    await expect(page).toHaveURL(new RegExp(`${category(ROOT, 2).replace('?', '\?')}$`));
+    await expect(page).toHaveURL(new RegExp(`${category(ROOT, 2).replace('?', '\\?')}$`));
     await expect(page.getByTestId('category-card')).toHaveCount(Math.min(PAGE_SIZE, rootCount - PAGE_SIZE));
     await expect(page.getByTestId('category-summary')).toHaveText(summaryText(rootCount, 2, rootPages));
     await expect(page.getByTestId('pagination-indicator')).toHaveText(indicator(2));
