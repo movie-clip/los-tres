@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { DemoNotice } from '@/components/DemoNotice';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
@@ -54,6 +55,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
   if (product.ean !== null) details.push({ label: t('ean'), value: product.ean });
 
+  // The product's own leaf: an unknown or root slug keeps the plain square.
+  const illustration = toIllustrationKey(product.categorySlug);
+  const imageLabel = illustration
+    ? t(`imageByCategory.${illustration}`)
+    : t('imagePlaceholder');
+
   // Null when no offer is visible: then no script tag is rendered at all.
   const jsonLd = buildProductJsonLd(product);
 
@@ -65,7 +72,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className={styles.layout}>
           <ProductDetails
             title={product.title}
-            imageLabel={t('imagePlaceholder')}
+            imageLabel={imageLabel}
+            illustration={illustration}
             details={details}
             description={product.description}
           />

@@ -55,6 +55,7 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
   `SEED_DEMO_DATA` is true in `.env.example` and false by default in Compose.
   `demoOnly` on the product and category page data is computed only in `src/server/catalogue` from `feeds.is_demo` over visible offers; no file under `src/app` or `src/components` names `isDemo`.
   Drizzle 0.45 `update().set().from(table).where().returning()` works and qualifies RETURNING columns (`setFeedApproval` reads the shop's flag in the same statement).
+  The category and product read models inner-join `categories` and return `categorySlug`; the join is not a filter (`isNotNull` stays in `visibility.ts`).
   Sitemap and `indexable` = `visibleProductWhere()` AND `hasNonDemoOfferWhere()`; the two literal calls must appear in `sitemap.ts`; `demo.ts` names `feeds.isDemo` only inside `src/server/catalogue`.
 - **(2) No scraping.** The importer fetches only the URL of a feed registered in
   the database, and parses it as CSV or XML feed data. Never add a crawler, a
@@ -99,6 +100,7 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
 - [ ] Lint and test commands from `CLAUDE.md` § Commands run and passing, or
       their absence reported
 - [ ] Contract notes emitted for every field the frontend will consume
+- [ ] A change to feeds or the importer is verified with a real import on a scratch database, not the dev volume (create db, set `DATABASE_URL`, migrate, seed, import, drop)
 - [ ] Compose logs checked for no feed URL, database URL or `.example` host
       (Next's own `http://localhost:3000` and `http://0.0.0.0:3000` start-up
       lines are expected)

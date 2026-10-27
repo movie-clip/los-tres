@@ -17,6 +17,7 @@ const card: ProductCardProps = {
   priceFrom: 'Desde',
   price: '11,49 €',
   shopCount: '2 tiendas',
+  illustration: null,
 };
 
 const render = (props: Partial<ProductCardProps> = {}) =>
@@ -136,5 +137,24 @@ describe('CategoryEmpty', () => {
 
   it('renders no card, grid or pagination', () => {
     expect(html).not.toMatch(/category-card|<ul\b|pagination/);
+  });
+});
+
+describe('ProductCard tile (S11.2)', () => {
+  it.each([null, 'filtros-de-aire' as const])('renders an aria-hidden card-tile for illustration %s', (illustration) => {
+    const html = render({ illustration });
+    expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*data-testid="card-tile"|<span[^>]*data-testid="card-tile"[^>]*aria-hidden="true"/);
+    expect(html.match(/data-testid="card-tile"/g)).toHaveLength(1);
+  });
+
+  it('draws the illustration inside the tile only when one is given', () => {
+    expect(render({ illustration: null })).not.toContain('<svg');
+    expect(render({ illustration: 'aceite-de-motor' })).toContain('data-testid="category-illustration"');
+  });
+
+  it('keeps the title as the one link of the card, with or without an illustration', () => {
+    for (const illustration of [null, 'filtros-de-aceite' as const]) {
+      expect(render({ illustration }).match(/<a\b/g)).toHaveLength(1);
+    }
   });
 });

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
 import { CategoryEmpty } from '@/components/CategoryEmpty';
+import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { DemoNotice } from '@/components/DemoNotice';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
@@ -108,6 +109,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           priceFrom: product.offerCount >= 2 ? t('priceFrom') : null,
           price: formatEuroCents(product.lowestPriceCents),
           shopCount: tProduct('shopCount', { count: product.offerCount }),
+          illustration: toIllustrationKey(product.categorySlug),
         }))}
       />
       {category.pageCount > 1 ? (

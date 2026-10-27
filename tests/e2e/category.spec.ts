@@ -5,7 +5,9 @@ import {
   DEMO_CATEGORY_COUNTS,
   DEMO_CATEGORY_NAMES,
   DEMO_DRILL,
-  DEMO_FILLER,
+  DEMO_CHEAPEST,
+  DEMO_FOUR_OFFERS,
+  DEMO_ILLUSTRATED,
   DEMO_LONG_TITLE,
   DEMO_NO_BRAND,
   DEMO_SHARED,
@@ -31,14 +33,18 @@ const siteName = (process.env.SITE_NAME ?? '').trim();
 
 const category = (slug: string, page?: number | string) =>
   `/categoria/${slug}${page === undefined ? '' : `?pagina=${page}`}`;
-// The root holds every product of its five children: 27, so two pages. A leaf
-// holds one page at most (filtros-de-aire is exactly one full page of 24).
+// The root holds every product of its five children, so more than one page. A leaf
+// holds one page at most (the largest, aceite-de-motor, is well under a full page).
 const ROOT = 'mantenimiento-del-coche';
 const OIL_FILTERS = 'filtros-de-aceite';
 const EMPTY_LEAF = 'filtros-de-combustible';
 const PAGE_SIZE = 24;
 const rootCount = DEMO_CATEGORY_COUNTS[ROOT];
 const rootPages = Math.ceil(rootCount / PAGE_SIZE);
+/** Every page URL of the root listing, page one at the clean URL. */
+const rootPageUrls = Array.from({ length: rootPages }, (_, index) =>
+  index === 0 ? category(ROOT) : category(ROOT, index + 1),
+);
 
 const price = async (locator: Locator) => normaliseSpaces((await locator.textContent())?.trim() ?? '');
 const cardWithTitle = (page: Page, title: string) =>
@@ -79,10 +85,12 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   test('lists cards cheapest first with price in EUR, and no "from" label for a single shop', async ({ page }) => {
     await page.goto(category(ROOT));
     const first = page.getByTestId('category-card').first();
-    await expect(first.getByTestId('card-title')).toHaveText(DEMO_FILLER.firstTitle);
-    expect(await price(first.getByTestId('card-price'))).toBe('5,55 €');
+    await expect(first.getByTestId('card-title')).toHaveText(DEMO_CHEAPEST.title);
+    expect(await price(first.getByTestId('card-price'))).toBe('3,90 €');
     await expect(first.getByTestId('card-price-from')).toHaveCount(0);
-    await expect(first.getByTestId('card-shop-count')).toHaveText(icuPlural(messages.Product.shopCount, 1));
+    await expect(first.getByTestId('card-shop-count')).toHaveText(
+      icuPlural(messages.Product.shopCount, DEMO_CHEAPEST.offerCount),
+    );
 
     const prices = (await page.getByTestId('card-price').allTextContents()).map((text) =>
       Number(normaliseSpaces(text).replace(/[^\d,]/g, '').replace(',', '.')),
@@ -103,6 +111,23 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     expect(await card.innerHTML()).not.toMatch(/\/go\/|env[ií]o/i);
   });
 
+  test('shows a decorative tile with the category drawing on the card of each populated leaf', async ({ page }) => {
+    await page.goto(category(ROOT));
+    // Every card has the tile, hidden from assistive technology, and the root page mixes leaves.
+    const tiles = page.getByTestId('card-tile');
+    await expect(tiles).toHaveCount(PAGE_SIZE);
+    await expect(page.locator('[data-testid="card-tile"]:not([aria-hidden="true"])')).toHaveCount(0);
+    for (const [leaf, productSlug] of Object.entries(DEMO_ILLUSTRATED)) {
+      await page.goto(category(leaf));
+      const card = page
+        .getByTestId('category-card')
+        .filter({ has: page.locator(`a[href="/producto/${productSlug}"]`) });
+      await expect(card).toHaveCount(1);
+      await expect(card.getByTestId('card-tile').locator('svg[data-testid="category-illustration"]')).toHaveCount(1);
+      await expect(card.locator('a')).toHaveCount(1);
+    }
+  });
+
   test('opens a product from its card and lands on that product page', async ({ page }) => {
     await page.goto(category(OIL_FILTERS));
     const card = cardWithTitle(page, DEMO_SHARED.title);
@@ -111,26 +136,23 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(DEMO_SHARED.title);
   });
 
-  test('page 2 holds the rest, with previous and no next, and previous goes back to the clean URL', async ({
+  test('walks the root pages: page 2 has previous and next, the last page has previous and no next', async ({
     page,
   }) => {
+    const indicator = (n: number) =>
+      messages.Category.pageIndicator.replace('{page}', String(n)).replace('{pages}', String(rootPages));
     await page.goto(category(ROOT));
     await expect(page.getByTestId('pagination-prev')).toHaveCount(0);
-    await expect(page.getByTestId('pagination-indicator')).toHaveText(
-      messages.Category.pageIndicator.replace('{page}', '1').replace('{pages}', String(rootPages)),
-    );
+    await expect(page.getByTestId('pagination-indicator')).toHaveText(indicator(1));
     await expect(page.getByTestId('pagination-next')).toContainText(messages.Category.nextPage);
     await expect(page.getByTestId('pagination-next')).toHaveAttribute('href', category(ROOT, 2));
 
     await page.getByTestId('pagination-next').click();
 
     await expect(page).toHaveURL(new RegExp(`${category(ROOT, 2).replace('?', '\\?')}$`));
-    await expect(page.getByTestId('category-card')).toHaveCount(rootCount - PAGE_SIZE);
+    await expect(page.getByTestId('category-card')).toHaveCount(Math.min(PAGE_SIZE, rootCount - PAGE_SIZE));
     await expect(page.getByTestId('category-summary')).toHaveText(summaryText(rootCount, 2, rootPages));
-    await expect(page.getByTestId('pagination-indicator')).toHaveText(
-      messages.Category.pageIndicator.replace('{page}', '2').replace('{pages}', String(rootPages)),
-    );
-    await expect(page.getByTestId('pagination-next')).toHaveCount(0);
+    await expect(page.getByTestId('pagination-indicator')).toHaveText(indicator(2));
     await expect(page.getByTestId('pagination-prev')).toContainText(messages.Category.previousPage);
     await expect(page.getByTestId('pagination-prev')).toHaveAttribute('href', category(ROOT));
     expect(await page.title()).toBe(
@@ -140,14 +162,21 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
         .replace('{siteName}', siteName),
     );
 
+    await page.goto(category(ROOT, rootPages));
+    await expect(page.getByTestId('category-card')).toHaveCount(rootCount - PAGE_SIZE * (rootPages - 1));
+    await expect(page.getByTestId('pagination-indicator')).toHaveText(indicator(rootPages));
+    await expect(page.getByTestId('pagination-next')).toHaveCount(0);
+    await expect(page.getByTestId('pagination-prev')).toHaveAttribute('href', rootPageUrls[rootPages - 2]);
+
+    await page.goto(category(ROOT, 2));
     await page.getByTestId('pagination-prev').click();
     await expect(page).toHaveURL(new RegExp(`${category(ROOT)}$`));
     await expect(page.getByTestId('category-card')).toHaveCount(PAGE_SIZE);
   });
 
-  test('page 2 continues the order of page 1 without repeating a product', async ({ request, browser }) => {
+  test('later pages continue the order of the first without repeating a product', async ({ request, browser }) => {
     const titles: string[] = [];
-    for (const target of [category(ROOT), category(ROOT, 2)]) {
+    for (const target of rootPageUrls) {
       const { page, close } = await openRawHtml(browser, await (await request.get(target)).text());
       titles.push(...(await page.getByTestId('card-title').allTextContents()));
       await close();
@@ -163,8 +192,10 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
       icuPlural(messages.Category.summary, rootCount),
     );
     const titles = await page.getByTestId('card-title').allTextContents();
-    await page.goto(category(ROOT, 2));
-    titles.push(...(await page.getByTestId('card-title').allTextContents()));
+    for (const target of rootPageUrls.slice(1)) {
+      await page.goto(target);
+      titles.push(...(await page.getByTestId('card-title').allTextContents()));
+    }
     expect(titles).toHaveLength(rootCount);
     expect(titles).toContain(DEMO_NO_BRAND.title);
     expect(titles).toContain(DEMO_SHARED.title);
@@ -181,7 +212,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
     await expect(page.getByTestId('category-summary')).toHaveText(summaryText(DEMO_CATEGORY_COUNTS[slug]));
     expect(DEMO_CATEGORY_COUNTS[slug]).toBeLessThan(rootCount);
     await expect(page.getByTestId('pagination')).toHaveCount(0);
-    await expect(page.getByTestId('card-title').filter({ hasText: DEMO_FILLER.firstTitle })).toHaveCount(1);
+    await expect(page.locator(`a[href="/producto/${DEMO_FOUR_OFFERS.slug}"]`)).toHaveCount(1);
   });
 
   for (const slug of ['filtros', 'automovil', 'herramientas']) {
@@ -216,7 +247,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
   }) => {
     const unmapped = [DEMO_UNMAPPED_CATEGORY, DEMO_UNMAPPED_EMPTY, DEMO_DRILL, DEMO_WRENCHES];
     for (const slug of Object.keys(DEMO_CATEGORY_COUNTS)) {
-      for (const pageNumber of [1, 2]) {
+      for (const pageNumber of rootPageUrls.map((_url, index) => index + 1)) {
         const response = await page.goto(category(slug, pageNumber));
         if (response?.status() !== 200) continue; // page 2 of a one-page category is a 404
         const titles = await page.getByTestId('card-title').allTextContents();
@@ -329,7 +360,7 @@ for (const viewport of [
       expect(overflow).toBeLessThanOrEqual(0);
 
       // The long-title card stays inside the viewport; the title is clamped, not stretched.
-      const all = [category(ROOT), category(ROOT, 2)];
+      const all = rootPageUrls;
       let found = false;
       for (const target of all) {
         await page.goto(target);

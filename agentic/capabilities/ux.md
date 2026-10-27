@@ -110,14 +110,17 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 |---|---|
 | a product with offers | `/producto/demo-filtro-de-aceite-oc-1234` (demo data, two shops) |
 | not found | `/producto/no-existe` |
-| home, populated | `/` (four of the five children are populated, so the five-row home is not producible; report not checked) |
+| home, populated | `/` (the home lists only categories that hold products, so the empty fuel category is not on it; four of the five children are populated, so the five-row home is not producible; report not checked) |
 | home, no category has products | not producible without wiping the demo database; report not checked unless a separate empty database is available |
-| category, two pages | `/categoria/mantenimiento-del-coche` (the root, 27 products, 2 pages) |
-| category, last page | `/categoria/mantenimiento-del-coche?pagina=2` (3 cards) |
-| category, one page of 24 | `/categoria/filtros-de-aire` |
-| category, one card, no brand, single page | `/categoria/aceite-de-motor` |
+| category, three pages | `/categoria/mantenimiento-del-coche` (the root, 50 products on 3 pages: 24, 24, 2) |
+| category, last page | `/categoria/mantenimiento-del-coche?pagina=3` (2 cards) |
+| category, one page | `/categoria/aceite-de-motor` (16), `/categoria/filtros-de-aceite` (12), `/categoria/filtros-de-aire` (12), `/categoria/filtros-de-habitaculo` (10), each one page |
+| card with no brand | the first card on `/categoria/aceite-de-motor`; its product is `/producto/demo-aceite-de-motor-5w-30-1-l` |
+| card with a 100-character title | the "DEMO Filtro de habitáculo de carbón activo con triple capa..." card on `/categoria/filtros-de-habitaculo` |
+| product with four offers | `/producto/demo-filtro-de-habitaculo-mahle-ca-1118-antipolen` |
+| product with one offer | `/producto/demo-filtro-de-aire-bosch-af-2287` |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
-| not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=3` (404) |
+| not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=4` (404) |
 | not found, double chrome | a 404 raised inside `(public)` (`/categoria/no-existe`, `/producto/no-existe`) renders the public header and footer twice (root `not-found.tsx` inside `(public)/layout.tsx`); an unknown top-level URL has single chrome. Pre-existing (seen in S11.1, #242), so report it as `SHOULD_FIX` until it is fixed |
 | old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
@@ -135,8 +138,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
 | demo notice | shown on the demo product, `/categoria/mantenimiento-del-coche`, `?pagina=2`, `/categoria/aceite-de-motor`; absent on home, the empty category, 404 and the legal pages |
 
-Any state this table cannot produce (one offer, a missing image, the longest
-title, a product with no offers) is reported as `not checked` with the reason. Never mark
+Any state this table cannot produce (a missing image, a product with no offers) is reported as `not checked` with the reason. Never mark
 it satisfied. Add a row here through `pack_corrections` when a slice adds a way
 to reach a state.
 

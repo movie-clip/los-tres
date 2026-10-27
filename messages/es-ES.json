@@ -41,7 +41,14 @@
     "vatIncluded": "Precios con IVA incluido.",
     "priceUpdatedOn": "Precio actualizado el {date, date, medium}",
     "goToShop": "Ir a la tienda de {shopName}",
-    "imagePlaceholder": "Imagen del producto no disponible"
+    "imagePlaceholder": "Imagen del producto no disponible",
+    "imageByCategory": {
+      "aceite-de-motor": "Ilustración de un bidón de aceite de motor. No es una foto del producto.",
+      "filtros-de-aceite": "Ilustración de un filtro de aceite. No es una foto del producto.",
+      "filtros-de-aire": "Ilustración de un filtro de aire. No es una foto del producto.",
+      "filtros-de-combustible": "Ilustración de un filtro de combustible. No es una foto del producto.",
+      "filtros-de-habitaculo": "Ilustración de un filtro de habitáculo. No es una foto del producto."
+    }
   },
   "Footer": {
     "legalNotice": "Aviso legal",

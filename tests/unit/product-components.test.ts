@@ -16,6 +16,7 @@ function details(props: Partial<Parameters<typeof ProductDetails>[0]> = {}) {
       imageLabel: 'Sin imagen',
       details: [],
       description: null,
+      illustration: null,
       ...props,
     }),
   );
@@ -127,5 +128,21 @@ describe('OfferList', () => {
       createElement(OfferList, { heading: 'h', shopCount: '0 tiendas', vatNote: 'n', offers: [] }),
     );
     expect(html).not.toContain('data-testid="offer-row"');
+  });
+});
+
+describe('ImagePlaceholder via ProductDetails (S11.2)', () => {
+  it('keeps role="img" and the label, and draws nothing when there is no illustration', () => {
+    const html = details({ illustration: null });
+    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-label="Sin imagen"');
+    expect(html).not.toContain('<svg');
+  });
+
+  it('keeps role="img" and the label around the drawing when there is one', () => {
+    const html = details({ illustration: 'filtros-de-habitaculo', imageLabel: 'Ilustración de prueba' });
+    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-label="Ilustración de prueba"');
+    expect(html.match(/<svg\b/g)).toHaveLength(1);
   });
 });

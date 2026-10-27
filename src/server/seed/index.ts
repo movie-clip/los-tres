@@ -14,7 +14,7 @@ export type SeedReport = {
 };
 
 /**
- * Loads the demo network, two demo shops with one demo feed each and each demo
+ * Loads the demo network, the four demo shops with one demo feed each and each demo
  * feed's category mappings onto the fixed tree. Creates no category: the tree
  * comes from `ensureFixedCategoryTree` at the end of migrate, and a missing
  * fixed slug throws. Loads no products: the first import is manual (TD-22).
@@ -44,7 +44,7 @@ export async function seedDemoData(db: Database): Promise<SeedReport> {
       .from(networks)
       .where(eq(networks.slug, demoNetwork.slug));
 
-    // One insert per shop and feed, in order, so a fresh database gets ids 1 and 2.
+    // One insert per shop and feed, in order, so a fresh database numbers them 1 to 4.
     for (const shop of demoShops) {
       const insertedShops = await tx
         .insert(shops)

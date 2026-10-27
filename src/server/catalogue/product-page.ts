@@ -3,7 +3,7 @@ import 'server-only';
 import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { getDb } from '../../db/client';
-import { feeds, offers, products, shops } from '../../db/schema';
+import { categories, feeds, offers, products, shops } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { hasNonDemoOfferWhere } from './demo';
@@ -34,6 +34,8 @@ export type PublicProductPage = {
   ean: string | null;
   /** Plain text: the page must render it as text, never as HTML. */
   description: string | null;
+  /** categories.slug of the product's own category; never null for a public product. */
+  categorySlug: string;
   /** Length >= 1, visible offers only, already sorted by price, shop, id. */
   offers: PublicOffer[];
   /** True when every listed (visible) offer is from a demo feed. offers.length >= 1, so never vacuous. */
@@ -63,6 +65,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       partNumber: products.partNumber,
       ean: products.ean,
       description: products.description,
+      categorySlug: categories.slug,
       offerId: offers.id,
       shopName: shops.name,
       priceCents: offers.priceCents,
@@ -74,6 +77,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
     .innerJoin(products, eq(offers.productId, products.id))
     .innerJoin(feeds, eq(offers.feedId, feeds.id))
     .innerJoin(shops, eq(feeds.shopId, shops.id))
+    .innerJoin(categories, eq(products.categoryId, categories.id))
     .where(and(eq(products.slug, slug), visibleProductWhere(), visibleOfferWhere()))
     .orderBy(asc(offers.priceCents), asc(shops.name), asc(offers.id));
 
@@ -86,6 +90,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
     partNumber: first.partNumber,
     ean: first.ean,
     description: first.description,
+    categorySlug: first.categorySlug,
     offers: rows.map((row) => ({
       offerId: row.offerId,
       shopName: row.shopName,

@@ -104,7 +104,7 @@ test.describe('home page (C-7)', () => {
     }
 
     // Never a zero count.
-    expect(await page.getByTestId('category-tree').textContent()).not.toMatch(/0 producto/);
+    expect(await page.getByTestId('category-tree').textContent()).not.toMatch(/(^|\D)0 producto/);
     await expectLocalScriptsAndLinks(page);
     await close();
   });

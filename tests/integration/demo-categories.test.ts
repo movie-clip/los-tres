@@ -13,7 +13,9 @@ import {
   DEMO_CATEGORY_COUNTS,
   DEMO_COUNTS,
   DEMO_DRILL,
-  DEMO_FILLER,
+  DEMO_FOUR_OFFERS,
+  DEMO_ILLUSTRATED,
+  DEMO_CHEAPEST,
   DEMO_LONG_TITLE,
   DEMO_NO_BRAND,
   DEMO_SHARED,
@@ -69,20 +71,63 @@ describe('demo data categories (AC 23, AC 24)', () => {
     expect(rows.some((row) => row.categoryId === root.id)).toBe(false);
   });
 
-  it('pages the root: 24 on page one, the rest on page two, cheapest first', async () => {
-    const first = await getPublicCategoryPage(ROOT, 1);
-    const second = await getPublicCategoryPage(ROOT, 2);
-    expect(first).toMatchObject({ pageCount: 2, productCount: DEMO_CATEGORY_COUNTS[ROOT] });
-    expect(first?.products).toHaveLength(24);
-    expect(second?.products).toHaveLength(DEMO_CATEGORY_COUNTS[ROOT] - 24);
-    expect(await getPublicCategoryPage(ROOT, 3)).toBeNull();
+  it('pages the root: 24 per page, the rest on the last, cheapest first', async () => {
+    const pageCount = Math.ceil(DEMO_CATEGORY_COUNTS[ROOT] / 24);
+    const pages = [];
+    for (let number = 1; number <= pageCount; number += 1) pages.push(await getPublicCategoryPage(ROOT, number));
+    const [first] = pages;
+    expect(first).toMatchObject({ pageCount, productCount: DEMO_CATEGORY_COUNTS[ROOT] });
+    expect(pages.map((page) => page?.products.length)).toEqual(
+      pages.map((_page, index) => Math.min(24, DEMO_CATEGORY_COUNTS[ROOT] - index * 24)),
+    );
+    expect(await getPublicCategoryPage(ROOT, pageCount + 1)).toBeNull();
     expect(first?.products[0]).toMatchObject({
-      title: DEMO_FILLER.firstTitle,
-      lowestPriceCents: DEMO_FILLER.firstPriceCents,
-      offerCount: 1,
+      slug: DEMO_CHEAPEST.slug,
+      title: DEMO_CHEAPEST.title,
+      lowestPriceCents: DEMO_CHEAPEST.priceCents,
+      offerCount: DEMO_CHEAPEST.offerCount,
     });
-    const prices = [...(first?.products ?? []), ...(second?.products ?? [])].map((card) => card.lowestPriceCents);
+    const prices = pages.flatMap((page) => page?.products ?? []).map((card) => card.lowestPriceCents);
     expect(prices).toEqual([...prices].sort((a, b) => a - b));
+  });
+
+  it('stamps each root card with the slug of its own leaf category (cards from several leaves)', async () => {
+    const leaves = new Map<string, string>();
+    for (const [leaf, productSlug] of Object.entries(DEMO_ILLUSTRATED)) leaves.set(productSlug, leaf);
+    const cards = [
+      ...((await getPublicCategoryPage(ROOT, 1))?.products ?? []),
+      ...((await getPublicCategoryPage(ROOT, 2))?.products ?? []),
+    ];
+    expect(new Set(cards.map((card) => card.categorySlug)).size).toBeGreaterThanOrEqual(2);
+    for (const [productSlug, leaf] of leaves) {
+      expect(cards.find((card) => card.slug === productSlug)?.categorySlug).toBe(leaf);
+    }
+    const leafSlugs: string[] = FIXED_CATEGORY_TREE.children.map((child) => child.slug);
+    expect(cards.every((card) => leafSlugs.includes(card.categorySlug))).toBe(true);
+  });
+
+  it('gives a leaf page cards that carry that leaf slug', async () => {
+    for (const leaf of Object.keys(DEMO_ILLUSTRATED)) {
+      const cards = (await getPublicCategoryPage(leaf, 1))?.products ?? [];
+      expect(cards.length).toBeGreaterThan(0);
+      expect(cards.every((card) => card.categorySlug === leaf)).toBe(true);
+    }
+  });
+
+  it('puts the product own leaf slug on the product page', async () => {
+    expect((await getPublicProductBySlug(DEMO_SHARED.slug))?.categorySlug).toBe('filtros-de-aceite');
+    expect((await getPublicProductBySlug(DEMO_NO_BRAND.slug))?.categorySlug).toBe(DEMO_NO_BRAND.categorySlug);
+    for (const [leaf, productSlug] of Object.entries(DEMO_ILLUSTRATED)) {
+      expect((await getPublicProductBySlug(productSlug))?.categorySlug).toBe(leaf);
+    }
+  });
+
+  it('lists the four-shop product with all four offers, cheapest first', async () => {
+    const page = await getPublicProductBySlug(DEMO_FOUR_OFFERS.slug);
+    expect(page?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual(
+      DEMO_FOUR_OFFERS.offers.map((offer) => [offer.shopName, offer.priceCents]),
+    );
+    expect(page?.categorySlug).toBe(DEMO_FOUR_OFFERS.categorySlug);
   });
 
   it('shows the shared filter with its cheaper shop price and two shops', async () => {
@@ -95,7 +140,9 @@ describe('demo data categories (AC 23, AC 24)', () => {
   });
 
   it('carries the product without a brand and the 100-character title', async () => {
-    const oil = (await getPublicCategoryPage(DEMO_NO_BRAND.categorySlug, 1))?.products[0];
+    const oil = (await getPublicCategoryPage(DEMO_NO_BRAND.categorySlug, 1))?.products.find(
+      (card) => card.slug === DEMO_NO_BRAND.slug,
+    );
     expect(oil).toMatchObject({ slug: DEMO_NO_BRAND.slug, brand: null, lowestPriceCents: DEMO_NO_BRAND.priceCents });
     const all = [
       ...((await getPublicCategoryPage(ROOT, 1))?.products ?? []),
@@ -124,7 +171,7 @@ describe('demo data categories (AC 23, AC 24)', () => {
       expect(row?.categoryId).toBeNull();
       expect(await getPublicProductBySlug(slug)).toBeNull();
       for (const category of Object.keys(DEMO_CATEGORY_COUNTS)) {
-        for (const page of [1, 2]) {
+        for (const page of [1, 2, 3]) {
           const listing = await getPublicCategoryPage(category, page);
           expect(listing?.products.map((card) => card.slug) ?? []).not.toContain(slug);
         }

@@ -84,6 +84,10 @@ matching test, and it should be one that would fail if the rule broke:
 
 - **Sitemap and robots seam.** `seams.test.ts` `isSitemapOrRobotsFile` covers metadata files, route handlers under `sitemap.xml/` and `sitemaps/`, and `src/server/catalogue/sitemap*.ts`, and asserts at least 5 files so it cannot go vacuous.
 
+- **Fixture size.** A fixture-size change reaches literals outside `tests/fixtures/demo.ts` that a grep for the constant misses: `entrypoint.spec.ts` `feeds=2`, the page-count and page-length asserts, seed `approvedFeeds`. After changing the demo size grep tests for `feeds=`, `toHaveLength(1|2)`, `pageCount`, `[1, 2]` and `ROOT, 2`.
+
+- **Count text.** A count-text guard must not substring-match (`/0 producto/` matches "50 productos"): anchor with `(^|\D)`, and escape query strings correctly in a template-literal RegExp.
+
 - **Demo notice.** Any e2e that reads the first paragraph of `main` on a demo product or category page must skip `p[role=note]`.
 
 Never call a live affiliate network in a test. Import from local fixture feed
@@ -97,7 +101,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 
 - `tests/support/catalogue.ts`: insert helpers whose defaults are the fully
   VISIBLE state, so a test sets only the one flag it is about. `insertProduct` defaults `categoryId` to a shared test category (`defaultCategoryId`, found by slug so it survives `resetDatabase`); pass `categoryId: null` for the unmapped state. `insertCategory({slug,name,parentId,position})`, `insertCategoryMapping` and `insertListedProduct` (a product with one visible offer per price) live in the same file.
-- Category feed fixtures are `tests/fixtures/feeds/category-*.csv` (mixed, ean-one/two/three, no-column); demo category expectations are `DEMO_CATEGORY_COUNTS` and `DEMO_CATEGORY_NAMES`, keyed by the six fixed slugs, in `tests/fixtures/demo.ts`, and `DEMO_COUNTS` carries `publicProducts` and `categoryMappings`. `DEMO_NO_BRAND` is the oil (`aceite-de-motor`); `DEMO_DRILL` and `DEMO_WRENCHES` are unmapped and never public; the paging dataset is the root (27, two pages) and `filtros-de-combustible` is the empty child.
+- Category feed fixtures are `tests/fixtures/feeds/category-*.csv` (mixed, ean-one/two/three, no-column); demo category expectations are `DEMO_CATEGORY_COUNTS` and `DEMO_CATEGORY_NAMES`, keyed by the six fixed slugs, in `tests/fixtures/demo.ts`, and `DEMO_COUNTS` carries `publicProducts` and `categoryMappings`. `DEMO_NO_BRAND` is the oil (`aceite-de-motor`); `DEMO_DRILL` and `DEMO_WRENCHES` are unmapped and never public; the paging dataset is the root (50, three pages); e2e specs use `rootPageUrls`, never a hardcoded page 2; `filtros-de-combustible` is the empty child. `DEMO_FEED_ROWS` is `{ uno|dos|tres|cuatro: {rows, productsCreated} }`; `DEMO_FILLER` is gone; `DEMO_CHEAPEST`, `DEMO_FOUR_OFFERS` and `DEMO_ILLUSTRATED` are new. `tests/unit/demo-feeds.test.ts` reads `demo/feeds/*.csv` with `parseCsv`, `readHeader` and `validateRow` and pins the CSV invariants; `tests/unit/category-illustration.test.ts` renders all five drawings.
 - `resetDatabase` re-ensures the fixed category tree (`ensureFixedCategoryTree`) after truncating, so tests must not assume an empty `categories` table or ids starting at 1: the six fixed categories take ids 1 to 6. Fixed slugs come from `FIXED_CATEGORY_TREE` in `src/db/category-tree.ts`; e2e specs import it by relative path. Never retype a fixed slug.
 - A migration SQL file is tested by reading it, splitting on `--> statement-breakpoint` and executing each statement with `sql.raw` against legacy rows (`tests/integration/fixed-category-tree.test.ts`, with `tests/unit/category-tree-constant.test.ts` as the template for pinning fixed reference data).
 - A malformed category slug needs no DB bypass, `categories.slug` has no check constraint; insert it directly. A parent cycle is built by inserting then updating `parent_id`.
