@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { BrandChips, VISIBLE_BRAND_CHIPS, type BrandChip } from '@/components/BrandChips';
+import { BrandChips, NARROW_BRAND_CHIPS, VISIBLE_BRAND_CHIPS, type BrandChip } from '@/components/BrandChips';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { CategoryResultsPanel } from '@/components/CategoryResultsPanel';
 import { CategorySort } from '@/components/CategorySort';
@@ -324,6 +324,124 @@ describe('BrandChips (S11.4)', () => {
     const html = render({ chips: [{ ...chip(1), label: '<b>x</b>' }] });
     expect(html).not.toContain('<b>');
     expect(html).toContain('&lt;b&gt;');
+  });
+});
+
+describe('BrandChips two lists (S11.6)', () => {
+  const chip = (n: number, selected = false): BrandChip => ({
+    key: `m${n}`,
+    href: `/categoria/x?marca=m${n}`,
+    label: `Marca ${n}`,
+    count: String(n),
+    ariaLabel: `Marca ${n}: ${n} productos`,
+    selected,
+  });
+  const range = (from: number, to: number, selected = 0) =>
+    Array.from({ length: to - from + 1 }, (_, i) => chip(from + i, from + i === selected));
+
+  /** The page's own split: the first N chips in the row, the rest behind "more". */
+  const list = (all: BrandChip[], visible: number) => ({
+    chips: all.slice(0, visible),
+    moreChips: all.slice(visible),
+    moreLabel: `Más marcas (${Math.max(all.length - visible, 0)})`,
+  });
+
+  const render = (brands: BrandChip[], allSelected = true) =>
+    renderToStaticMarkup(
+      createElement(BrandChips, {
+        groupLabel: 'Marca',
+        all: { href: '/categoria/x', label: 'Todas las marcas', selected: allSelected },
+        narrow: list(brands, NARROW_BRAND_CHIPS),
+        wide: list(brands, VISIBLE_BRAND_CHIPS),
+      }),
+    );
+
+  /** The markup of one wrapper, from its testid to the start of the other wrapper or the end. */
+  const block = (html: string, which: 'narrow' | 'wide') => {
+    const start = html.indexOf(`data-testid="brand-chips-${which}"`);
+    expect(start, which).toBeGreaterThan(-1);
+    const other = which === 'narrow' ? 'wide' : 'narrow';
+    const otherStart = html.indexOf(`data-testid="brand-chips-${other}"`);
+    return otherStart > start ? html.slice(start, otherStart) : html.slice(start);
+  };
+  const chipsIn = (html: string) => html.match(/data-testid="brand-chip"/g)?.length ?? 0;
+
+  it('pins the two row sizes: 2 below 40rem, 8 from it', () => {
+    expect(NARROW_BRAND_CHIPS).toBe(2);
+    expect(VISIBLE_BRAND_CHIPS).toBe(8);
+  });
+
+  it('renders the narrow and the wide list once each, under one shared label', () => {
+    const html = render(range(1, 5));
+    expect(html.match(/data-testid="brand-chips-narrow"/g)).toHaveLength(1);
+    expect(html.match(/data-testid="brand-chips-wide"/g)).toHaveLength(1);
+    expect(html.match(/id="brand-chips-label"/g)).toHaveLength(1);
+    expect(html.match(/aria-labelledby="brand-chips-label"/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('gives each list its own "all brands" chip', () => {
+    const html = render(range(1, 5));
+    expect(block(html, 'narrow').match(/data-testid="brand-chip-all"/g)).toHaveLength(1);
+    expect(block(html, 'wide').match(/data-testid="brand-chip-all"/g)).toHaveLength(1);
+  });
+
+  it('shows 2 chips in the narrow row and 8 in the wide row for 13 brands, the rest behind "more"', () => {
+    const html = render(range(1, 13));
+    const narrow = block(html, 'narrow');
+    const wide = block(html, 'wide');
+    // Each count is the total chips in the block, "more" ones included; the row is what sits outside the details.
+    const rowOf = (b: string) => chipsIn(b.slice(0, b.indexOf('<details')));
+    expect(rowOf(narrow)).toBe(2);
+    expect(rowOf(wide)).toBe(8);
+    expect(chipsIn(narrow)).toBe(13);
+    expect(chipsIn(wide)).toBe(13);
+  });
+
+  it('counts the overflow per list: 11 behind "more" on narrow, 5 on wide', () => {
+    const html = render(range(1, 13));
+    expect(block(html, 'narrow')).toContain('Más marcas (11)');
+    expect(block(html, 'wide')).toContain('Más marcas (5)');
+  });
+
+  it('renders no control in the wide list when 8 or fewer brands fit its row, but keeps one in the narrow list', () => {
+    const html = render(range(1, 6));
+    expect(block(html, 'wide')).not.toMatch(/<details|brand-more/);
+    expect(block(html, 'narrow')).toContain('data-testid="brand-more"');
+    expect(block(html, 'narrow')).toContain('Más marcas (4)');
+  });
+
+  it('renders no control in either list when 2 or fewer brands exist', () => {
+    const html = render(range(1, 2));
+    expect(html).not.toMatch(/<details|brand-more/);
+  });
+
+  it('opens the narrow control only when the selected chip sits behind it in that list', () => {
+    // Brand 5: behind "more" on narrow (rows hold 1-2), in the row on wide (rows hold 1-8).
+    const html = render(range(1, 13, 5), false);
+    expect(block(html, 'narrow')).toMatch(/<details[^>]*\bopen\b/);
+    expect(block(html, 'wide')).not.toMatch(/<details[^>]*\bopen\b/);
+  });
+
+  it('opens the wide control only when the selected chip sits behind it in that list', () => {
+    // Brand 11 is behind "more" on both lists.
+    const html = render(range(1, 13, 11), false);
+    expect(block(html, 'narrow')).toMatch(/<details[^>]*\bopen\b/);
+    expect(block(html, 'wide')).toMatch(/<details[^>]*\bopen\b/);
+  });
+
+  it('opens neither control when the selected chip is in the row of both lists', () => {
+    const html = render(range(1, 13, 1), false);
+    expect(html).not.toMatch(/<details[^>]*\bopen\b/);
+  });
+
+  it('opens neither control when no brand is selected', () => {
+    expect(render(range(1, 13))).not.toMatch(/<details[^>]*\bopen\b/);
+  });
+
+  it('marks the selected chip with aria-current in each list, and no more', () => {
+    const html = render(range(1, 13, 5), false);
+    expect(block(html, 'narrow').match(/aria-current="true"/g)).toHaveLength(1);
+    expect(block(html, 'wide').match(/aria-current="true"/g)).toHaveLength(1);
   });
 });
 

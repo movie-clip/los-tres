@@ -58,6 +58,7 @@ describe('getPublicCategoryPage shape (C-3)', () => {
       ],
       // The fixture sets no brand_normalised, so the product has no chip.
       brands: [],
+      ancestors: [],
       selectedBrand: null,
       sort: 'price-asc',
       demoOnly: false,
@@ -344,6 +345,7 @@ describe('empty category (AC 14)', () => {
       state: 'empty-category',
       products: [],
       brands: [],
+      ancestors: [],
       selectedBrand: null,
       sort: 'price-asc',
       demoOnly: false,
@@ -431,6 +433,101 @@ async function listBranded(o: {
 
 const brandSlugs = (page: Awaited<ReturnType<typeof getPublicCategoryPage>>) =>
   page?.brands.map((brand) => brand.slug);
+
+describe('ancestors (S11.6)', () => {
+  async function chain() {
+    const root = await insertCategory({ slug: 'raiz', name: 'Raíz' });
+    const child = await insertCategory({ slug: 'hija', name: 'Hija', parentId: root.id });
+    const grandchild = await insertCategory({ slug: 'nieta', name: 'Nieta', parentId: child.id });
+    return { root, child, grandchild };
+  }
+
+  it('is empty for a root category', async () => {
+    await chain();
+    expect((await getPublicCategoryPage('raiz', 1, null, 'price-asc'))?.ancestors).toEqual([]);
+  });
+
+  it('holds the root alone for a leaf one level down, as slug and name', async () => {
+    await chain();
+    expect((await getPublicCategoryPage('hija', 1, null, 'price-asc'))?.ancestors).toEqual([
+      { slug: 'raiz', name: 'Raíz' },
+    ]);
+  });
+
+  it('lists the ancestors root first and leaves the category itself out on a three-level tree', async () => {
+    await chain();
+    const page = await getPublicCategoryPage('nieta', 1, null, 'price-asc');
+    expect(page?.ancestors).toEqual([
+      { slug: 'raiz', name: 'Raíz' },
+      { slug: 'hija', name: 'Hija' },
+    ]);
+    expect(page?.slug).toBe('nieta');
+  });
+
+  it('does not list a sibling or a child as an ancestor', async () => {
+    const { root } = await chain();
+    await insertCategory({ slug: 'hermana', name: 'Hermana', parentId: root.id });
+    const page = await getPublicCategoryPage('hija', 1, null, 'price-asc');
+    expect(page?.ancestors.map((crumb) => crumb.slug)).toEqual(['raiz']);
+  });
+
+  it('is the same in every state: results, no-match and empty-category', async () => {
+    const { child } = await chain();
+    const expected = [{ slug: 'raiz', name: 'Raíz' }];
+    // empty-category
+    expect((await getPublicCategoryPage('hija', 1, null, 'price-asc'))?.state).toBe('empty-category');
+    expect((await getPublicCategoryPage('hija', 1, null, 'price-asc'))?.ancestors).toEqual(expected);
+    // results
+    await listBranded({ slug: 'a', categoryId: child.id, brand: 'Bosch' });
+    const results = await getPublicCategoryPage('hija', 1, null, 'price-asc');
+    expect(results?.state).toBe('results');
+    expect(results?.ancestors).toEqual(expected);
+    // no-match
+    const noMatch = await getPublicCategoryPage('hija', 1, 'no-existe', 'price-asc');
+    expect(noMatch?.state).toBe('no-match');
+    expect(noMatch?.ancestors).toEqual(expected);
+  });
+
+  it('is the same on every page, brand and sort', async () => {
+    const { child } = await chain();
+    for (let n = 0; n < 26; n += 1) {
+      await listBranded({ slug: `p-${n}`, categoryId: child.id, brand: n % 2 ? 'Bosch' : 'Mahle', prices: [100 + n] });
+    }
+    const expected = [{ slug: 'raiz', name: 'Raíz' }];
+    for (const [page, brand, sort] of [
+      [1, null, 'price-asc'],
+      [2, null, 'price-asc'],
+      [1, 'bosch', 'price-desc'],
+      [1, 'mahle', 'name'],
+    ] as const) {
+      const read = await getPublicCategoryPage('hija', page, brand, sort);
+      expect(read?.ancestors, `${page} ${brand} ${sort}`).toEqual(expected);
+    }
+  });
+
+  it('is empty for a root even when its subtree holds products', async () => {
+    const { child } = await chain();
+    await listBranded({ slug: 'a', categoryId: child.id, brand: 'Bosch' });
+    const page = await getPublicCategoryPage('raiz', 1, null, 'price-asc');
+    expect(page?.productCount).toBe(1);
+    expect(page?.ancestors).toEqual([]);
+  });
+
+  it('answers null for an unknown slug and for a page past the last, so no trail is produced', async () => {
+    await chain();
+    expect(await getPublicCategoryPage('no-existe', 1, null, 'price-asc')).toBeNull();
+    expect(await getPublicCategoryPage('hija', 9, null, 'price-asc')).toBeNull();
+  });
+
+  it('terminates on a parent cycle and still answers', async () => {
+    const a = await insertCategory({ slug: 'ciclo-a', name: 'A' });
+    const b = await insertCategory({ slug: 'ciclo-b', name: 'B', parentId: a.id });
+    await getDb().update(categories).set({ parentId: b.id }).where(eq(categories.id, a.id));
+    const page = await getPublicCategoryPage('ciclo-b', 1, null, 'price-asc');
+    expect(page).not.toBeNull();
+    expect(Array.isArray(page?.ancestors)).toBe(true);
+  });
+});
 
 describe('sort (S11.4)', () => {
   it('echoes the sort it applied', async () => {

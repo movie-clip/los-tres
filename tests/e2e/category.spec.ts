@@ -416,7 +416,14 @@ const VISIBLE_CHIPS = 8;
 /** Brand of the root list that sits outside the first 8 chips (2 products). */
 const LATE_BRAND = { slug: 'total', label: 'Total' };
 const listing = (slug: string, query = '') => `/categoria/${slug}${query}`;
-const brandChips = (page: Page) => page.getByTestId('brand-chip');
+// The brand group renders two lists (S11.6): a short one below 40rem and a long one from it, the
+// other hidden by CSS. The default viewport is 1280 wide, so the default list is the wide one; a
+// phone test passes 'narrow'. Never select by the bare testid, it matches in both lists.
+type ChipList = 'narrow' | 'wide';
+const brandList = (page: Page, which: ChipList = 'wide') => page.getByTestId(`brand-chips-${which}`);
+const brandChips = (page: Page, which: ChipList = 'wide') => brandList(page, which).getByTestId('brand-chip');
+const chipAll = (page: Page, which: ChipList = 'wide') => brandList(page, which).getByTestId('brand-chip-all');
+const chipMore = (page: Page, which: ChipList = 'wide') => brandList(page, which).getByTestId('brand-more');
 const chipCount = async (chip: Locator): Promise<number> => {
   const label = (await chip.getAttribute('aria-label')) ?? '';
   const found = /: (\d+) producto/.exec(label);
@@ -464,12 +471,12 @@ test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
     page,
   }) => {
     await page.goto(listing(AIR));
-    const group = page.getByTestId('brand-chips');
+    const group = brandList(page);
     await expect(group.getByRole('link').first()).toHaveAttribute('data-testid', 'brand-chip-all');
-    await expect(page.getByTestId('brand-chip-all')).toHaveText(messages.Category.brandAll);
-    await expect(page.getByTestId('brand-chip-all')).toHaveAttribute('aria-current', 'true');
+    await expect(chipAll(page)).toHaveText(messages.Category.brandAll);
+    await expect(chipAll(page)).toHaveAttribute('aria-current', 'true');
     await expect(group.locator('[aria-current="true"]')).toHaveCount(1);
-    await expect(group.getByText(messages.Category.brandGroupLabel, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('brand-chips').getByText(messages.Category.brandGroupLabel, { exact: true })).toBeVisible();
     await expect(group.getByRole('list', { name: messages.Category.brandGroupLabel })).toHaveCount(1);
   });
 
@@ -499,7 +506,7 @@ test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
 
   test('check 4: ?marca=bosch selects the Bosch chip, lists only Bosch and carries no pagina', async ({ page }) => {
     await page.goto(listing(AIR, '?marca=bosch'));
-    const selected = page.getByTestId('brand-chips').locator('[aria-current="true"]');
+    const selected = brandList(page).locator('[aria-current="true"]');
     await expect(selected).toHaveCount(1);
     await expect(selected).toHaveAttribute('data-testid', 'brand-chip');
     expect(await chipBrand(selected)).toBe('Bosch');
@@ -511,31 +518,31 @@ test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
     await expect(page.getByTestId('category-summary')).toHaveText(summaryText(cards));
     expect(await page.getByTestId('card-brand').allTextContents()).toEqual(Array(cards).fill('Bosch'));
     expect(new URL(page.url()).searchParams.has('pagina')).toBe(false);
-    await expect(page.getByTestId('brand-chip-all')).not.toHaveAttribute('aria-current', 'true');
+    await expect(chipAll(page)).not.toHaveAttribute('aria-current', 'true');
   });
 
   test('check 5: pressing the selected chip returns to the clean unfiltered URL', async ({ page }) => {
     await page.goto(listing(AIR, '?marca=bosch'));
-    await page.getByTestId('brand-chips').locator('[aria-current="true"]').click();
+    await brandList(page).locator('[aria-current="true"]').click();
     await expect(page).toHaveURL(new RegExp(`${listing(AIR)}$`));
     await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[AIR]);
   });
 
   test('check 5: "Todas las marcas" drops the brand and keeps the sort', async ({ page }) => {
     await page.goto(listing(AIR, '?marca=bosch&orden=nombre'));
-    await page.getByTestId('brand-chip-all').click();
+    await chipAll(page).click();
     await expect(page).toHaveURL(new RegExp(`${listing(AIR, '\\?orden=nombre')}$`));
   });
 
   test('check 6: the root shows 8 chips and "Más marcas (7)", which holds the other 7', async ({ page }) => {
     await page.goto(listing(ROOT));
-    const more = page.getByTestId('brand-more');
+    const more = chipMore(page);
     await expect(more).toHaveCount(1);
     await expect(more.locator('summary')).toContainText(
       messages.Category.brandMore.replace('{count}', String(MANY_BRANDS - VISIBLE_CHIPS)),
     );
     await expect(brandChips(page)).toHaveCount(MANY_BRANDS);
-    await expect(page.getByTestId('brand-chips').locator('> ul > li > a[data-testid="brand-chip"]')).toHaveCount(
+    await expect(brandList(page).locator('> ul > li > a[data-testid="brand-chip"]')).toHaveCount(
       VISIBLE_CHIPS,
     );
     await expect(more.getByTestId('brand-chip')).toHaveCount(MANY_BRANDS - VISIBLE_CHIPS);
@@ -549,7 +556,7 @@ test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
 
   test('check 7: a selected brand outside the first 8 opens "Más marcas" with its chip visible', async ({ page }) => {
     await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
-    const more = page.getByTestId('brand-more');
+    const more = chipMore(page);
     await expect(more).toHaveAttribute('open', '');
     const selected = more.locator('[aria-current="true"]');
     await expect(selected).toBeVisible();
@@ -558,18 +565,18 @@ test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
 
   test('check 7: a selected brand in the first 8 leaves "Más marcas" closed', async ({ page }) => {
     await page.goto(listing(ROOT, '?marca=bosch'));
-    await expect(page.getByTestId('brand-more')).not.toHaveAttribute('open', '');
+    await expect(chipMore(page)).not.toHaveAttribute('open', '');
   });
 
   test('check 8: a category with 7 brands shows no "Más marcas" control', async ({ page }) => {
     await page.goto(listing(OIL));
     await expect(brandChips(page)).toHaveCount(7);
-    await expect(page.getByTestId('brand-more')).toHaveCount(0);
+    await expect(chipMore(page)).toHaveCount(0);
   });
 
   test('the brand count in each chip is the same number the chip name carries on the root', async ({ page }) => {
     await page.goto(listing(ROOT));
-    await page.getByTestId('brand-more').locator('summary').click();
+    await chipMore(page).locator('summary').click();
     let total = 0;
     for (const chip of await brandChips(page).all()) total += await chipCount(chip);
     // Every demo product has a brand except the one without, so the chips cover all but that one.
@@ -691,8 +698,8 @@ test.describe('category sort form (S11.4, 02-ux checks 9 to 15)', () => {
     expect(url.searchParams.get('marca')).toBe('bosch');
     expect(url.searchParams.get('orden')).toBe('nombre');
     expect(url.searchParams.has('pagina')).toBe(false);
-    await expect(page.getByTestId('brand-chips').locator('[aria-current="true"]')).toHaveCount(1);
-    expect(await chipBrand(page.getByTestId('brand-chips').locator('[aria-current="true"]'))).toBe('Bosch');
+    await expect(brandList(page).locator('[aria-current="true"]')).toHaveCount(1);
+    expect(await chipBrand(brandList(page).locator('[aria-current="true"]'))).toBe('Bosch');
     expect((await cardTitles(page)).sort()).toEqual(before);
     await context.close();
   });
@@ -839,7 +846,7 @@ test.describe('category no-match, malformed parameters and empty states (S11.4, 
     await expect(page.getByTestId('category-sort')).toHaveCount(0);
     await expect(page.getByTestId('category-card')).toHaveCount(0);
     await expect(page.getByTestId('pagination')).toHaveCount(0);
-    await expect(page.getByTestId('brand-chips').locator('[aria-current="true"]')).toHaveCount(0);
+    await expect(brandList(page).locator('[aria-current="true"]')).toHaveCount(0);
     const empty = page.getByTestId('category-empty');
     await expect(empty).toContainText(messages.Category.noMatchHeading);
     await expect(empty).toContainText(messages.Category.noMatchBody);
@@ -902,7 +909,7 @@ test.describe('category no-match, malformed parameters and empty states (S11.4, 
       await expect(page.getByTestId('category-card')).toHaveCount(DEMO_CATEGORY_COUNTS[AIR]);
       await expect(page.getByTestId('category-empty')).toHaveCount(0);
       await expect(page.getByTestId('category-sort-select')).toHaveValue('precio-asc');
-      await expect(page.getByTestId('brand-chip-all')).toHaveAttribute('aria-current', 'true');
+      await expect(chipAll(page)).toHaveAttribute('aria-current', 'true');
       const prices = await cardPrices(page);
       expect(prices).toEqual([...prices].sort((a, b) => a - b));
       await close();
@@ -950,7 +957,7 @@ test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 
           outline: style.outlineStyle,
         };
       });
-    await page.getByTestId('brand-chip-all').focus();
+    await chipAll(page).focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     const stops = 1 + 6 + 1 + 1 + 1; // all, six chips, select, button, first card title
@@ -989,7 +996,7 @@ test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 
 
     test('check 26: the open overflow of the root does not scroll sideways', async ({ page }) => {
       await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
-      await expect(page.getByTestId('brand-more')).toHaveAttribute('open', '');
+      await expect(chipMore(page, 'narrow')).toHaveAttribute('open', '');
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
@@ -999,8 +1006,8 @@ test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 
     test('check 26: chips, select and buttons are at least 44px high', async ({ page }) => {
       await page.goto(listing(AIR));
       const controls: Locator[] = [
-        page.getByTestId('brand-chip-all'),
-        ...(await brandChips(page).all()),
+        chipAll(page, 'narrow'),
+        ...(await brandChips(page, 'narrow').filter({ visible: true }).all()),
         page.getByTestId('category-sort-select'),
         page.getByTestId('category-sort-submit'),
       ];
@@ -1008,8 +1015,9 @@ test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 
         const box = await control.boundingBox();
         expect(box!.height, (await control.textContent())?.trim()).toBeGreaterThanOrEqual(44);
       }
+      // Phone: the narrow list shows 2 brands, so the root and a leaf both carry the control.
       await page.goto(listing(ROOT));
-      const summary = (await page.getByTestId('brand-more').locator('summary').boundingBox())!;
+      const summary = (await chipMore(page, 'narrow').locator('summary').boundingBox())!;
       expect(summary.height).toBeGreaterThanOrEqual(44);
       await page.goto(listing(AIR, '?marca=no-existe'));
       expect((await page.getByTestId('category-empty-action').boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -1059,5 +1067,150 @@ test.describe('category controls: keyboard and size (S11.4, 02-ux checks 26 and 
       const ys = prices.map((box) => Math.round(box!.y + box!.height));
       expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(1);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S11.6: the category breadcrumb (03-ux § 8 checks 19 to 22).
+// ---------------------------------------------------------------------------
+
+test.describe('category breadcrumb (S11.6)', () => {
+  for (const [name, slug, query] of [
+    ['a leaf', AIR, ''],
+    ['an empty leaf', EMPTY_LEAF, ''],
+    ['a brand filter', AIR, '?marca=bosch'],
+    ['a no-match', AIR, '?marca=no-existe'],
+    ['a sort', AIR, '?orden=nombre'],
+  ] as const) {
+    test(`${name}: one crumb to the root category, named, before the title`, async ({ page }) => {
+      await page.goto(listing(slug, query));
+      const nav = page.getByTestId('breadcrumb');
+      await expect(nav).toHaveCount(1);
+      await expect(nav).toHaveAttribute('aria-label', messages.Product.breadcrumbLabel);
+      const links = nav.getByRole('link');
+      await expect(links).toHaveCount(1);
+      await expect(links).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
+      await expect(links).toHaveAttribute('href', category(ROOT));
+
+      // Before the h1 in reading order and on screen, and a 44px target.
+      const navBox = (await nav.boundingBox())!;
+      const h1Box = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+      expect(navBox.y + navBox.height).toBeLessThanOrEqual(h1Box.y);
+      expect((await links.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    });
+  }
+
+  test('the crumb link is clean: no pagina, marca or orden, whatever the current URL', async ({ page }) => {
+    await page.goto(listing(AIR, '?marca=bosch&orden=nombre'));
+    expect(await page.getByTestId('breadcrumb').getByRole('link').getAttribute('href')).toBe(category(ROOT));
+  });
+
+  test('the root category has no breadcrumb, on any of its pages', async ({ page }) => {
+    for (const url of [...rootPageUrls, listing(ROOT, '?orden=nombre'), listing(ROOT, '?marca=bosch')]) {
+      await page.goto(url);
+      await expect(page.getByRole('heading', { level: 1 }), url).toBeVisible();
+      await expect(page.getByTestId('breadcrumb'), url).toHaveCount(0);
+    }
+  });
+
+  test('the crumb is the first stop after the site link, before the brand chips', async ({ page }) => {
+    await page.goto(listing(AIR));
+    await page.getByTestId('site-header-link').focus();
+    await page.keyboard.press('Tab');
+    const active = page.locator(':focus');
+    await expect(active).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
+    await expect(active).toHaveAttribute('href', category(ROOT));
+  });
+
+  test('the crumb leads to the root category page, which has no crumb', async ({ page }) => {
+    await page.goto(listing(AIR));
+    await page.getByTestId('breadcrumb').getByRole('link').click();
+    await expect(page).toHaveURL(new RegExp(`${category(ROOT)}$`));
+    await expect(page.getByTestId('breadcrumb')).toHaveCount(0);
+  });
+});
+
+// The sort labels are the shortened S11.6 strings; pin them once, here, in the browser.
+test.describe('category sort labels (S11.6)', () => {
+  test('the options read Menor precio, Mayor precio, Nombre (A a Z) under Ordenar por', async ({ page }) => {
+    await page.goto(listing(AIR));
+    await expect(page.getByLabel('Ordenar por')).toHaveCount(1);
+    expect(await page.getByTestId('category-sort-select').locator('option').allTextContents()).toEqual([
+      'Menor precio',
+      'Mayor precio',
+      'Nombre (A a Z)',
+    ]);
+  });
+});
+
+// The phone list shows 2 brands, the desktop list 8; only the visible one is on screen.
+test.describe('category brand chips, two lists (S11.6)', () => {
+  test.describe('at 375 wide', () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test('the narrow list is visible and the wide one is not, with the control counting the rest', async ({ page }) => {
+      await page.goto(listing(ROOT));
+      await expect(brandList(page, 'narrow')).toBeVisible();
+      await expect(brandList(page, 'wide')).toBeHidden();
+      await expect(brandChips(page, 'narrow').filter({ visible: true })).toHaveCount(2);
+      await expect(chipMore(page, 'narrow').locator('summary')).toContainText(
+        messages.Category.brandMore.replace('{count}', String(MANY_BRANDS - 2)),
+      );
+    });
+
+    test('a leaf shows 2 brands and the control with the other 4', async ({ page }) => {
+      await page.goto(listing(AIR));
+      await expect(brandChips(page, 'narrow').filter({ visible: true })).toHaveCount(2);
+      await expect(chipMore(page, 'narrow').locator('summary')).toContainText(
+        messages.Category.brandMore.replace('{count}', '4'),
+      );
+    });
+
+    test('a brand outside the first 2 opens the narrow control with its chip visible', async ({ page }) => {
+      await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
+      await expect(chipMore(page, 'narrow')).toHaveAttribute('open', '');
+      const selected = brandList(page, 'narrow').locator('[aria-current="true"]');
+      await expect(selected).toBeVisible();
+      expect(await chipBrand(selected)).toBe(LATE_BRAND.label);
+    });
+
+    test('Tab through the group stops only on chips that are on screen', async ({ page }) => {
+      await page.goto(listing(AIR));
+      await chipAll(page, 'narrow').focus();
+      for (let stop = 0; stop < 4; stop += 1) {
+        const onScreen = await page.evaluate(() => {
+          const box = (document.activeElement as HTMLElement).getBoundingClientRect();
+          return box.width > 0 && box.height > 0;
+        });
+        expect(onScreen, `stop ${stop}`).toBe(true);
+        await page.keyboard.press('Tab');
+      }
+    });
+  });
+
+  test.describe('at 1280 wide', () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+
+    test('the wide list is visible and the narrow one is not', async ({ page }) => {
+      await page.goto(listing(ROOT));
+      await expect(brandList(page, 'wide')).toBeVisible();
+      await expect(brandList(page, 'narrow')).toBeHidden();
+      await expect(brandList(page, 'wide').locator('> ul > li > a[data-testid="brand-chip"]')).toHaveCount(
+        VISIBLE_CHIPS,
+      );
+    });
+
+    test('a leaf with six brands shows all six in the row and no control', async ({ page }) => {
+      await page.goto(listing(AIR));
+      await expect(brandChips(page, 'wide').filter({ visible: true })).toHaveCount(6);
+      await expect(chipMore(page, 'wide')).toHaveCount(0);
+    });
+  });
+
+  test('both lists are in the server HTML with JavaScript off', async ({ request, browser }) => {
+    const { page, close } = await openRawHtml(browser, await (await request.get(listing(AIR))).text());
+    await expect(page.getByTestId('brand-chips-narrow')).toHaveCount(1);
+    await expect(page.getByTestId('brand-chips-wide')).toHaveCount(1);
+    await close();
   });
 });
