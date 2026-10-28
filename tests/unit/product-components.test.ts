@@ -3,26 +3,31 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { OfferList } from '@/components/OfferList';
-import { ProductDetails } from '@/components/ProductDetails';
+import { ProductDescription } from '@/components/ProductDescription';
+import { ProductHero } from '@/components/ProductHero';
 import { goPath } from '@/server/clicks/go-path';
 
 // The two display components take finished strings only (C-12, C-13). These
 // cover the branches the e2e cannot reach with the demo data.
 
-function details(props: Partial<Parameters<typeof ProductDetails>[0]> = {}) {
+function details(props: Partial<Parameters<typeof ProductHero>[0]> = {}) {
   return renderToStaticMarkup(
-    createElement(ProductDetails, {
+    createElement(ProductHero, {
       title: 'Titulo de prueba',
+      brand: null,
       imageLabel: 'Sin imagen',
       details: [],
-      description: null,
       illustration: null,
+      priceLabel: null,
+      price: '10,49 €',
+      shopCount: '1 tienda',
+      vatNote: 'Con IVA',
       ...props,
     }),
   );
 }
 
-describe('ProductDetails', () => {
+describe('ProductHero', () => {
   it('renders one h1 with the title and the labelled image placeholder', () => {
     const html = details();
     expect(html.match(/<h1\b/g)).toHaveLength(1);
@@ -38,22 +43,25 @@ describe('ProductDetails', () => {
   it('renders a dt/dd pair for each detail present', () => {
     const html = details({
       details: [
-        { label: 'Marca', value: 'MarcaX' },
+        { label: 'Referencia', value: 'REF-1' },
         { label: 'EAN', value: '2000000000015' },
       ],
     });
     expect(html.match(/<dt\b/g)).toHaveLength(2);
     expect(html.match(/<dd\b/g)).toHaveLength(2);
-    expect(html).toContain('>Marca</dt>');
+    expect(html).toContain('>Referencia</dt>');
     expect(html).toContain('>2000000000015</dd>');
   });
+});
 
-  it('omits the description paragraph when the description is null', () => {
-    expect(details({ description: null })).not.toContain('<p');
-  });
-
+describe('ProductDescription', () => {
   it('renders the description as text: markup in it is escaped, never HTML', () => {
-    const html = details({ description: '<script>alert(1)</script><b>negrita</b>' });
+    const html = renderToStaticMarkup(
+      createElement(ProductDescription, {
+        heading: 'Descripcion',
+        text: '<script>alert(1)</script><b>negrita</b>',
+      }),
+    );
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('<b>');
     expect(html).toContain('&lt;script&gt;');
@@ -68,7 +76,9 @@ describe('OfferList', () => {
       price: '11,49 €',
       updated: 'Actualizado hoy',
       goHref: goPath(2),
-      goLabel: 'Ir a la tienda de Tienda B',
+      goLabel: 'Ir a la tienda',
+      goAccessibleName: 'Ir a la tienda de Tienda B',
+      isBestPrice: true,
     },
     {
       key: '1',
@@ -76,7 +86,9 @@ describe('OfferList', () => {
       price: '12,99 €',
       updated: 'Actualizado hoy',
       goHref: goPath(1),
-      goLabel: 'Ir a la tienda de Tienda A',
+      goLabel: 'Ir a la tienda',
+      goAccessibleName: 'Ir a la tienda de Tienda A',
+      isBestPrice: false,
     },
   ];
 
@@ -84,8 +96,7 @@ describe('OfferList', () => {
     return renderToStaticMarkup(
       createElement(OfferList, {
         heading: 'Donde comprarlo',
-        shopCount: '2 tiendas',
-        vatNote: 'Con IVA',
+        bestPriceLabel: 'Mejor precio',
         offers: rows,
       }),
     );
@@ -98,10 +109,8 @@ describe('OfferList', () => {
     expect(html.match(/data-testid="offer-row"/g)).toHaveLength(2);
   });
 
-  it('shows the count, the IVA note and the price of each row', () => {
+  it('shows the price of each row', () => {
     const html = list();
-    expect(html).toContain('data-testid="shop-count">2 tiendas<');
-    expect(html).toContain('Con IVA');
     expect(html).toContain('>11,49 €<');
   });
 
@@ -125,13 +134,13 @@ describe('OfferList', () => {
 
   it('renders an empty list without throwing', () => {
     const html = renderToStaticMarkup(
-      createElement(OfferList, { heading: 'h', shopCount: '0 tiendas', vatNote: 'n', offers: [] }),
+      createElement(OfferList, { heading: 'h', bestPriceLabel: 'b', offers: [] }),
     );
     expect(html).not.toContain('data-testid="offer-row"');
   });
 });
 
-describe('ImagePlaceholder via ProductDetails (S11.2)', () => {
+describe('ImagePlaceholder via ProductHero (S11.2)', () => {
   it('keeps role="img" and the label, and draws nothing when there is no illustration', () => {
     const html = details({ illustration: null });
     expect(html).toContain('role="img"');

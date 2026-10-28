@@ -1,0 +1,24 @@
+/* A white card under the offers. The text is capped at a reading column;
+   42rem is this component's own size, not a global token. */
+.description {
+  min-width: 0;
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.description .text {
+  max-width: 42rem;
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}

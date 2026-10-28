@@ -1,5 +1,7 @@
 /* A white panel. Rows are separated by a top border; the first row's border
-   also closes the heading block. */
+   also closes the heading. Source order in a row is shop, price, date, button
+   at every width; the grid areas place them. 9rem and 12rem are this
+   component's own column sizes, not global tokens. */
 .offers {
   min-width: 0;
   padding: var(--card-padding);
@@ -9,41 +11,64 @@
 }
 
 .heading {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
 }
 
-/* The count and VAT lines carry no extra margin between them. */
-.offers p {
-  margin: 0;
-}
-
 .list {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Phone: the shop and the price on the first line, the date, then the button
+   across the row. */
 .row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'shop price'
+    'updated updated'
+    'go go';
   gap: var(--space-1) var(--space-2);
   align-items: center;
   padding: var(--space-2) 0;
   border-top: 1px solid var(--color-border);
 }
 
-.shop {
-  flex: 1 1 8rem;
+.shopCell {
+  grid-area: shop;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0) var(--space-1);
+  align-items: center;
   min-width: 0;
+}
+
+.shop {
+  min-width: 0;
+  font-size: var(--text-md);
   font-weight: var(--weight-medium);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
 }
 
+/* The best-price tag is a label, not a control: ink fill, no pill ends, no
+   check mark, no focus or hover state. */
+.tag {
+  padding: var(--space-0) var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
 .price {
+  grid-area: price;
   color: var(--color-price);
   font-size: var(--text-price);
   font-variant-numeric: tabular-nums;
@@ -54,11 +79,18 @@
   white-space: nowrap;
 }
 
+.updated {
+  grid-area: updated;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
 /* The primary button: amber fill, ink label, a thin darker edge. Hover and
    pressed change fill and border colour only, never size. */
 .go {
+  grid-area: go;
   display: inline-flex;
-  flex: 1 1 14rem;
   align-items: center;
   justify-content: center;
   min-height: var(--tap-target);
@@ -88,9 +120,15 @@
   outline-offset: var(--focus-offset);
 }
 
-.updated {
-  flex: 1 1 100%;
-  color: var(--color-muted);
-  font-size: var(--text-sm);
-  line-height: var(--leading-snug);
+/* From 40rem: one line per row. The columns are fixed, so every price and
+   every button sits at the same x on every row. The price and the button span
+   the shop and date lines. */
+@media (min-width: 40rem) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) 9rem 12rem;
+    grid-template-areas:
+      'shop price go'
+      'updated price go';
+    gap: var(--space-0) var(--space-3);
+  }
 }

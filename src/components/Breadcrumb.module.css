@@ -1,0 +1,51 @@
+/* A wrapping row of links. Each link is at least a tap target tall and the
+   links are kept apart by the gap. The chevron between two crumbs is a
+   clip-path polygon on an empty pseudo-element, never text. */
+.nav {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.item + .item::before {
+  content: '';
+  flex: none;
+  width: 0.375rem;
+  height: 0.625rem;
+  background: var(--color-muted);
+  clip-path: polygon(0 0, 100% 50%, 0 100%, 0 80%, 60% 50%, 0 20%);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  overflow-wrap: anywhere;
+  color: var(--color-link);
+  line-height: var(--leading-snug);
+  text-decoration: underline;
+}
+
+.link:hover {
+  text-decoration-thickness: 0.125rem;
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}

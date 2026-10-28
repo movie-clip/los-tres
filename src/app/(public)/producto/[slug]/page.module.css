@@ -1,14 +1,7 @@
-/* One column on a phone; details and offers side by side from 52rem. Source
-   order stays details then offers, so reading and focus order do not change. */
+/* One column at every width: hero, offers, description. The breadcrumb sits
+   above this block, outside it. Each component sets its own breakpoints. */
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--grid-gap);
-}
-
-@media (min-width: 52rem) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
-    align-items: start;
-  }
 }

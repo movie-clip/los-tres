@@ -100,13 +100,16 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
   it.each([
     'Product.metaTitle',
     'Product.metaDescription',
-    'Product.brand',
+    'Product.breadcrumbLabel',
     'Product.partNumber',
     'Product.ean',
     'Product.shopCount',
     'Product.offersHeading',
     'Product.vatIncluded',
+    'Product.bestPrice',
+    'Product.descriptionHeading',
     'Product.priceUpdatedOn',
+    'Product.goToShopShort',
     'Product.goToShop',
     'Product.imagePlaceholder',
   ])('has a non-empty string at %s', (key) => {

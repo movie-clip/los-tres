@@ -52,13 +52,16 @@
   "Product": {
     "metaTitle": "{title} | {siteName}",
     "metaDescription": "Compara el precio de {title} en las tiendas de España y elige la más barata.",
-    "brand": "Marca",
+    "breadcrumbLabel": "Ruta de navegación",
     "partNumber": "Referencia",
     "ean": "EAN",
     "shopCount": "{count, plural, one {# tienda} other {# tiendas}}",
     "offersHeading": "Dónde comprarlo",
     "vatIncluded": "Precios con IVA incluido.",
-    "priceUpdatedOn": "Precio actualizado el {date, date, medium}",
+    "bestPrice": "Mejor precio",
+    "descriptionHeading": "Descripción",
+    "priceUpdatedOn": "Actualizado el {date, date, medium}",
+    "goToShopShort": "Ir a la tienda",
     "goToShop": "Ir a la tienda de {shopName}",
     "imagePlaceholder": "Imagen del producto no disponible",
     "imageByCategory": {
