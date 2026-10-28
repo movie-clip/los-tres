@@ -100,19 +100,31 @@ describe('messages/es-ES.json Product namespace (C-14)', () => {
   it.each([
     'Product.metaTitle',
     'Product.metaDescription',
-    'Product.brand',
+    'Product.breadcrumbLabel',
     'Product.partNumber',
     'Product.ean',
     'Product.shopCount',
     'Product.offersHeading',
     'Product.vatIncluded',
+    'Product.bestPrice',
+    'Product.descriptionHeading',
     'Product.priceUpdatedOn',
+    'Product.goToShopShort',
     'Product.goToShop',
     'Product.imagePlaceholder',
   ])('has a non-empty string at %s', (key) => {
     const value = lookup(key);
     expect(typeof value).toBe('string');
     expect((value as string).trim().length).toBeGreaterThan(0);
+  });
+
+  it('words the S11.5 product copy and no longer has a brand label', () => {
+    expect(lookup('Product.breadcrumbLabel')).toBe('Ruta de navegación');
+    expect(lookup('Product.bestPrice')).toBe('Mejor precio');
+    expect(lookup('Product.goToShopShort')).toBe('Ir a la tienda');
+    expect(lookup('Product.descriptionHeading')).toBe('Descripción');
+    expect(lookup('Product.priceUpdatedOn')).toBe('Actualizado el {date, date, medium}');
+    expect(lookup('Product.brand')).toBeUndefined();
   });
 
   it('takes the placeholders C-14 fixes', () => {

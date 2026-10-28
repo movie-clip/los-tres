@@ -65,12 +65,15 @@ the owner can change it without a code change.
   it, sorted by price from lowest to highest, like hotline.ua.
 - **Price** is the product price only: integer cents in EUR, IVA included.
   **No shipping costs** anywhere.
-- Each offer shows the shop, the price and "price updated on <date>", and links
-  out through our redirect (see *Outgoing clicks*).
+- Each offer shows the shop, the price and "Actualizado el <date>", and links
+  out through our redirect (see *Outgoing clicks*). The row at the lowest price
+  carries a "Mejor precio" tag when at least two distinct prices exist.
 - **Products with a single offer are shown.** The page says "1 shop".
 - **Product text** (title, brand, part number, EAN, description, attributes)
   comes from the feeds. When feeds disagree, the first feed's text stays (no
-  shop ranking in the MVP).
+  shop ranking in the MVP). On the product page a blank or whitespace-only
+  brand, part number, EAN or description counts as absent (read as null) and
+  its line is not shown.
 - **Deferred until after the prototype** (owner ruling, 2026-10-26): product
   images uploaded by the admin, the price history chart, keeping a product page
   when it loses all its offers, and feed attributes on the product page.
