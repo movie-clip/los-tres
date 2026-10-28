@@ -1,0 +1,131 @@
+/* The brand filter: a visible label above a wrapping list of pill links. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* An interactive chip: white, a strong edge, ink text. Hover only changes the
+   edge and the fill, so nothing shifts. The long name wraps inside the chip. */
+.chip,
+.summary {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  text-decoration: none;
+}
+
+.chip:hover,
+.summary:hover {
+  border-color: var(--color-ink);
+  background: var(--color-chip-bg);
+}
+
+.chip:focus-visible,
+.summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.count {
+  color: var(--color-muted);
+  font-weight: var(--weight-regular);
+}
+
+/* Selected: ink fill, light text, a leading check. The same box as the others. */
+.selected,
+.selected:hover {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.selected .count {
+  color: var(--color-on-ink-muted);
+}
+
+.selected:hover .name {
+  text-decoration: underline;
+}
+
+/* The check and the chevrons are filled shapes clipped from empty boxes:
+   decorative, no text. */
+.check {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  background: var(--color-on-ink);
+  clip-path: polygon(0 55%, 15% 40%, 38% 62%, 85% 10%, 100% 25%, 38% 92%);
+}
+
+/* The overflow control. Closed it is one more pill in the row; open it grows to
+   take its own row, and the extra chips wrap under the summary. */
+.more {
+  flex: 0 1 auto;
+}
+
+.details {
+  min-width: 0;
+}
+
+.summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.chevron {
+  flex: none;
+  width: 0.875rem;
+  height: 0.5rem;
+  background: var(--color-ink);
+  clip-path: polygon(0 0, 0 35%, 50% 100%, 100% 35%, 100% 0, 50% 65%);
+}
+
+.details[open] .chevron {
+  clip-path: polygon(0 100%, 0 65%, 50% 0, 100% 65%, 100% 100%, 50% 35%);
+}
+
+.details[open] > .list {
+  margin-top: var(--space-1);
+}

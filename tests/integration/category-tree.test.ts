@@ -218,7 +218,7 @@ describe('invariant I-1: the home count is the category page count', () => {
     expect(nodes.length).toBe(5);
 
     for (const node of nodes) {
-      const page = await getPublicCategoryPage(node.slug, 1);
+      const page = await getPublicCategoryPage(node.slug, 1, null, 'price-asc');
       expect(page, node.slug).not.toBeNull();
       expect(page?.productCount, node.slug).toBeGreaterThanOrEqual(1);
       expect(page?.productCount, node.slug).toBe(node.productCount);
@@ -227,7 +227,7 @@ describe('invariant I-1: the home count is the category page count', () => {
     const listed = new Set(nodes.map((node) => node.slug));
     for (const slug of ['aceites', 'vacia']) {
       expect(listed.has(slug)).toBe(false);
-      expect((await getPublicCategoryPage(slug, 1))?.productCount).toBe(0);
+      expect((await getPublicCategoryPage(slug, 1, null, 'price-asc'))?.productCount).toBe(0);
     }
   });
 });

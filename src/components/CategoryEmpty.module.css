@@ -52,3 +52,8 @@
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
 }
+
+/* The action link is the same secondary button as the home link. */
+.action {
+  composes: home;
+}

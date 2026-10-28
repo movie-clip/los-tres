@@ -1,9 +1,17 @@
-/* 16rem is the narrowest a card may get; the grid reflows with no media query. */
+/* One column on a phone. From 40rem the grid reflows by width, with 16rem as
+   the narrowest a card may get: two columns at 768, three at 1280. 40rem is the
+   breakpoint the home tiles and the product card already use. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--grid-gap);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 40rem) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  }
 }

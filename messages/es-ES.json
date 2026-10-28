@@ -33,7 +33,21 @@
     "pageIndicator": "Página {page} de {pages}",
     "priceFrom": "Desde",
     "emptyHeading": "Aún no hay productos en esta categoría",
-    "emptyBody": "Estamos añadiendo productos y tiendas. Vuelve pronto."
+    "emptyBody": "Estamos añadiendo productos y tiendas. Vuelve pronto.",
+    "brandGroupLabel": "Marca",
+    "brandAll": "Todas las marcas",
+    "brandChipLabel": "{brand}: {count, plural, one {# producto} other {# productos}}",
+    "brandChipSelectedLabel": "{brand}: {count, plural, one {# producto} other {# productos}}. Seleccionada, pulsa para quitar el filtro",
+    "brandMore": "Más marcas ({count})",
+    "sortLabel": "Ordenar por",
+    "sortSubmit": "Ordenar",
+    "sortPriceAsc": "Precio: de menor a mayor",
+    "sortPriceDesc": "Precio: de mayor a menor",
+    "sortName": "Nombre: de la A a la Z",
+    "specRef": "Ref. {partNumber}",
+    "noMatchHeading": "No hay productos de esta marca en esta categoría",
+    "noMatchBody": "Prueba con otra marca o quita el filtro para ver todos los productos.",
+    "noMatchAction": "Quitar el filtro"
   },
   "Product": {
     "metaTitle": "{title} | {siteName}",

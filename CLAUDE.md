@@ -143,7 +143,8 @@ deploy it must be the public https origin**, or all of them point at
   a category only if its subtree holds such a product. No `lastmod`.
 - Demo-only products and categories are `noindex` and carry no canonical.
 - Canonical keeps only `?pagina=<n>` for n above 1; any other query parameter,
-  including any future filter, is dropped from it.
+  including any future filter, is dropped from it; `marca` and `orden` on a
+  category page (S11.4) are dropped like any other.
 - `/robots.txt` disallows `/go/`, `/api/` and `/buscar` (reserved for search;
   the search story must use that path). It does not mention the admin area,
   which sends its own noindex signals. `/go/<offer>` also answers

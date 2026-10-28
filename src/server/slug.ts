@@ -14,20 +14,29 @@ export function isWellFormedSlug(slug: string): boolean {
 }
 
 /**
- * Lower-case ASCII slug of a title: accents stripped, every run of characters
- * outside [a-z0-9] becomes one hyphen, trimmed, at most 80 characters.
- * Falls back to `producto` when nothing is left.
+ * The shared slug transform: accents stripped, lower-cased, every run of
+ * characters outside [a-z0-9] becomes one hyphen, trimmed, cut to `max`
+ * characters and trimmed again. Empty when nothing is left; the caller decides
+ * whether that is a fallback or an absence.
  */
-export function slugify(title: string): string {
-  const base = title
+export function toSlugWords(text: string, max: number): string {
+  return text
     .normalize('NFD')
     .replace(/\p{M}+/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, MAX_LENGTH)
+    .slice(0, max)
     .replace(/-+$/g, '');
-  return base || FALLBACK;
+}
+
+/**
+ * Lower-case ASCII slug of a title: accents stripped, every run of characters
+ * outside [a-z0-9] becomes one hyphen, trimmed, at most 80 characters.
+ * Falls back to `producto` when nothing is left.
+ */
+export function slugify(title: string): string {
+  return toSlugWords(title, MAX_LENGTH) || FALLBACK;
 }
 
 /**

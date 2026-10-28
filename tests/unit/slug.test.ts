@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { slugify, uniqueSlug } from '@/server/slug';
+import { slugify, toSlugWords, uniqueSlug } from '@/server/slug';
 
 const FORMAT = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -31,6 +31,28 @@ describe('slugify (TD-30)', () => {
   it('always produces a string the products_slug_format check accepts', () => {
     for (const title of ['A', 'a--b', 'Ñ 1', '1', 'x'.repeat(200), 'Árbol/Pieza #5']) {
       expect(slugify(title)).toMatch(FORMAT);
+    }
+  });
+});
+
+describe('toSlugWords (S11.4, the transform slugify and brandSlug share)', () => {
+  it('lower-cases, strips accents and hyphenates runs of other characters', () => {
+    expect(toSlugWords('  --Ñandú (Pro) / 3M!!  ', 80)).toBe('nandu-pro-3m');
+  });
+
+  it('is empty, not a fallback, when nothing is left', () => {
+    for (const text of ['', '   ', '!!!', '日本語']) expect(toSlugWords(text, 80)).toBe('');
+  });
+
+  it('cuts to max and trims a hyphen the cut leaves at the end', () => {
+    expect(toSlugWords('aaaa bbbb', 5)).toBe('aaaa');
+    expect(toSlugWords('aaaa bbbb', 4)).toBe('aaaa');
+    expect(toSlugWords('abcdef', 3)).toBe('abc');
+  });
+
+  it('agrees with slugify wherever slugify has no fallback', () => {
+    for (const title of ['DEMO Filtro de aceite OC 1234', 'Aceite sintético ñandú', 'x'.repeat(200)]) {
+      expect(slugify(title)).toBe(toSlugWords(title, 80));
     }
   });
 });

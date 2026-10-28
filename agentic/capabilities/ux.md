@@ -121,6 +121,10 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | product with four offers | `/producto/demo-filtro-de-habitaculo-mahle-ca-1118-antipolen` |
 | product with one offer | `/producto/demo-filtro-de-aire-bosch-af-2287` |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
+| category, one brand | `/categoria/filtros-de-aire?marca=bosch` (2 cards) |
+| category, no match (200) | `/categoria/filtros-de-aire?marca=no-existe` |
+| category, sorted | `?orden=precio-desc`, `?orden=nombre` on any populated category |
+| category, brand overflow closed and open | `/categoria/mantenimiento-del-coche` (8 chips plus "Más marcas (7)", press the summary); `?marca=total` opens it on load |
 | not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=4` (404) |
 | not found, double chrome | a 404 raised inside `(public)` (`/categoria/no-existe`, `/producto/no-existe`) renders the public header and footer twice (root `not-found.tsx` inside `(public)/layout.tsx`); an unknown top-level URL has single chrome. Pre-existing (seen in S11.1, #242), so report it as `SHOULD_FIX` until it is fixed |
 | old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
@@ -138,6 +142,8 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, session expired | clear cookies in the context, then press a button; expect `/admin/acceso?aviso=sesion` with the notice |
 | admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
 | demo notice | shown on the demo product, `/categoria/mantenimiento-del-coche`, `?pagina=2`, `/categoria/aceite-de-motor`; absent on home, the empty category, 404 and the legal pages |
+
+Every demo category is demo-only, so a rendered page never carries a canonical (noindex, no canonical): the canonical half of any check on `?marca=` is not observable in a screenshot or curl; the integration test carries it.
 
 Any state this table cannot produce (a missing image, a product with no offers) is reported as `not checked` with the reason. Never mark
 it satisfied. Add a row here through `pack_corrections` when a slice adds a way
