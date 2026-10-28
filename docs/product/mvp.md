@@ -56,8 +56,13 @@ the owner can change it without a code change.
   mapped once by the admin to one of the five (S4.2). Products from an
   unmapped feed category are not public until the admin maps the category
   (owner ruling, 2026-10-17).
-- **No vehicle fitment.** Auto parts are found by part number, EAN or text. If
-  a feed carries fitment text, it is shown as text and nothing more.
+- **Vehicle fitment ("Mi coche")** (owner ruling, 2026-10-28, decision 0016):
+  a visitor selects make, model and engine; listings and search show the
+  parts that fit first, then parts with no fitment data, and the product page
+  says whether the part fits. The vehicle list is our own, in code; fitment
+  comes from feeds only; the choice is kept in the URL and the visitor's
+  browser, never on the server. Spec: `docs/product/vehicle-fitment.md`.
+  Parts are still also found by part number, EAN or text.
 
 ## Product and offers
 
@@ -90,6 +95,8 @@ Decision 0008 holds the detail.
 ## Search and browsing
 
 - Free-text search in PostgreSQL that also matches EAN and part numbers.
+- With a car selected, category pages and search results are filtered by fit
+  (decision 0016).
 - Category pages list products as a card grid with sort (price ascending, price descending, name) and a brand filter; price and shop filters are deferred.
 - Product pages are server-rendered with schema.org `Product` / `AggregateOffer`
   structured data, so Google can show prices in its results.
@@ -237,7 +244,7 @@ product text (S8.5).
 - Ads, and any cookie-consent banner.
 - Public user accounts, alerts, reviews, shop ratings and favourites.
 - Shipping costs.
-- Vehicle fitment search and TecDoc.
+- TecDoc or any licensed vehicle catalogue, and plate (matrícula) or VIN lookup.
 - Tyres, building materials, and plumbing and electrical supplies.
 - Amazon (its product API access is limited to affiliates with recent sales).
 - Open Icecat enrichment.

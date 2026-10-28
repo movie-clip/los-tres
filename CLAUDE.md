@@ -44,6 +44,8 @@ line here is the owner's call: propose it and stop.
   `import-feeds` command (an admin button is deferred); no scraping (0007)
 - **Matching:** EAN, then brand + normalised part number; on a conflict the
   offer stays its own product, the admin queue is deferred (0008)
+- **Vehicle fitment:** own vehicle list in code, fitment from feeds only,
+  selected car in `?coche=` and `localStorage`, never stored on the server (0016)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   no ads (0009); no traffic analytics for now (0014)
 - **Admin sign-in:** Better Auth 1.7.12 used as a library, server-stored
