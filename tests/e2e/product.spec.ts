@@ -1,7 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_FOUR_OFFERS, DEMO_NO_BRAND, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
+import {
+  DEMO_CATEGORY_NAMES,
+  DEMO_FOUR_OFFERS,
+  DEMO_NO_BRAND,
+  DEMO_SHARED,
+  DEMO_SHOP_HOSTS,
+} from '../fixtures/demo';
+import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import { loadEnv } from '../support/env';
 import { dateMessagePattern, icuPlural, normaliseSpaces } from '../support/messages';
 import {
@@ -46,19 +53,95 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     );
     await expect(page.locator('div[role="img"] svg[data-testid="category-illustration"]')).toHaveCount(1);
 
-    // brand, part number and EAN as dt/dd pairs.
+    // Referencia and EAN as dt/dd pairs; the brand is its own line above the title, not a pair.
     const terms = await page.locator('dl dt').allTextContents();
     const values = await page.locator('dl dd').allTextContents();
-    expect(terms).toEqual([messages.Product.brand, messages.Product.partNumber, messages.Product.ean]);
-    expect(values).toEqual([DEMO_SHARED.brand, DEMO_SHARED.partNumber, DEMO_SHARED.ean]);
+    expect(terms).toEqual([messages.Product.partNumber, messages.Product.ean]);
+    expect(values).toEqual([DEMO_SHARED.partNumber, DEMO_SHARED.ean]);
+    await expect(page.getByTestId('product-brand')).toHaveText(DEMO_SHARED.brand);
 
-    // The description paragraph comes first (the demo feeds say the product is fictional).
-    await expect(page.locator('main p:not([role="note"])').first()).toContainText('ficticio');
+    // The description sits in its own section after the offers (the demo feeds say the product is fictional).
+    await expect(page.getByTestId('product-description')).toContainText('ficticio');
     await expect(page.getByTestId('shop-count')).toHaveText(icuPlural(messages.Product.shopCount, 2));
-    await expect(page.locator('h2')).toHaveText(messages.Product.offersHeading);
+    await expect(page.locator('h2')).toHaveText([
+      messages.Product.offersHeading,
+      messages.Product.descriptionHeading,
+    ]);
+    const descriptionFollowsOffers = await page.evaluate(() => {
+      const offers = document.querySelector('[data-testid="offer-row"]');
+      const description = document.querySelector('[data-testid="product-description"]');
+      return Boolean(
+        offers && description && offers.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
+    expect(descriptionFollowsOffers).toBe(true);
     await expect(page.getByText(messages.Product.vatIncluded, { exact: true })).toHaveCount(1);
 
     await expectLocalScriptsAndLinks(page);
+    await close();
+  });
+
+  test('has a category breadcrumb, root first, linking to the category pages', async ({ request, browser }) => {
+    const response = await request.get(path(DEMO_SHARED.slug));
+    const { page, close } = await openRawHtml(browser, await response.text());
+
+    const nav = page.getByTestId('breadcrumb');
+    await expect(nav).toHaveCount(1);
+    await expect(nav).toHaveAttribute('aria-label', messages.Product.breadcrumbLabel);
+    const links = nav.getByRole('link');
+    await expect(links).toHaveText([
+      DEMO_CATEGORY_NAMES[FIXED_CATEGORY_TREE.slug],
+      DEMO_CATEGORY_NAMES[DEMO_SHARED.categorySlug],
+    ]);
+    await expect(links.nth(0)).toHaveAttribute('href', `/categoria/${FIXED_CATEGORY_TREE.slug}`);
+    await expect(links.nth(1)).toHaveAttribute('href', `/categoria/${DEMO_SHARED.categorySlug}`);
+    // The product itself is not a crumb.
+    await expect(nav).not.toContainText(DEMO_SHARED.title);
+    await close();
+  });
+
+  test('marks the lowest price Mejor precio on the first row only and repeats it in the hero', async ({
+    request,
+    browser,
+  }) => {
+    const response = await request.get(path(DEMO_FOUR_OFFERS.slug));
+    const { page, close } = await openRawHtml(browser, await response.text());
+
+    await expect(page.getByTestId('best-price')).toHaveCount(1);
+    await expect(page.getByTestId('offer-row').first().getByTestId('best-price')).toHaveText(
+      messages.Product.bestPrice,
+    );
+    await expect(page.getByTestId('offer-row').nth(1).getByTestId('best-price')).toHaveCount(0);
+
+    // The hero price is the cheapest row's price, with the from-label because several shops sell it.
+    const prices = await text(page, 'offer-price');
+    expect(await text(page, 'product-price')).toEqual([prices[0]]);
+    await expect(page.locator('main')).toContainText(messages.Category.priceFrom);
+    await expect(page.getByText(messages.Product.vatIncluded, { exact: true })).toHaveCount(1);
+    await expect(page.getByTestId('shop-count')).toHaveCount(1);
+    await close();
+  });
+
+  test('shows no best price and no from-label for a one-shop product, and no brand line or list', async ({
+    request,
+    browser,
+  }) => {
+    const response = await request.get(path(DEMO_NO_BRAND.slug));
+    const { page, close } = await openRawHtml(browser, await response.text());
+
+    await expect(page.getByTestId('offer-row')).toHaveCount(1);
+    await expect(page.getByTestId('best-price')).toHaveCount(0);
+    await expect(page.locator('main')).not.toContainText(messages.Category.priceFrom);
+    await expect(page.getByTestId('product-brand')).toHaveCount(0);
+    await expect(page.locator('dl')).toHaveCount(0);
+    expect(await text(page, 'product-price')).toEqual(await text(page, 'offer-price'));
+    await close();
+  });
+
+  test('has no Marca term on the shared-EAN product', async ({ request, browser }) => {
+    const response = await request.get(path(DEMO_SHARED.slug));
+    const { page, close } = await openRawHtml(browser, await response.text());
+    await expect(page.locator('dt', { hasText: /^Marca$/ })).toHaveCount(0);
     await close();
   });
 
@@ -66,14 +149,16 @@ test.describe('product page /producto/<slug> (C-13)', () => {
     const response = await request.get(path(DEMO_SHARED.slug));
     const { page, close } = await openRawHtml(browser, await response.text());
 
-    await expect(page.locator('ol > li')).toHaveCount(DEMO_SHARED.offers.length);
     await expect(page.getByTestId('offer-row')).toHaveCount(DEMO_SHARED.offers.length);
     expect(await text(page, 'offer-shop')).toEqual(DEMO_SHARED.offers.map((offer) => offer.shopName));
     // 11,49 before 12,99; U+00A0 before the euro sign is normalised.
     expect(await text(page, 'offer-price')).toEqual(['11,49 €', '12,99 €']);
     const datePattern = dateMessagePattern(messages.Product.priceUpdatedOn);
-    for (const updated of await text(page, 'offer-updated')) {
+    const updates = await text(page, 'offer-updated');
+    expect(updates).toHaveLength(DEMO_SHARED.offers.length);
+    for (const updated of updates) {
       expect(updated).toMatch(datePattern);
+      expect(updated).toMatch(/^Actualizado el /);
     }
     await close();
   });
@@ -143,13 +228,22 @@ test.describe('product page /producto/<slug> (C-13)', () => {
       expect(rel).toContain('sponsored');
       expect(rel).toContain('nofollow');
       expect(await link.getAttribute('target')).toBeNull();
-      // The shop name is in the link text, which is its accessible name.
-      expect(await link.textContent()).toContain(DEMO_SHARED.offers[index].shopName);
+      // No noreferrer or referrerpolicy: /go reads the product page from the Referer.
+      expect(rel).not.toContain('noreferrer');
+      expect(await link.getAttribute('referrerpolicy')).toBeNull();
+      // Short visible text; the shop name is in the accessible name.
+      expect((await link.textContent())?.trim()).toBe(messages.Product.goToShopShort);
+      await expect(link).toHaveAttribute(
+        'aria-label',
+        messages.Product.goToShop.replace('{shopName}', DEMO_SHARED.offers[index].shopName),
+      );
     }
 
-    // No other link in the page body, and no button in the offer list.
-    await expect(page.locator('main a')).toHaveCount(rowCount);
-    await expect(page.locator('ol button')).toHaveCount(0);
+    // One /go link per row, no other /go link, and no button.
+    await expect(page.getByTestId('offer-go')).toHaveCount(rowCount);
+    await expect(page.locator('main a[href^="/go/"]')).toHaveCount(rowCount);
+    await expect(page.locator('main button')).toHaveCount(0);
+    await expect(page.locator('meta[name="referrer"]')).toHaveCount(0);
     await expectLocalScriptsAndLinks(page);
     await close();
   });
