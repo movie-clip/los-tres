@@ -8,6 +8,7 @@ const offer = (offerId: number, priceCents: number) => ({
   shopName: `Tienda ${offerId}`,
   priceCents,
   priceUpdatedAt: new Date('2026-10-01T10:00:00Z'),
+  isBestPrice: false,
 });
 
 const product = (o: Partial<PublicProductPage> = {}): PublicProductPage => ({
@@ -19,6 +20,10 @@ const product = (o: Partial<PublicProductPage> = {}): PublicProductPage => ({
   description: 'Texto plano',
   offers: [offer(1, 1149), offer(2, 1299)],
   categorySlug: 'filtros-de-aceite',
+  categoryTrail: [
+    { slug: 'mantenimiento-del-coche', name: 'Mantenimiento del coche' },
+    { slug: 'filtros-de-aceite', name: 'Filtros de aceite' },
+  ],
   demoOnly: false,
   indexable: true,
   ...o,

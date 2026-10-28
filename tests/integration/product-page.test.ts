@@ -60,8 +60,17 @@ describe('getPublicProductBySlug shape (C-11)', () => {
       partNumber: 'PN 1',
       ean: '2000000000015',
       description: 'Texto plano',
-      offers: [{ offerId, shopName: 'Tienda Forma', priceCents: 1999, priceUpdatedAt: updated }],
+      offers: [
+        {
+          offerId,
+          shopName: 'Tienda Forma',
+          priceCents: 1999,
+          priceUpdatedAt: updated,
+          isBestPrice: false,
+        },
+      ],
       categorySlug: 'categoria-de-prueba',
+      categoryTrail: [{ slug: 'categoria-de-prueba', name: 'Categoría de prueba' }],
       demoOnly: false,
       indexable: true,
     } satisfies PublicProductPage);
