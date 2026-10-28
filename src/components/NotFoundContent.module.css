@@ -1,0 +1,5 @@
+/* The way back from a 404 is the secondary button of the system: the rule of
+   the empty-state home link, composed so the two never drift apart. */
+.home {
+  composes: home from './CategoryEmpty.module.css';
+}

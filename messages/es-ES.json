@@ -19,7 +19,8 @@
   "NotFound": {
     "heading": "Página no encontrada",
     "body": "La página que buscas no existe o ya no está disponible.",
-    "backHome": "Volver al inicio"
+    "backHome": "Volver al inicio",
+    "metaTitle": "Página no encontrada | {siteName}"
   },
   "Category": {
     "metaTitle": "{category} | {siteName}",
@@ -41,9 +42,9 @@
     "brandMore": "Más marcas ({count})",
     "sortLabel": "Ordenar por",
     "sortSubmit": "Ordenar",
-    "sortPriceAsc": "Precio: de menor a mayor",
-    "sortPriceDesc": "Precio: de mayor a menor",
-    "sortName": "Nombre: de la A a la Z",
+    "sortPriceAsc": "Menor precio",
+    "sortPriceDesc": "Mayor precio",
+    "sortName": "Nombre (A a Z)",
     "specRef": "Ref. {partNumber}",
     "noMatchHeading": "No hay productos de esta marca en esta categoría",
     "noMatchBody": "Prueba con otra marca o quita el filtro para ver todos los productos.",

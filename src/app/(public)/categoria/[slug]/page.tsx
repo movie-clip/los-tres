@@ -3,7 +3,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
-import { BrandChips, VISIBLE_BRAND_CHIPS, type BrandChip } from '@/components/BrandChips';
+import {
+  BrandChips,
+  NARROW_BRAND_CHIPS,
+  VISIBLE_BRAND_CHIPS,
+  type BrandChip,
+} from '@/components/BrandChips';
+import { Breadcrumb } from '@/components/Breadcrumb';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { CategoryResultsPanel } from '@/components/CategoryResultsPanel';
 import { CategorySort } from '@/components/CategorySort';
@@ -91,9 +97,21 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     getTranslations('DemoNotice'),
   ]);
 
+  // The ancestors, root first, the category itself not listed: empty for a root, so no nav renders.
+  const breadcrumb = (
+    <Breadcrumb
+      label={tProduct('breadcrumbLabel')}
+      items={category.ancestors.map((crumb) => ({
+        name: crumb.name,
+        href: categoryPath(crumb.slug),
+      }))}
+    />
+  );
+
   if (category.state === 'empty-category') {
     return (
       <main className="page">
+        {breadcrumb}
         <div className={styles.header}>
           <h1 className={styles.title}>{category.name}</h1>
         </div>
@@ -141,7 +159,15 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     };
   };
   const brandChips = category.brands.map(toChip);
-  const moreChips = brandChips.slice(VISIBLE_BRAND_CHIPS);
+  // Two lists: a short one below 40rem and the long one from 40rem (BrandChips renders both).
+  const toList = (visible: number) => {
+    const moreChips = brandChips.slice(visible);
+    return {
+      chips: brandChips.slice(0, visible),
+      moreChips,
+      moreLabel: t('brandMore', { count: moreChips.length }),
+    };
+  };
   const brands =
     category.brands.length >= 2 ? (
       <BrandChips
@@ -152,9 +178,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           label: t('brandAll'),
           selected: category.state === 'results' && selectedBrandSlug === null,
         }}
-        chips={brandChips.slice(0, VISIBLE_BRAND_CHIPS)}
-        moreChips={moreChips}
-        moreLabel={t('brandMore', { count: moreChips.length })}
+        narrow={toList(NARROW_BRAND_CHIPS)}
+        wide={toList(VISIBLE_BRAND_CHIPS)}
       />
     ) : null;
 
@@ -178,6 +203,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   return (
     <main className="page">
       {category.demoOnly && <DemoNotice text={tDemo('body')} />}
+      {breadcrumb}
       <div className={styles.header}>
         <h1 className={styles.title}>{category.name}</h1>
         <p className={styles.note}>{tProduct('vatIncluded')}</p>

@@ -12,6 +12,27 @@
   font-weight: var(--weight-medium);
 }
 
+/* Two lists, one per width: the short one below 40rem, the long one from
+   40rem. The hidden one is display none, so it is not read and not tabbed. */
+.narrow {
+  min-width: 0;
+}
+
+.wide {
+  display: none;
+  min-width: 0;
+}
+
+@media (min-width: 40rem) {
+  .narrow {
+    display: none;
+  }
+
+  .wide {
+    display: block;
+  }
+}
+
 .list {
   display: flex;
   flex-wrap: wrap;

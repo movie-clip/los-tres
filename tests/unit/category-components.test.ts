@@ -240,16 +240,21 @@ describe('BrandChips (S11.4)', () => {
     ariaLabel: `Marca ${n}: ${n} productos`,
     selected,
   });
+  // BrandChips renders a narrow and a wide list (S11.6). These cases exercise one list, so the
+  // narrow list is empty here and its block is cut from the markup; the two-list cases are the test lane's.
   const render = (props: { chips: BrandChip[]; more?: BrandChip[]; allSelected?: boolean }) =>
     renderToStaticMarkup(
       createElement(BrandChips, {
         groupLabel: 'Marca',
         all: { href: '/categoria/x', label: 'Todas las marcas', selected: props.allSelected ?? true },
-        chips: props.chips,
-        moreChips: props.more ?? [],
-        moreLabel: `Más marcas (${(props.more ?? []).length})`,
+        narrow: { chips: [], moreChips: [], moreLabel: '' },
+        wide: {
+          chips: props.chips,
+          moreChips: props.more ?? [],
+          moreLabel: `Más marcas (${(props.more ?? []).length})`,
+        },
       }),
-    );
+    ).replace(/<div[^>]*brand-chips-narrow.*?<\/ul><\/div>/s, '');
 
   it('keeps 8 chips in the row before the overflow', () => {
     expect(VISIBLE_BRAND_CHIPS).toBe(8);
@@ -324,9 +329,9 @@ describe('BrandChips (S11.4)', () => {
 
 describe('CategorySort (S11.4)', () => {
   const options = [
-    { value: 'precio-asc', label: 'Precio: de menor a mayor' },
-    { value: 'precio-desc', label: 'Precio: de mayor a menor' },
-    { value: 'nombre', label: 'Nombre: de la A a la Z' },
+    { value: 'precio-asc', label: 'Menor precio' },
+    { value: 'precio-desc', label: 'Mayor precio' },
+    { value: 'nombre', label: 'Nombre (A a Z)' },
   ];
   const render = (props: { selected?: string; hidden?: { name: string; value: string } | null } = {}) =>
     renderToStaticMarkup(
