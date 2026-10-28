@@ -3,3 +3,8 @@
 .home {
   composes: home from './CategoryEmpty.module.css';
 }
+
+/* A long word in the heading wraps instead of crossing the content edge. */
+.heading {
+  overflow-wrap: anywhere;
+}

@@ -56,11 +56,14 @@
   line-height: var(--leading-snug);
 }
 
-/* The root link: text, count and chevron on one line, a full-height tap target. */
+/* The root link: text, count and chevron on one line while they fit, then the
+   count and chevron drop under the label, left aligned. A full-height tap target. */
 .allLink {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
+  column-gap: var(--space-1);
+  row-gap: 0;
   min-height: var(--tap-target);
   color: var(--color-link);
   font-size: var(--text-md);
@@ -69,6 +72,12 @@
 }
 
 .allLink:hover {
+  text-decoration: underline;
+}
+
+.allLink:active {
+  border-radius: var(--radius-sm);
+  background: var(--color-chip-bg);
   text-decoration: underline;
 }
 

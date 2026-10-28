@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
@@ -8,8 +8,11 @@ import { icuPlural } from '../support/messages';
 import {
   expectLocalScriptsAndLinks,
   expectNoForeignOrigin,
+  cssColour,
   expectNoSetCookie,
   openRawHtml,
+  snapshotOf,
+  whilePressed,
 } from '../support/page-checks';
 
 loadEnv();
@@ -307,3 +310,69 @@ for (const viewport of [
     });
   });
 }
+
+// S11.7 (03-ux checks 6, 7 and 17): the root link wraps at 195 and stays one row from 360.
+const allLink = (page: Page) => page.getByTestId('home-all-link');
+const labelOf = (page: Page) => allLink(page).locator('span').first();
+
+/** The rects of the text lines of a node: one per rendered line. */
+const lineCount = (locator: Locator) =>
+  locator.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  });
+
+test.describe('home root link at narrow widths (S11.7)', () => {
+  test.describe('at 195 wide', () => {
+    test.use({ viewport: { width: 195, height: 422 } });
+
+    test('check 6: the label is on one line, the count and chevron sit on a row below it at the link edge', async ({ page }) => {
+      await page.goto('/');
+      const link = (await allLink(page).boundingBox())!;
+      expect(link.height).toBeGreaterThanOrEqual(44);
+      expect(await lineCount(labelOf(page))).toBe(1);
+      const label = (await labelOf(page).boundingBox())!;
+      const count = (await page.getByTestId('home-all-count').boundingBox())!;
+      expect(count.y).toBeGreaterThanOrEqual(label.y + label.height - 1);
+      expect(Math.abs(count.x - link.x)).toBeLessThanOrEqual(1);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  });
+
+  for (const [width, height] of [
+    [360, 740],
+    [375, 812],
+    [1280, 800],
+  ] as const) {
+    test.describe(`at ${width} wide`, () => {
+      test.use({ viewport: { width, height } });
+
+      test('check 7: the label, the count and the chevron share one row', async ({ page }) => {
+        await page.goto('/');
+        expect(await lineCount(labelOf(page))).toBe(1);
+        const label = (await labelOf(page).boundingBox())!;
+        const count = (await page.getByTestId('home-all-count').boundingBox())!;
+        expect(count.x).toBeGreaterThan(label.x + label.width - 1);
+        expect(Math.abs(count.y + count.height / 2 - (label.y + label.height / 2))).toBeLessThanOrEqual(4);
+        const link = (await allLink(page).boundingBox())!;
+        expect(link.height).toBeLessThan(label.height * 2.5);
+      });
+    });
+  }
+});
+
+test.describe('home root link pressed (S11.7, 03-ux checks 17 and 19)', () => {
+  test('a pressed root link gets the chip fill, a 4px corner and an underline, and does not move', async ({ page }) => {
+    await page.goto('/');
+    const chipBg = await cssColour(page, 'var(--color-chip-bg)');
+    const link = allLink(page);
+    const before = await snapshotOf(link);
+    const pressed = await whilePressed(page, link, () => snapshotOf(link));
+    expect(pressed.background).toBe(chipBg);
+    expect(pressed.radius).toBe('4px');
+    expect(pressed.decoration).toContain('underline');
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+  });
+});

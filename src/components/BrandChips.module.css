@@ -122,6 +122,13 @@
   flex: 0 1 auto;
 }
 
+/* Open, the overflow takes its own full row, so the summary sits at the left
+   edge and the extra chips wrap flush left under it. Native details state, no
+   script. */
+.more:has(> .details[open]) {
+  flex: 1 0 100%;
+}
+
 .details {
   min-width: 0;
 }
@@ -149,4 +156,25 @@
 
 .details[open] > .list {
   margin-top: var(--space-1);
+}
+
+/* Pressed: written last so it beats hover and selected. Same box, so nothing
+   shifts; the amber fill needs the dark text on the count, name, check and
+   chevron. */
+.chip:active,
+.summary:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.chip:active .count,
+.chip:active .name,
+.summary:active .name {
+  color: var(--color-on-accent);
+}
+
+.chip:active .check,
+.summary:active .chevron {
+  background: var(--color-on-accent);
 }

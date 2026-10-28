@@ -45,6 +45,12 @@
   text-decoration-thickness: 0.125rem;
 }
 
+.link:active {
+  border-radius: var(--radius-sm);
+  background: var(--color-chip-bg);
+  text-decoration-thickness: 0.125rem;
+}
+
 .link:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);

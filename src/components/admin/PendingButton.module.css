@@ -30,6 +30,18 @@
   color: var(--color-link);
 }
 
+/* Pressed inverts the fill. A pending button is not a press target. */
+.filled:not(.pending):active {
+  border-color: var(--color-link);
+  background: var(--color-bg);
+  color: var(--color-link);
+}
+
+.outlined:not(.pending):active {
+  background: var(--color-link);
+  color: var(--color-bg);
+}
+
 .full {
   width: 100%;
 }

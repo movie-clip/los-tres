@@ -73,3 +73,16 @@
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
 }
+
+/* Below 14rem (a 195 px phone): the select and the button each take a full row,
+   and the select drops to the small size so the longest option is readable. */
+@media (max-width: 14rem) {
+  .select,
+  .button {
+    flex: 1 0 100%;
+  }
+
+  .select {
+    font-size: var(--text-sm);
+  }
+}

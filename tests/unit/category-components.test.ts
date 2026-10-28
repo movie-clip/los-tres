@@ -443,6 +443,38 @@ describe('BrandChips two lists (S11.6)', () => {
     expect(block(html, 'narrow').match(/aria-current="true"/g)).toHaveLength(1);
     expect(block(html, 'wide').match(/aria-current="true"/g)).toHaveLength(1);
   });
+
+  // S11.7 (D-4): the demo data has 15 brands at most, so 16 or more is proven here only.
+  describe('more than 15 brands', () => {
+    it.each([16, 20, 40])('with %d brands keeps 2 and 8 in the rows and every other chip behind "more"', (total) => {
+      const html = render(range(1, total));
+      const narrow = block(html, 'narrow');
+      const wide = block(html, 'wide');
+      const rowOf = (b: string) => chipsIn(b.slice(0, b.indexOf('<details')));
+      expect(rowOf(narrow)).toBe(NARROW_BRAND_CHIPS);
+      expect(rowOf(wide)).toBe(VISIBLE_BRAND_CHIPS);
+      expect(chipsIn(narrow)).toBe(total);
+      expect(chipsIn(wide)).toBe(total);
+      expect(narrow).toContain(`Más marcas (${total - NARROW_BRAND_CHIPS})`);
+      expect(wide).toContain(`Más marcas (${total - VISIBLE_BRAND_CHIPS})`);
+    });
+
+    it('opens the control of each list for the last of 16 brands and marks it once per list', () => {
+      const html = render(range(1, 16, 16), false);
+      expect(block(html, 'narrow')).toMatch(/<details[^>]*\bopen\b/);
+      expect(block(html, 'wide')).toMatch(/<details[^>]*\bopen\b/);
+      expect(block(html, 'narrow').match(/aria-current="true"/g)).toHaveLength(1);
+      expect(block(html, 'wide').match(/aria-current="true"/g)).toHaveLength(1);
+    });
+
+    it('renders no brand twice within a list', () => {
+      const html = render(range(1, 16));
+      for (const which of ['narrow', 'wide'] as const) {
+        const hrefs = block(html, which).match(/href="\/categoria\/x\?marca=m\d+"/g) ?? [];
+        expect(new Set(hrefs).size, which).toBe(hrefs.length);
+      }
+    });
+  });
 });
 
 describe('CategorySort (S11.4)', () => {

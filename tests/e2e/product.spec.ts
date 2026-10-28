@@ -14,8 +14,12 @@ import { dateMessagePattern, icuPlural, normaliseSpaces } from '../support/messa
 import {
   expectLocalScriptsAndLinks,
   expectNoForeignOrigin,
+  cssColour,
   expectNoSetCookie,
+  expectServerRenderedNotFound,
   openRawHtml,
+  snapshotOf,
+  whilePressed,
 } from '../support/page-checks';
 
 loadEnv();
@@ -283,9 +287,17 @@ test.describe('product page /producto/<slug> (C-13)', () => {
       const response = await request.get(path(slug));
       expect(response.status()).toBe(404);
       expectNoSetCookie(response);
-      expect(await response.text()).toContain(messages.NotFound.heading);
+      expectServerRenderedNotFound(await response.text(), siteName, slug.slice(0, 12));
     });
   }
+
+  test('an unknown product serves the full 404 page in the server HTML, not only in the flight payload', async ({
+    request,
+  }) => {
+    const response = await request.get(path('no-existe-este-producto'));
+    expect(response.status()).toBe(404);
+    expectServerRenderedNotFound(await response.text(), siteName);
+  });
 
   test.describe('product JSON-LD (S6.1)', () => {
     const SELECTOR = 'script[type="application/ld+json"][data-testid="product-jsonld"]';
@@ -354,5 +366,20 @@ test.describe('product page /producto/<slug> (C-13)', () => {
       expect(response.status()).toBe(404);
       expect(scripts(await response.text())).toHaveLength(0);
     });
+  });
+});
+
+// S11.7 (03-ux checks 17 and 19): the breadcrumb link has a pressed state.
+test.describe('product breadcrumb pressed (S11.7)', () => {
+  test('a pressed crumb gets the chip fill, a 4px corner and a 2px underline, and does not move', async ({ page }) => {
+    await page.goto(path(DEMO_SHARED.slug));
+    const chipBg = await cssColour(page, 'var(--color-chip-bg)');
+    const crumb = page.getByTestId('breadcrumb').getByRole('link').first();
+    const before = await snapshotOf(crumb);
+    const pressed = await whilePressed(page, crumb, () => snapshotOf(crumb));
+    expect(pressed.background).toBe(chipBg);
+    expect(pressed.radius).toBe('4px');
+    expect(pressed.thickness).toBe('2px');
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
   });
 });

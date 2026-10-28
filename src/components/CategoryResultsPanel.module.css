@@ -10,6 +10,13 @@
   background: var(--color-bg);
 }
 
+/* Below 14rem the panel gives the sort a little more width. */
+@media (max-width: 14rem) {
+  .panel {
+    padding-inline: var(--space-1);
+  }
+}
+
 /* The hairline sits under the brand group and only when there is one. */
 .brands {
   padding-bottom: var(--space-2);

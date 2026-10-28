@@ -93,7 +93,7 @@ npx playwright screenshot --viewport-size=1280,800 --full-page --lang=es-ES <url
 
 To see the configured legal pages export fake `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS`, `CONTACT_EMAIL` (and `OWNER_REGISTRY`, empty or set) in the shell, run `docker compose up -d app`, then unset and run it again; the host `.env` `OWNER_*` are blank so `/aviso-legal` and `/privacidad` return 500 until then.
 
-Phone (390 wide) and desktop (1280 wide) are the two viewports. Open every
+Phone (390 wide) and desktop (1280 wide) are the two main viewports; also check 360x740 and 195x422 (a phone at 200% zoom) for reflow. Open every
 image with `Read` before you judge it. A finding names its screenshot file.
 
 The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A short node script using the repo's `playwright` package can: run it with `createRequire` from the repo `package.json`, press Tab and screenshot; then focus is a screenshot check, not a consistency check. Without that script, check both halves as consistency checks, labelled so:

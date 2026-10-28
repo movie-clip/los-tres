@@ -21,7 +21,12 @@ import {
   expectLocalScriptsAndLinks,
   expectNoForeignOrigin,
   expectNoSetCookie,
+  cssColour,
+  expectServerRenderedNotFound,
   openRawHtml,
+  snapshotOf,
+  stripScripts,
+  whilePressed,
 } from '../support/page-checks';
 
 // S5.1 category page against the Compose stack, with the demo data. Elements
@@ -224,7 +229,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
       const response = await request.get(category(slug), { maxRedirects: 0 });
       expect(response.status()).toBe(404);
       expectNoSetCookie(response);
-      expect(await response.text()).toContain(messages.NotFound.heading);
+      expectServerRenderedNotFound(await response.text(), siteName, slug);
 
       await page.goto(category(slug));
       await expect(page.getByRole('heading', { name: messages.NotFound.heading })).toBeVisible();
@@ -296,7 +301,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
       const response = await request.get(category(slug));
       expect(response.status()).toBe(404);
       expectNoSetCookie(response);
-      expect(await response.text()).toContain(messages.NotFound.heading);
+      expectServerRenderedNotFound(await response.text(), siteName, slug.slice(0, 12));
     });
   }
 
@@ -307,6 +312,7 @@ test.describe('category page /categoria/<slug> (S5.1)', () => {
       const response = await request.get(category(ROOT, pageNumber));
       expect(response.status(), String(pageNumber).slice(0, 12)).toBe(404);
       expectNoSetCookie(response);
+      expectServerRenderedNotFound(await response.text(), siteName, String(pageNumber).slice(0, 12));
     }
   });
 
@@ -437,7 +443,6 @@ const parsePrice = (text: string): number =>
 const cardTitles = (page: Page) => page.getByTestId('card-title').allTextContents();
 const cardPrices = async (page: Page) =>
   (await page.getByTestId('card-price').allTextContents()).map(parsePrice);
-const stripScripts = (html: string) => html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
 
 test.describe('category brand chips (S11.4, 02-ux checks 1 to 8)', () => {
   test('check 1: the chips, the count and the sort sit in one panel between the IVA note and the first card', async ({
@@ -1260,4 +1265,253 @@ test.describe('category sort row and first card geometry (S11.6, CR-4)', () => {
       }
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// S11.7 (03-ux checks 8 to 16, 19 to 21): sort at 195, the open "Más marcas" row,
+// pressed states, hover and focus kept, and a brand with no match on the narrow list.
+// ---------------------------------------------------------------------------
+
+const PHONE_195 = { width: 195, height: 422 } as const;
+const PHONE_360 = { width: 360, height: 740 } as const;
+
+const colours = async (page: Page) => ({
+  ink: await cssColour(page, 'var(--color-ink)'),
+  accent: await cssColour(page, 'var(--color-accent)'),
+  onAccent: await cssColour(page, 'var(--color-on-accent)'),
+  chipBg: await cssColour(page, 'var(--color-chip-bg)'),
+  canvas: await cssColour(page, 'var(--color-canvas)'),
+  muted: await cssColour(page, 'var(--color-muted)'),
+});
+const chipName = (chip: Locator) => chip.locator('span:not([aria-hidden])').first();
+const chipCountText = (chip: Locator) => chip.locator('span:not([aria-hidden])').last();
+const leftOf = async (locator: Locator) => (await locator.boundingBox())!.x;
+
+/** Whether each sort option's text fits in the select box, measured with the select's own font; 24px is the native arrow. */
+const sortOptionRoom = (page: Page) =>
+  page.getByTestId('category-sort-select').evaluate((node) => {
+    const select = node as HTMLSelectElement;
+    const style = getComputedStyle(select);
+    const context = document.createElement('canvas').getContext('2d')!;
+    context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const room = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 24;
+    return [...select.options].map((option) => ({ text: option.text, width: context.measureText(option.text).width, room }));
+  });
+
+test.describe('category sort at narrow widths (S11.7, 03-ux checks 8 and 9)', () => {
+  test.describe('at 195 wide', () => {
+    test.use({ viewport: PHONE_195 });
+
+    test('check 8: the select and Ordenar are each a full-width row, one under the other', async ({ page }) => {
+      await page.goto(listing(AIR));
+      const select = (await page.getByTestId('category-sort-select').boundingBox())!;
+      const submit = (await page.getByTestId('category-sort-submit').boundingBox())!;
+      const row = await page.getByTestId('category-sort-select').evaluate((node) => node.parentElement!.getBoundingClientRect().width);
+      expect(Math.abs(select.width - row)).toBeLessThanOrEqual(1);
+      expect(Math.abs(submit.width - row)).toBeLessThanOrEqual(1);
+      expect(submit.y).toBeGreaterThanOrEqual(select.y + select.height - 1);
+      expect(Math.abs(select.x - submit.x)).toBeLessThanOrEqual(1);
+    });
+
+    test('check 8: each of the three options fits whole in the select box', async ({ page }) => {
+      await page.goto(listing(AIR));
+      const select = page.getByTestId('category-sort-select');
+      for (const value of await select.locator('option').evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value))) {
+        await select.selectOption(value);
+        for (const option of await sortOptionRoom(page)) {
+          expect(option.width, `${option.text} chosen ${value}`).toBeLessThanOrEqual(option.room);
+        }
+      }
+    });
+  });
+
+  for (const [width, height] of [
+    [360, 740],
+    [375, 812],
+    [390, 844],
+    [1280, 800],
+  ] as const) {
+    test.describe(`at ${width} wide`, () => {
+      test.use({ viewport: { width, height } });
+
+      test(`check 9: the select and Ordenar share one row and the option text is whole`, async ({ page }) => {
+        await page.goto(listing(AIR));
+        const select = (await page.getByTestId('category-sort-select').boundingBox())!;
+        const submit = (await page.getByTestId('category-sort-submit').boundingBox())!;
+        expect(Math.abs(select.y - submit.y)).toBeLessThanOrEqual(1);
+        expect(submit.height).toBeLessThan(select.height * 1.6);
+        for (const option of await sortOptionRoom(page)) {
+          expect(option.width, option.text).toBeLessThanOrEqual(option.room);
+        }
+      });
+    });
+  }
+});
+
+test.describe('category open "Más marcas" is one full row (S11.7, 03-ux checks 10 to 12)', () => {
+  test('check 10: at 1280 the open summary and its first chip start where "Todas las marcas" starts', async ({ page }) => {
+    await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
+    const more = chipMore(page);
+    await expect(more).toHaveAttribute('open', '');
+    const all = await leftOf(chipAll(page));
+    expect(Math.abs((await leftOf(more.locator('summary'))) - all)).toBeLessThanOrEqual(1);
+    expect(Math.abs((await leftOf(more.getByTestId('brand-chip').first())) - all)).toBeLessThanOrEqual(1);
+  });
+
+  for (const viewport of [PHONE_360, PHONE_195]) {
+    test(`check 11: at ${viewport.width} the summary is its own row and every row of the open list starts flush`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(listing(ROOT, `?marca=${LATE_BRAND.slug}`));
+      const more = chipMore(page, 'narrow');
+      await expect(more).toHaveAttribute('open', '');
+      const all = await leftOf(chipAll(page, 'narrow'));
+      const summary = (await more.locator('summary').boundingBox())!;
+      expect(Math.abs(summary.x - all)).toBeLessThanOrEqual(1);
+      const chips = await more.getByTestId('brand-chip').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const box = node.getBoundingClientRect();
+          return { x: box.x, y: box.y };
+        }),
+      );
+      expect(chips.length).toBeGreaterThan(0);
+      // The summary is alone on its row: every overflow chip is below it.
+      for (const chip of chips) expect(chip.y).toBeGreaterThan(summary.y + summary.height - 1);
+      // Every row starts at the same left edge (the first chip of each distinct top).
+      const rowStarts = new Map<number, number>();
+      for (const chip of chips) {
+        const top = Math.round(chip.y);
+        rowStarts.set(top, Math.min(rowStarts.get(top) ?? Infinity, chip.x));
+      }
+      for (const [top, x] of rowStarts) expect(Math.abs(x - all), `row at ${top}`).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('check 12: at 1280 the closed summary is inline after the last visible chip, and closing puts it back', async ({ page }) => {
+    await page.goto(listing(ROOT));
+    const summary = chipMore(page).locator('summary');
+    const lastVisible = brandList(page).locator('> ul > li > a[data-testid="brand-chip"]').last();
+    const closed = (await summary.boundingBox())!;
+    const last = (await lastVisible.boundingBox())!;
+    expect(Math.abs(closed.y - last.y)).toBeLessThanOrEqual(1);
+    expect(closed.x).toBeGreaterThan(last.x);
+
+    await summary.click();
+    await expect(chipMore(page)).toHaveAttribute('open', '');
+    await summary.click();
+    await expect(chipMore(page)).not.toHaveAttribute('open', '');
+    const again = (await summary.boundingBox())!;
+    expect(Math.abs(again.x - closed.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(again.y - closed.y)).toBeLessThanOrEqual(1);
+  });
+});
+
+test.describe('category pressed and kept states (S11.7, 03-ux checks 13 to 16, 19 and 21)', () => {
+  test('checks 13 and 19: a pressed brand chip is amber with ink edge, name and count, and does not move', async ({ page }) => {
+    await page.goto(listing(AIR));
+    const tone = await colours(page);
+    const chip = brandChips(page).nth(1);
+    const before = await snapshotOf(chip);
+    expect(await snapshotOf(chipCountText(chip))).toMatchObject({ colour: tone.muted });
+    const { pressed, name, count } = await whilePressed(page, chip, async () => ({
+      pressed: await snapshotOf(chip),
+      name: await snapshotOf(chipName(chip)),
+      count: await snapshotOf(chipCountText(chip)),
+    }));
+    expect(pressed).toMatchObject({ background: tone.accent, border: tone.ink });
+    expect(name.colour).toBe(tone.onAccent);
+    expect(count.colour).toBe(tone.onAccent);
+    expect(count.colour).not.toBe(tone.muted);
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+  });
+
+  test('checks 14 and 19: a pressed "Más marcas" summary is amber and its chevron is dark', async ({ page }) => {
+    await page.goto(listing(ROOT));
+    const tone = await colours(page);
+    const summary = chipMore(page).locator('summary');
+    const chevron = summary.locator('span[aria-hidden]');
+    const before = await snapshotOf(summary);
+    const { pressed, mark } = await whilePressed(page, summary, async () => ({
+      pressed: await snapshotOf(summary),
+      mark: await snapshotOf(chevron),
+    }));
+    expect(pressed).toMatchObject({ background: tone.accent, border: tone.ink });
+    expect(mark.background).toBe(tone.onAccent);
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+    await expect(chipMore(page)).not.toHaveAttribute('open', '');
+  });
+
+  test('check 15: a pressed selected chip is amber and its check mark is dark, not white', async ({ page }) => {
+    await page.goto(listing(AIR, '?marca=bosch'));
+    const tone = await colours(page);
+    const selected = brandList(page).locator('[aria-current="true"]');
+    await expect(selected).toHaveCount(1);
+    const { pressed, check, name } = await whilePressed(page, selected, async () => ({
+      pressed: await snapshotOf(selected),
+      check: await snapshotOf(selected.locator('span[aria-hidden]')),
+      name: await snapshotOf(chipName(selected)),
+    }));
+    expect(pressed.background).toBe(tone.accent);
+    expect(check.background).toBe(tone.onAccent);
+    expect(name.colour).toBe(tone.onAccent);
+  });
+
+  test('checks 16 and 19: a pressed product card gets an ink border, canvas fill and an underlined title', async ({ page }) => {
+    await page.goto(listing(AIR));
+    const tone = await colours(page);
+    const card = page.getByTestId('category-card').first();
+    const title = card.getByTestId('card-title');
+    const before = await snapshotOf(card);
+    const { pressed, link } = await whilePressed(page, title, async () => ({
+      pressed: await snapshotOf(card),
+      link: await snapshotOf(title),
+    }));
+    expect(pressed).toMatchObject({ background: tone.canvas, border: tone.ink });
+    expect(link.decoration).toContain('underline');
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+  });
+
+  test('check 21: hover on a chip still shows the ink border and chip fill, and focus the 3px ring', async ({ page }) => {
+    await page.goto(listing(AIR));
+    const tone = await colours(page);
+    const chip = brandChips(page).nth(1);
+    await chip.hover();
+    expect(await snapshotOf(chip)).toMatchObject({ background: tone.chipBg, border: tone.ink });
+    await page.mouse.move(0, 0);
+    await chip.focus();
+    const ring = await chip.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { width: parseFloat(style.outlineWidth), style: style.outlineStyle };
+    });
+    expect(ring).toEqual({ width: 3, style: 'solid' });
+  });
+});
+
+test.describe('category brand with no match, on the narrow list (S11.7, 03-ux check 20)', () => {
+  for (const [name, which, width, height] of [
+    ['phone', 'narrow', 375, 812],
+    ['desktop', 'wide', 1280, 800],
+  ] as const) {
+    test.describe(`at ${width} wide`, () => {
+      test.use({ viewport: { width, height } });
+
+      test(`${name}: no chip is current in the ${which} list, the way out and the count show, and there is no sort`, async ({ page }) => {
+        await page.goto(listing(AIR, '?marca=no-existe'));
+        await expect(brandList(page, which).locator('[aria-current]')).toHaveCount(0);
+        await expect(page.getByTestId('category-summary')).toHaveText(summaryText(0));
+        await expect(page.getByTestId('category-sort')).toHaveCount(0);
+        const empty = page.getByTestId('category-empty');
+        await expect(empty).toContainText(messages.Category.noMatchHeading);
+        await expect(page.getByTestId('category-empty-action')).toHaveText(messages.Category.noMatchAction);
+      });
+    });
+  }
+});
+
+test.describe('a brand past its last page is a server-rendered 404 (S11.7)', () => {
+  test('a real brand with a page that does not exist answers the full 404', async ({ request }) => {
+    const response = await request.get(listing(ROOT, '?marca=bosch&pagina=2'));
+    expect(response.status()).toBe(404);
+    expectNoSetCookie(response);
+    expectServerRenderedNotFound(await response.text(), siteName);
+  });
 });
