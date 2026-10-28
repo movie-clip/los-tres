@@ -7,17 +7,13 @@ import { categories, feeds, offers, products, shops } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { bestPriceFlags } from './best-price';
+import { readCategoryTrail, type PublicCategoryCrumb } from './category-trail';
 import { hasNonDemoOfferWhere } from './demo';
 
 // The backend/frontend contract for the product page (C-11). The page formats;
 // this returns integer cents and `Date`, never a formatted amount or date.
 
-export type PublicCategoryCrumb = {
-  /** categories.slug; the page links it with categoryPath(slug) (page 1, no filter). */
-  slug: string;
-  /** categories.name. Never empty. Display text, not a message key. */
-  name: string;
-};
+export type { PublicCategoryCrumb };
 
 export type PublicOffer = {
   /** offers.id; the page links to it through /go (goPath), never to a shop URL. */
@@ -63,26 +59,6 @@ export type PublicProductPage = {
 
 function nonBlank(value: string | null): string | null {
   return value?.trim() || null;
-}
-
-/**
- * The category and its ancestors, root first. Read from the `categories` table
- * (runtime truth), not from the fixed-tree constant. `depth < 8` is the cycle
- * guard: the depth column makes rows distinct, so UNION alone would not stop a
- * malformed parent cycle; a deeper chain is cut at the root end.
- */
-async function readCategoryTrail(categoryId: number): Promise<PublicCategoryCrumb[]> {
-  const result = await getDb().execute<PublicCategoryCrumb>(sql`
-    with recursive trail(id, parent_id, slug, name, depth) as (
-      select id, parent_id, slug, name, 0 from ${categories} where id = ${categoryId}
-      union all
-      select c.id, c.parent_id, c.slug, c.name, t.depth + 1
-      from ${categories} c join trail t on c.id = t.parent_id
-      where t.depth < 8
-    )
-    select slug, name from trail order by depth desc
-  `);
-  return result.rows.map((row) => ({ slug: row.slug, name: row.name }));
 }
 
 /**
