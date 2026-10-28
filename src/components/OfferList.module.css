@@ -120,6 +120,23 @@
   outline-offset: var(--focus-offset);
 }
 
+/* Below 14rem (a 390 phone at 200% zoom): the price takes its own line under
+   the shop name, so the name reads whole. */
+@media (max-width: 14rem) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'shop'
+      'price'
+      'updated'
+      'go';
+  }
+
+  .price {
+    text-align: left;
+  }
+}
+
 /* From 40rem: one line per row. The columns are fixed, so every price and
    every button sits at the same x on every row. The price and the button span
    the shop and date lines. */

@@ -142,6 +142,16 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
+  /* The term sits above its value, so the value gets the whole line. */
+  .row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .term {
+    min-width: 0;
+  }
 }
 
 /* From 52rem: three columns. The image spans the title and the details list;
