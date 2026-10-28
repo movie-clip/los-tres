@@ -1214,3 +1214,50 @@ test.describe('category brand chips, two lists (S11.6)', () => {
     await close();
   });
 });
+
+// ---------------------------------------------------------------------------
+// S11.6 CR-4: the sort select and "Ordenar" share one row, and the first card
+// of a populated category starts high enough on a phone to show a product.
+// ---------------------------------------------------------------------------
+
+test.describe('category sort row and first card geometry (S11.6, CR-4)', () => {
+  for (const [width, height] of [
+    [375, 812],
+    [390, 844],
+    [1280, 800],
+  ] as const) {
+    test.describe(`at ${width}x${height}`, () => {
+      test.use({ viewport: { width, height } });
+
+      for (const slug of [ROOT, AIR]) {
+        test(`${slug}: the select and the Ordenar button share one top`, async ({ page }) => {
+          await page.goto(listing(slug));
+          const select = (await page.getByTestId('category-sort-select').boundingBox())!;
+          const submit = (await page.getByTestId('category-sort-submit').boundingBox())!;
+          expect(Math.abs(select.y - submit.y)).toBeLessThanOrEqual(1);
+        });
+      }
+    });
+  }
+
+  for (const [width, height] of [
+    [375, 812],
+    [390, 844],
+  ] as const) {
+    test.describe(`first card on a ${width}x${height} phone`, () => {
+      test.use({ viewport: { width, height } });
+
+      for (const slug of [ROOT, AIR]) {
+        test(`${slug}: the first card top is at most 700 and its title starts inside the first view`, async ({
+          page,
+        }) => {
+          await page.goto(listing(slug));
+          const card = (await page.getByTestId('category-card').first().boundingBox())!;
+          expect(card.y).toBeLessThanOrEqual(700);
+          const title = (await page.getByTestId('card-title').first().boundingBox())!;
+          expect(title.y).toBeLessThan(height);
+        });
+      }
+    });
+  }
+});
