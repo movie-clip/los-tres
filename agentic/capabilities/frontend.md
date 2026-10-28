@@ -86,7 +86,7 @@ Working-copy files are CRLF on Windows (autocrlf): edit existing files with the 
 - A row that opens an inline panel keeps `openedFor` (the action state it was opened in) and derives `confirming = openedFor === state`, so any new result closes it without setState in an effect.
 - A client component that calls a server action through `useActionState` wraps it in try/catch: a transport failure rejects the promise and would reach `error.tsx`. Return a failed state, and rethrow an error whose digest starts with `NEXT_REDIRECT` so the sign-in redirect still navigates.
 - A Next route built from `robots.ts` with `force-dynamic` shows as dynamic in the build and reads `SITE_URL` per request; confirmed by running one build against two env values.
-- A nested `notFound()` is client-rendered from the flight payload, which carries the root layout's default title: `generateMetadata` in `(public)/not-found.tsx` fixes the served head only. Render a title element in the not-found component as well; the root `not-found.tsx` needs `generateMetadata` only (a title element there loses to the layout title).
+- A missing product, missing category, or page or brand past the last is served as a full server-rendered 404 (header, main, footer, `lang`, stylesheets): `src/proxy.ts` rewrites it to the root not-found, so that page needs no client rendering. The root `not-found.tsx` needs `generateMetadata` only (a title element there loses to the layout title).
 - Listing pages read `?pagina` through `parsePageParam`, call `notFound()` on a null read, link page 1 as the clean path with no `?pagina=1`, and use plain `<a>` (not `next/link`) for card and pagination links.
 
 ## Guardrails, in code terms
