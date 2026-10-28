@@ -61,6 +61,7 @@ describe('messages/es-ES.json (C-8)', () => {
     'NotFound.heading',
     'NotFound.body',
     'NotFound.backHome',
+    'NotFound.metaTitle',
   ])('has a non-empty string at %s', (key) => {
     const value = lookup(key);
     expect(typeof value).toBe('string');

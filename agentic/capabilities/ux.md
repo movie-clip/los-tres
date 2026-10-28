@@ -126,9 +126,9 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | category, one brand | `/categoria/filtros-de-aire?marca=bosch` (2 cards) |
 | category, no match (200) | `/categoria/filtros-de-aire?marca=no-existe` |
 | category, sorted | `?orden=precio-desc`, `?orden=nombre` on any populated category |
-| category, brand overflow closed and open | `/categoria/mantenimiento-del-coche` (8 chips plus "Más marcas (7)", press the summary); `?marca=total` opens it on load |
+| category, brand overflow closed and open | `/categoria/mantenimiento-del-coche` (at 40rem and up 8 chips plus "Más marcas (7)"; below 40rem "Todas las marcas", 2 brands and "Más marcas (13)" in `brand-chips-narrow`, press its summary, 15 chips inside); `?marca=total` opens it on load |
 | not found | `/categoria/no-existe` and `/categoria/mantenimiento-del-coche?pagina=4` (404) |
-| not found, double chrome | a 404 raised inside `(public)` (`/categoria/no-existe`, `/producto/no-existe`) renders the public header and footer twice (root `not-found.tsx` inside `(public)/layout.tsx`); an unknown top-level URL has single chrome. Pre-existing (seen in S11.1, #242), so report it as `SHOULD_FIX` until it is fixed |
+| not found, nested | `/categoria/no-existe` and `/producto/no-existe` render one header, one footer and one h1; no longer reproducible |
 | old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
 | legal page, identity blank | `/aviso-legal` returns 500 with Next's default English error page |

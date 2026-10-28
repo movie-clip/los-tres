@@ -56,6 +56,8 @@ The product e2e clicks nothing; the Referer click source is proven once in `go.s
 
 Product JSON-LD e2e reads the raw `request.get` HTML with a regex over script tags (expect one match) and `JSON.parse`, then `openRawHtml` for the selector and the visible-price comparison; selector `script[type="application/ld+json"][data-testid="product-jsonld"]`.
 
+The nested 404 (`notFound()` raised inside `(public)`) is client-rendered; assert its DOM and `document.title` in a browser (`tests/e2e/not-found.spec.ts`), not on raw HTML. A Tab walk right after `goto` can lose the first Tab to hydration: wait for the button visible and `networkidle` before pressing.
+
 Expected site name and copy come from `SITE_NAME` in `.env` and `messages/es-ES.json`, never a literal. Raw server HTML is parsed by `page.setContent` in a context with `javaScriptEnabled: false`, not by an HTML parser dependency.
 
 ## What must always be covered
@@ -149,13 +151,16 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - A Python script that opens a file with `open(p,'wb')` before building the
   content truncates it if the build raises: read, build, then write. Pass
   `encoding='utf-8'`; the default is cp1252.
-- Category e2e demo facts (after one import): `filtros-de-aire` has 6 brands of 2 products, `aceite-de-motor` 7, the root 15 (8 chips plus "Más marcas (7)"; `total` is outside the first 8); no demo brand has more than one page on the root, so a brand's pagination is not e2e-reachable. `DEMO_NO_BRAND` has no part number (no spec line); `DEMO_SHARED` has "OC 1234".
+- Category e2e demo facts (after one import): `filtros-de-aire` has 6 brands of 2 products, `aceite-de-motor` 7, the root 15 (on 1280 the root shows 8 chips plus "Más marcas (7)" (wide list); on 375 it shows 2 brands plus "Más marcas (13)" (narrow list); `filtros-de-aire` shows all six at 1280 and 2 plus "Más marcas (4)" at 375; `total` is outside the first 8); no demo brand has more than one page on the root, so a brand's pagination is not e2e-reachable. `DEMO_NO_BRAND` has no part number (no spec line); `DEMO_SHARED` has "OC 1234".
 - A JS-off interaction (form submit) uses `browser.newContext({ javaScriptEnabled: false, baseURL })`, not `openRawHtml`, which is for static HTML only. A ring drawn on a stretched link is on `::after`: read `getComputedStyle(node, '::after')` when the element's own outline is none.
 - `sed -i` in Git Bash strips CRs from CRLF test files; use Edit or a Python read/replace/write with `newline=''`.
 - A long Bash heredoc containing apostrophes failed to parse: use Write.
 - `tests/unit/styles.test.ts` (S11.1, #242) scans every css file under `src`, comments included, for `box-shadow`, `transition`, `transform`, `animation`, `100vw`, raw colours outside `:root` and a `var(--x)` with no `:root` definition; its pure helpers are exercised on in-memory CSS. Never name a variable `module` in a test: `@next/next/no-assign-module-variable` fails lint.
 - A Bash command holding several heredocs with apostrophes inside TypeScript strings failed to parse (exit 2, nothing ran): write test files with Write and run edit scripts from the scratchpad.
 - S11.5 product page: integration `product-page.test.ts` seeds trails with `insertCategory({parentId})` and ties with `insertListedProduct({prices})`; a parent cycle is built as above. e2e testids: `breadcrumb`, `product-brand`, `product-price`, `shop-count` (hero), `best-price`, `product-description`, `offer-go` (visible 'Ir a la tienda', aria-label has the shop).
+
+- Brand chips render twice (S11.6). e2e select through the helpers in `category.spec.ts`: `brandList(page, 'wide'|'narrow')` = `brand-chips-<which>`, and `brandChips`/`chipAll`/`chipMore` take the same argument. The default viewport (1280) shows the wide list; the narrow list is the one on screen below 40rem, so a phone test passes `'narrow'` and filters hidden chips with `.filter({ visible: true })` because the closed details holds them. Never select by the bare `brand-chip`, `brand-chip-all` or `brand-more` testid. Raw-HTML pages (`openRawHtml`) have no stylesheet, so both lists are visible there: scope to one.
+- eslint ignores `agentic/runs/**` (scratch scripts in run dirs); a `.cjs` left there no longer fails `npm run lint`.
 
 ## Definition of done for this lane
 

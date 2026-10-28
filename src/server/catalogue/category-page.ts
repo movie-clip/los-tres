@@ -7,6 +7,7 @@ import { categories, feeds, offers, products, shops } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { brandSlug, type CategorySort } from './category-query';
+import { readCategoryTrail, type PublicCategoryCrumb } from './category-trail';
 import { hasNonDemoOfferWhere } from './demo';
 
 // The backend/frontend contract for the category page (C-3, S11.4). The page
@@ -60,6 +61,11 @@ export type PublicCategoryPage = {
   slug: string;
   /** categories.name */
   name: string;
+  /**
+   * The category's ancestors, root first, the category itself excluded.
+   * [] for a root category. Each links with categoryPath(slug) (page 1, no filter).
+   */
+  ancestors: PublicCategoryCrumb[];
   /** 1-based, the page returned. */
   page: number;
   /** >= 1; ceil(productCount / CATEGORY_PAGE_SIZE), exactly 1 when productCount is 0. */
@@ -197,7 +203,7 @@ export async function getPublicCategoryPage(
     .limit(1);
   if (!category) return null;
 
-  const [[counted], [indexed], brandGroups] = await Promise.all([
+  const [[counted], [indexed], brandGroups, trail] = await Promise.all([
     db
       .select({ productCount: sql<number>`count(*)::int` })
       .from(products)
@@ -217,6 +223,7 @@ export async function getPublicCategoryPage(
         and(visibleProductWhere(), inSubtree(category.id), isNotNull(products.brandNormalised)),
       )
       .groupBy(products.brandNormalised),
+    readCategoryTrail(category.id),
   ]);
   const categoryProductCount = counted?.productCount ?? 0;
   const indexable = (indexed?.indexedCount ?? 0) > 0;
@@ -288,6 +295,7 @@ export async function getPublicCategoryPage(
   return {
     slug: category.slug,
     name: category.name,
+    ancestors: trail.slice(0, -1),
     page,
     pageCount,
     productCount,

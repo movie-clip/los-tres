@@ -31,6 +31,8 @@ export default defineConfig([
     'next-env.d.ts',
     'playwright-report/**',
     'test-results/**',
+    // Scratch scripts of agent runs (screenshots, measurements) are not product code.
+    'agentic/runs/**',
   ]),
   {
     files: ['src/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs,ts}'],
