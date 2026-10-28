@@ -85,6 +85,17 @@
   text-decoration: underline;
 }
 
+/* Pressed is read on the card: the stretched link sits inside it, so the card
+   matches while the link is pressed. Same 1px border, so nothing shifts. */
+.card:active {
+  border-color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.card:active .link {
+  text-decoration: underline;
+}
+
 /* The focus ring is drawn around the whole card, on the stretched box. */
 .link:focus-visible {
   outline: none;

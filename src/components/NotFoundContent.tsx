@@ -13,7 +13,7 @@ export async function NotFoundContent() {
   const t = await getTranslations('NotFound');
   return (
     <main className="page">
-      <h1>{t('heading')}</h1>
+      <h1 className={styles.heading}>{t('heading')}</h1>
       <p>{t('body')}</p>
       <p>
         <Link href="/" className={styles.home}>
