@@ -52,6 +52,8 @@ Listing e2e select only by the `data-testid` values of the design contract; the 
 
 Category listing (S11.4): integration tests call `getPublicCategoryPage(slug, page, brand, sort)` and set `products.brandNormalised` and `partNumber` themselves (`insertListedProduct` sets neither; the local helper `listBranded` in `category-page.test.ts` does it). Canonical on `?marca=`/`?orden=` is proven by importing `generateMetadata` from `src/app/(public)/categoria/[slug]/page` in an integration test with `vi.mock('next-intl/server', () => ({ getTranslations: async () => (key) => key }))`; `SITE_URL` comes from `test-database-env.ts`.
 
+The product e2e clicks nothing; the Referer click source is proven once in `go.spec.ts`, `product.spec.ts` asserts only that anchors are plain (no target, noreferrer, referrerpolicy, meta referrer).
+
 Product JSON-LD e2e reads the raw `request.get` HTML with a regex over script tags (expect one match) and `JSON.parse`, then `openRawHtml` for the selector and the visible-price comparison; selector `script[type="application/ld+json"][data-testid="product-jsonld"]`.
 
 Expected site name and copy come from `SITE_NAME` in `.env` and `messages/es-ES.json`, never a literal. Raw server HTML is parsed by `page.setContent` in a context with `javaScriptEnabled: false`, not by an HTML parser dependency.
@@ -153,6 +155,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - A long Bash heredoc containing apostrophes failed to parse: use Write.
 - `tests/unit/styles.test.ts` (S11.1, #242) scans every css file under `src`, comments included, for `box-shadow`, `transition`, `transform`, `animation`, `100vw`, raw colours outside `:root` and a `var(--x)` with no `:root` definition; its pure helpers are exercised on in-memory CSS. Never name a variable `module` in a test: `@next/next/no-assign-module-variable` fails lint.
 - A Bash command holding several heredocs with apostrophes inside TypeScript strings failed to parse (exit 2, nothing ran): write test files with Write and run edit scripts from the scratchpad.
+- S11.5 product page: integration `product-page.test.ts` seeds trails with `insertCategory({parentId})` and ties with `insertListedProduct({prices})`; a parent cycle is built as above. e2e testids: `breadcrumb`, `product-brand`, `product-price`, `shop-count` (hero), `best-price`, `product-description`, `offer-go` (visible 'Ir a la tienda', aria-label has the shop).
 
 ## Definition of done for this lane
 

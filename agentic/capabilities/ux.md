@@ -120,6 +120,8 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | card with a 100-character title | the "DEMO Filtro de habitáculo de carbón activo con triple capa..." card on `/categoria/filtros-de-habitaculo` |
 | product with four offers | `/producto/demo-filtro-de-habitaculo-mahle-ca-1118-antipolen` |
 | product with one offer | `/producto/demo-filtro-de-aire-bosch-af-2287` |
+| product with a long title | `/producto/demo-filtro-de-habitaculo-de-carbon-activo-con-triple-capa-para-varios-modelos-d` (Referencia FH-4000, no EAN) |
+| product with EAN only, two offers | `/producto/demo-aceite-shell-10w-40-mineral-5-l` (tag on row 1) |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
 | category, one brand | `/categoria/filtros-de-aire?marca=bosch` (2 cards) |
 | category, no match (200) | `/categoria/filtros-de-aire?marca=no-existe` |
