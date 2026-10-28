@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
+import { cssColour, snapshotOf, whilePressed } from '../support/page-checks';
 
 // US-2.3 against the Compose stack, read-only (D-9): no spec here changes an
 // approval in the shared development database, because fullyParallel specs and
@@ -255,5 +256,76 @@ test.describe('the signed-in page', () => {
     expect(`${anonymous.headers['x-action-redirect'] ?? ''}${anonymous.headers.location ?? ''}`).toContain('/admin/acceso');
     expect(anonymous.text).not.toContain('"status":"failed"');
     expect(anonymous.text).not.toContain('"status":"done"');
+  });
+});
+
+// S11.7 (03-ux checks 18 and 19): pressed states of the shared admin PendingButton. The colours are
+// read from tokens, not literals; each press is held on the button and let go away from it.
+test.describe('admin pressed buttons (S11.7)', () => {
+  test('a pressed filled button reads light fill and dark text, and does not move', async ({ page }) => {
+    await page.goto('/admin/acceso');
+    const light = await cssColour(page, 'var(--color-bg)');
+    const dark = await cssColour(page, 'var(--color-link)');
+    const submit = page.getByTestId('sign-in-submit');
+    const before = await snapshotOf(submit);
+    expect(before.background).toBe(dark);
+    const pressed = await whilePressed(page, submit, () => snapshotOf(submit));
+    expect(pressed.background).toBe(light);
+    expect(pressed.colour).toBe(dark);
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+  });
+
+  test('a pending filled button does not invert when pressed', async ({ page }) => {
+    await page.goto('/admin/acceso');
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/admin/acceso', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await held;
+      return route.abort();
+    });
+    await page.locator('#admin-email').fill('nobody@example.test');
+    await page.locator('#admin-password').fill('not-a-password');
+    const submit = page.getByTestId('sign-in-submit');
+    await submit.click();
+    await expect(submit).toHaveAttribute('aria-disabled', 'true');
+    const pending = await snapshotOf(submit);
+    const pressed = await whilePressed(page, submit, () => snapshotOf(submit));
+    expect(pressed.background).toBe(pending.background);
+    expect(pressed.colour).toBe(pending.colour);
+    release();
+  });
+
+  test('signed in, a pressed outlined button reads dark fill and light text, and does not move', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/admin/tiendas');
+    const light = await cssColour(page, 'var(--color-bg)');
+    const dark = await cssColour(page, 'var(--color-link)');
+    const signOut = page.getByTestId('admin-sign-out');
+    const before = await snapshotOf(signOut);
+    expect(before.background).not.toBe(dark);
+    const pressed = await whilePressed(page, signOut, () => snapshotOf(signOut));
+    expect(pressed.background).toBe(dark);
+    expect(pressed.colour).toBe(light);
+    expect([pressed.width, pressed.height]).toEqual([before.width, before.height]);
+    await expect(page.getByTestId('admin-identity')).toBeVisible();
+  });
+
+  test('signed in, the confirm button of /admin/tiendas is a filled button that inverts when pressed', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/admin/tiendas');
+    const light = await cssColour(page, 'var(--color-bg)');
+    const feed = shopGroup(page, SHOP_NAMES[0]).getByTestId(/^source-feed-/).first();
+    await feed.getByTestId('source-disable').click();
+    const yes = feed.getByTestId('source-confirm-yes');
+    await expect(yes).toBeVisible();
+    const pressed = await whilePressed(page, yes, () => snapshotOf(yes));
+    expect(pressed.background).toBe(light);
+    // Let go away from the button: nothing was confirmed.
+    await expect(feed.getByTestId('source-confirm')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(feed.getByTestId('source-tag')).toHaveText(copy.feedApproved);
   });
 });
