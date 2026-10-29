@@ -38,6 +38,24 @@ export function categoryListingPath(
   return query === '' ? base : `${base}?${query}`;
 }
 
+/** The search results page; also the `action` of every search form. */
+export const SEARCH_PATH = '/buscar';
+
+export type SearchLinkState = { term: string; page?: number };
+
+/**
+ * `/buscar` for an empty term, else `/buscar?q=<term>`, plus `&pagina=<n>` for
+ * n > 1. The parameter order is `q`, then `pagina`; values are encoded by
+ * URLSearchParams. The one builder of a search URL: no page writes one by hand.
+ */
+export function searchPath(state: SearchLinkState): string {
+  const params = new URLSearchParams();
+  if (state.term !== '') params.set('q', state.term);
+  if (state.page !== undefined && state.page > 1) params.set('pagina', String(state.page));
+  const query = params.toString();
+  return query === '' ? SEARCH_PATH : `${SEARCH_PATH}?${query}`;
+}
+
 /** `origin + path`. `origin` has no trailing slash (`URL.origin`); `path` starts with `/`. */
 export function absoluteUrl(origin: string, path: string): string {
   return `${origin}${path}`;
