@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { Error as errorMessages, NotFound as notFoundMessages } from '../../../messages/es-ES.json';
+import { usePublicFallback } from '@/components/PublicFallbackContext';
 
 import styles from './error.module.css';
 
@@ -13,18 +13,20 @@ import styles from './error.module.css';
  * (a query error carries it) and no server detail reaches a visitor. The props
  * Next passes are deliberately not read.
  *
- * A client boundary cannot call next-intl without a provider, so it reads the
- * three finished strings straight from the message file; named imports keep the
- * rest of the file out of the client bundle.
+ * A client boundary cannot call next-intl without a provider, so the finished
+ * strings come from the context PublicChrome fills on the server (the admin
+ * error page works the same way).
  */
 export default function PublicError() {
+  const fallback = usePublicFallback();
+  if (!fallback) return null;
   return (
     <main className="page" data-testid="public-error">
-      <h1 className={styles.heading}>{errorMessages.heading}</h1>
-      <p>{errorMessages.body}</p>
+      <h1 className={styles.heading}>{fallback.heading}</h1>
+      <p>{fallback.body}</p>
       <p>
         <Link href="/" className={styles.home}>
-          {notFoundMessages.backHome}
+          {fallback.home}
         </Link>
       </p>
     </main>
