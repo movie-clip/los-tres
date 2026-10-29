@@ -208,7 +208,7 @@ test.describe('home search form (S11.3, S5.4)', () => {
     await expect(input).toHaveAttribute('name', 'q');
     await expect(input).toHaveValue('');
     await expect(input).not.toHaveAttribute('placeholder', /.*/);
-    await expect(page.getByLabel(messages.Home.searchLabel)).toHaveCount(1);
+    await expect(form.getByLabel(messages.Home.searchLabel)).toHaveCount(1);
     await expect(page.getByTestId('home-search-button')).toHaveText(messages.Home.searchButton);
     await expect(form.getByText(messages.Home.searchHint)).toHaveCount(1);
     await close();

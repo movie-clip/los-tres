@@ -359,7 +359,7 @@ test.describe('search form and metadata (S5.4)', () => {
     await expect(input).toHaveAttribute('maxlength', '100');
     await expect(input).not.toHaveAttribute('placeholder', /.*/);
     await expect(input).toHaveValue(MANY);
-    await expect(page.getByLabel(messages.Search.fieldLabel)).toHaveCount(1);
+    await expect(form.getByLabel(messages.Search.fieldLabel)).toHaveCount(1);
     await expect(page.getByTestId('search-button')).toHaveText(messages.Search.button);
     await expect(form.getByText(messages.Search.hint)).toHaveCount(1);
     await close();
@@ -368,7 +368,7 @@ test.describe('search form and metadata (S5.4)', () => {
   test('AC 37: the home field keeps its 100-character limit and its label', async ({ request, browser }) => {
     const { page, close } = await openRawHtml(browser, await html(request, '/'));
     await expect(page.getByTestId('home-search-input')).toHaveAttribute('maxlength', '100');
-    await expect(page.getByLabel(messages.Home.searchLabel)).toHaveCount(1);
+    await expect(page.getByTestId('home-search').getByLabel(messages.Home.searchLabel)).toHaveCount(1);
     await close();
   });
 

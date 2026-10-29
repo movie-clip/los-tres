@@ -1120,7 +1120,8 @@ test.describe('category breadcrumb (S11.6)', () => {
 
   test('the crumb is the first stop after the site link, before the brand chips', async ({ page }) => {
     await page.goto(listing(AIR));
-    await page.getByTestId('site-header-link').focus();
+    // The header search box (T5.4.5) sits between the site link and the crumb: focus its button.
+    await page.getByTestId('header-search-button').focus();
     await page.keyboard.press('Tab');
     const active = page.locator(':focus');
     await expect(active).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
