@@ -3,9 +3,9 @@ import 'server-only';
 import { and, eq, exists, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 
-import { feeds, offers, products, shops } from '../db/schema';
+import { feeds, offers, products, shops, vehicles } from '../db/schema';
 
-// The one visibility scope (guardrail 1). Every public read applies these two
+// The one visibility scope (guardrail 1). Every public read applies these
 // conditions and none restates a flag. Outside this file only the schema, the
 // seed and the importer may name the approval, hidden and review columns.
 //
@@ -14,6 +14,9 @@ import { feeds, offers, products, shops } from '../db/schema';
 //   product public = product not hidden AND product mapped to a category
 //                     (products.category_id is not null) AND it has at least
 //                     one visible offer
+//   fitment counted = feed approved AND shop approved AND vehicle not retired
+//                     (no offer or product flag: a fitment never makes a
+//                     product public, S5.5)
 
 /**
  * Condition over `offers` joined to `feeds` (offers.feed_id) and `shops`
@@ -41,4 +44,18 @@ export function visibleProductWhere(): SQL {
     isNotNull(products.categoryId),
     exists(visibleOffer),
   ) as SQL;
+}
+
+/** Condition over `vehicles`: the vehicle is in the current list (not retired). */
+export function activeVehicleWhere(): SQL {
+  return eq(vehicles.isRetired, false);
+}
+
+/**
+ * Condition over `fitments` joined to `feeds` (fitments.feed_id), `shops`
+ * (feeds.shop_id) and `vehicles` (fitments.vehicle_id): the fitment counts.
+ * It names no offer or product flag, so it never decides what is public.
+ */
+export function countedFitmentWhere(): SQL {
+  return and(eq(feeds.isApproved, true), eq(shops.isApproved, true), activeVehicleWhere()) as SQL;
 }
