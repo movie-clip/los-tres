@@ -43,6 +43,13 @@
       "when": 1793256488443,
       "tag": "0005_search",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793288341223,
+      "tag": "0006_vehicle_fitment",
+      "breakpoints": true
     }
   ]
 }

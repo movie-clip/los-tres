@@ -35,6 +35,8 @@ describe('migrations (TD-37)', () => {
         'admin_accounts',
         'admin_sessions',
         'admin_verifications',
+        'vehicles',
+        'fitments',
       ]),
     );
   });

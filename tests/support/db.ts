@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 
 import { ensureFixedCategoryTree } from '@/db/category-tree';
 import { getDb } from '@/db/client';
+import { ensureVehicleCatalogue } from '@/db/vehicle-catalogue';
 
 /**
  * Any helper that mutates the database calls this first. Fails unless the
@@ -18,8 +19,8 @@ export async function assertTestDatabase(): Promise<void> {
 
 /**
  * Empties every table in schema `public` and restarts identities, so each test
- * starts from the migrated state, which includes the fixed category tree (ids 1-6),
- * re-created after the truncate. Drizzle's own migrations table lives
+ * starts from the migrated state, which includes the fixed category tree (ids 1-6)
+ * and the vehicle list, both re-created after the truncate. Drizzle's own migrations table lives
  * in schema `drizzle` and is left alone. Integration files call this in
  * `beforeEach`.
  */
@@ -34,4 +35,5 @@ export async function resetDatabase(): Promise<void> {
     await db.execute(sql.raw(`truncate table ${names} restart identity cascade`));
   }
   await ensureFixedCategoryTree(db);
+  await ensureVehicleCatalogue(db);
 }

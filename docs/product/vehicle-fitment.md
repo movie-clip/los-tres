@@ -44,8 +44,11 @@ that device until they change or remove it.
      over its offers' feeds.
    - An unknown slug does not reject the row: it is skipped and counted in the
      import output as `fitment: unknown vehicle <slug>`.
-   - A fitment from a feed that is not approved or is disabled does not count
-     (guardrail 1). Hidden products stay hidden whatever their fit.
+   - A fitment counts only while its feed and that feed's shop are both
+     approved (guardrail 1); a feed an admin disables is an unapproved one, and
+     there is no separate enabled flag. Whether the product's offers are hidden
+     or in review does not change it, and fitments to a retired vehicle do not
+     count. Hidden products stay hidden whatever their fit.
 3. **Filtering.** With a vehicle selected, a listing (category page, search
    results) shows:
    - first the `fits` products, under the heading "Compatibles con tu

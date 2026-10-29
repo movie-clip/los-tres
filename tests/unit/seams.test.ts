@@ -456,3 +456,54 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([]);
   });
 });
+
+describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
+  const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+  const FIT_STATE = 'src/server/catalogue/fit-state.ts';
+
+  it('finds the fitment modules it scans, so the rules below are not vacuous', () => {
+    const files = sources().map(({ file }) => file);
+    expect(files).toEqual(
+      expect.arrayContaining([FIT_STATE, 'src/server/visibility.ts', 'src/db/vehicle-catalogue.ts']),
+    );
+  });
+
+  it('decides which fitments count in the visibility scope, from the feed, the shop and the vehicle (AC 27)', () => {
+    const code = codeOf('src/server/visibility.ts');
+    const body = code.match(/function\s+countedFitmentWhere\s*\([^)]*\)[^{]*\{([\s\S]*?)\r?\n\}/)?.[1] ?? '';
+    expect(body).toMatch(/feeds\.isApproved/);
+    expect(body).toMatch(/shops\.isApproved/);
+    expect(body).toContain('activeVehicleWhere()');
+    expect(code).toMatch(/function\s+activeVehicleWhere/);
+  });
+
+  it('has the fit-state read go through the shared fitment condition and name no flag of its own (AC 27)', () => {
+    const code = codeOf(FIT_STATE);
+    expect(code.length).toBeGreaterThan(0);
+    expect(code).toContain('countedFitmentWhere()');
+    expect(code).toContain('activeVehicleWhere()');
+    expect(code).not.toMatch(/(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)/);
+    expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
+  });
+
+  it('names the fitment condition only in the visibility scope and the fit-state read', () => {
+    const found = offenders(
+      /(countedFitmentWhere|activeVehicleWhere)/,
+      (file) => file === 'src/server/visibility.ts' || file === FIT_STATE,
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('writes nothing and logs nothing in the fit-state read (AC 28, guardrail 5)', () => {
+    const code = codeOf(FIT_STATE);
+    expect(code.length).toBeGreaterThan(0);
+    expect(code).not.toMatch(/console\.\w+\s*\(/);
+    expect(code).not.toMatch(/\.(insert|update|delete)\(/);
+  });
+
+  it('keeps the vehicle list free of the server-only marker and the client, so the CLI can run it', () => {
+    const code = codeOf('src/db/vehicle-catalogue.ts');
+    expect(code).not.toMatch(/server-only/);
+    expect(code).not.toMatch(/\.(delete)\(/);
+  });
+});

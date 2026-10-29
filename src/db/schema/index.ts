@@ -6,3 +6,4 @@ export * from './catalogue';
 export * from './sources';
 export * from './clicks';
 export * from './auth';
+export * from './vehicles';
