@@ -12,8 +12,10 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
   category tree (0015), with stable slugs. No TecDoc or other licensed
   catalogue in the MVP; that stays an owner call for later.
 - **Fitment links enter through feeds only**, as a field of a feed row (demo
-  feeds now, a network's mapped field later). No scraping (guardrail 2). Only
-  fitments from approved, enabled feeds count (guardrail 1).
+  feeds now, a network's mapped field later). No scraping (guardrail 2). A
+  fitment counts only while its feed and that feed's shop are approved
+  (guardrail 1); there is no separate "enabled" flag, disabling a feed is
+  unapproving it.
 - **The selection lives in the URL (`?coche=<slug>`) and in the visitor's
   `localStorage`.** The server stores nothing about it: no cookie, session or
   log (guardrail 5). Pages render on the server from the URL.
