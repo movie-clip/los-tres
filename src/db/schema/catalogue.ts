@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  customType,
   index,
   integer,
   pgTable,
@@ -12,6 +13,14 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { feeds } from './sources';
+
+// PostgreSQL full-text vector (S5.4). Only ever written by the database, as the
+// generated column below; no application code binds or reads a value of it.
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return 'tsvector';
+  },
+});
 
 export const categories = pgTable('categories', {
   id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
@@ -43,9 +52,20 @@ export const products = pgTable(
     // Set by an admin only (guardrail 1).
     isHidden: boolean('is_hidden').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // Searchable text (S5.4), generated and stored by PostgreSQL so the importer
+    // never writes it and every insert or update refreshes it. The title is
+    // stemmed and unaccented (public.search_es, viscosity codes folded by
+    // public.search_fold_codes, D-6); the brand is unaccented only
+    // (public.search_simple). The functions and configurations come from
+    // migration 0005_search; src/server/catalogue/search-page.ts queries it.
+    searchVector: tsvector('search_vector').generatedAlwaysAs(
+      sql`to_tsvector('public.search_es'::regconfig, public.search_fold_codes(title)) || to_tsvector('public.search_simple'::regconfig, coalesce(brand, ''))`,
+    ),
   },
   (table) => [
     index('products_ean_normalised_idx').on(table.eanNormalised),
+    index('products_part_number_normalised_idx').on(table.partNumberNormalised),
+    index('products_search_vector_idx').using('gin', table.searchVector),
     index('products_category_id_idx').on(table.categoryId),
     check('products_slug_format', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
   ],

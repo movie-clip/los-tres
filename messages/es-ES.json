@@ -9,7 +9,6 @@
     "searchLabel": "Buscar un producto",
     "searchButton": "Buscar",
     "searchHint": "Por nombre, referencia o EAN",
-    "searchNotice": "La búsqueda por texto todavía no está disponible. Elige una categoría para ver sus productos.",
     "categoriesHeading": "Elige una categoría",
     "allLink": "Ver todo el catálogo",
     "productCount": "{count, plural, one {# producto} other {# productos}}",
@@ -49,6 +48,27 @@
     "noMatchHeading": "No hay productos de esta marca en esta categoría",
     "noMatchBody": "Prueba con otra marca o quita el filtro para ver todos los productos.",
     "noMatchAction": "Quitar el filtro"
+  },
+  "Search": {
+    "metaTitle": "Buscar productos | {siteName}",
+    "metaTitleTerm": "Resultados para «{term}» | {siteName}",
+    "metaTitleTermPaged": "Resultados para «{term}», página {page} | {siteName}",
+    "heading": "Buscar productos",
+    "formLabel": "Buscar",
+    "fieldLabel": "Buscar un producto",
+    "hint": "Por nombre, referencia o EAN",
+    "button": "Buscar",
+    "summary": "{count, plural, one {# producto} other {# productos}} para «{term}»",
+    "summaryPaged": "{count, plural, one {# producto} other {# productos}} para «{term}» · Página {page} de {pages}",
+    "promptHeading": "¿Qué estás buscando?",
+    "promptBody": "Escribe el nombre de un producto, su referencia o su EAN. Por ejemplo, «filtro de aceite» o «5W-30».",
+    "noResultsHeading": "No hay resultados",
+    "noResultsBody": "No hemos encontrado ningún producto para «{term}». Prueba con una palabra más corta o con la referencia o el EAN del producto. Comprueba también que esté bien escrito.",
+    "browseAction": "Explorar por categoría"
+  },
+  "Error": {
+    "heading": "Ha ocurrido un error",
+    "body": "No se ha podido mostrar esta página. Inténtalo de nuevo en unos minutos."
   },
   "Product": {
     "metaTitle": "{title} | {siteName}",

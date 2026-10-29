@@ -1,0 +1,49 @@
+.header {
+  margin-bottom: var(--space-3);
+}
+
+.title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+/* The panel above the results: a white card like the category results panel,
+   the form on top and, in the results state, a hairline then the count. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+/* Below 14rem the panel gives the form a little more width. */
+@media (max-width: 14rem) {
+  .panel {
+    padding-inline: var(--space-1);
+  }
+}
+
+/* A paragraph inside .page is muted by globals.css; the count is not. The term
+   in it is user text, so a long unbroken one wraps. */
+.panel .count {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,153 @@
+/* One search form, three presentations chosen by a class on the form:
+   hero (home band, on ink), page (the /buscar panel, on white) and header (the
+   site header, on ink). Sizes here are this component's own, not global tokens:
+   40rem the hero and page row width, 3.5rem their field and button height,
+   14rem and 26rem the header form basis and maximum, 8rem its field minimum. */
+.form {
+  margin: 0;
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+}
+
+/* The field takes the remaining width. When the row is too narrow the button
+   wraps under it and, alone on its line, takes the whole line: the field's grow
+   factor is so large that beside the field the button gains next to nothing. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.input {
+  box-sizing: border-box;
+  flex: 1000 1 12rem;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+/* The primary button: amber fill, ink label, a thin darker edge. Hover and
+   pressed change fill and border colour only, never size. */
+.button {
+  box-sizing: border-box;
+  flex: 1 0 auto;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-accent-edge);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-accent-hover);
+}
+
+.button:active {
+  border-color: var(--color-ink);
+  background: var(--color-accent-active);
+}
+
+/* The hint is a paragraph; two classes keep `.page p` from deciding its colour. */
+.form .hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+/* hero: on the ink band, left aligned, under the tagline. */
+.hero {
+  max-width: 40rem;
+  margin-top: var(--space-3);
+}
+
+.hero .label {
+  color: var(--color-on-ink);
+}
+
+.hero .input,
+.hero .button {
+  height: 3.5rem;
+}
+
+.hero .input {
+  font-size: var(--text-lg);
+}
+
+.hero .input:focus-visible,
+.hero .button:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}
+
+.form.hero .hint {
+  color: var(--color-on-ink-muted);
+}
+
+/* page: inside the white results panel. The field edge is the stronger border,
+   because a control edge on white must show. */
+.page {
+  max-width: 40rem;
+}
+
+.page .label {
+  color: var(--color-text);
+}
+
+.page .input,
+.page .button {
+  height: 3.5rem;
+}
+
+.page .input {
+  border-color: var(--color-border-strong);
+  font-size: var(--text-lg);
+}
+
+.page .input:focus-visible,
+.page .button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.form.page .hint {
+  color: var(--color-muted);
+}
+
+/* header: on the ink bar, a tap target high, no visible label and no hint.
+   The form takes the room beside the site name up to 26rem. */
+.header {
+  flex: 1 1 14rem;
+  max-width: 26rem;
+  min-width: 0;
+}
+
+.header .input {
+  flex-basis: 8rem;
+  font-size: var(--text-md);
+}
+
+.header .input,
+.header .button {
+  height: var(--tap-target);
+}
+
+.header .input:focus-visible,
+.header .button:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}

@@ -33,6 +33,11 @@ describe('admin response headers (AC 23, AC 24)', () => {
     const rules = (await nextConfig.headers?.()) ?? [];
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) {
+      // The one public rule (S5.4) is the search page's referrer policy and sets nothing else.
+      if (rule.source === '/buscar') {
+        expect(rule.headers).toEqual([{ key: 'Referrer-Policy', value: 'same-origin' }]);
+        continue;
+      }
       expect(rule.source.startsWith('/admin')).toBe(true);
     }
   });

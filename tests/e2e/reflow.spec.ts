@@ -16,6 +16,13 @@ const PAGES: { name: string; url: string }[] = [
   { name: 'four-offer product', url: `/producto/${DEMO_FOUR_OFFERS.slug}` },
   { name: '404', url: '/no-existe' },
   { name: 'nested 404', url: '/producto/no-existe' },
+  // S5.4 (AC 27): the results page and its two empty states, and a 100-character term with no break.
+  { name: 'search results', url: '/buscar?q=filtro' },
+  { name: 'search results, page 2', url: '/buscar?q=filtro&pagina=2' },
+  { name: 'search empty query', url: '/buscar' },
+  { name: 'search no results', url: '/buscar?q=zqxvbnmw' },
+  { name: 'search no results, 100-character term', url: `/buscar?q=${'w'.repeat(100)}` },
+  { name: 'search past the last page', url: '/buscar?q=filtro&pagina=99' },
 ];
 
 /** The href of the long-title demo product, found on the root listing pages. */

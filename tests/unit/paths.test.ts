@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { absoluteUrl, categoryListingPath, categoryPath, productPath } from '@/server/catalogue/paths';
+import {
+  absoluteUrl,
+  categoryListingPath,
+  categoryPath,
+  productPath,
+  SEARCH_PATH,
+  searchPath,
+} from '@/server/catalogue/paths';
 
 describe('catalogue paths', () => {
   it('builds the product path', () => {
@@ -64,5 +71,29 @@ describe('categoryListingPath (S11.4)', () => {
 
   it('leaves categoryPath as the canonical-only builder: pagina and nothing else', () => {
     expect(categoryPath('filtros', 2)).toBe('/categoria/filtros?pagina=2');
+  });
+});
+
+describe('searchPath (S5.4, AC 21, 22)', () => {
+  it('is the bare search path for an empty term, and keeps a page above 1', () => {
+    expect(SEARCH_PATH).toBe('/buscar');
+    expect(searchPath({ term: '' })).toBe('/buscar');
+    expect(searchPath({ term: '', page: 3 })).toBe('/buscar?pagina=3');
+  });
+
+  it('omits the page for page 1 and for none, and puts it after q for later pages', () => {
+    expect(searchPath({ term: 'filtro' })).toBe('/buscar?q=filtro');
+    expect(searchPath({ term: 'filtro', page: 1 })).toBe('/buscar?q=filtro');
+    expect(searchPath({ term: 'filtro', page: 2 })).toBe('/buscar?q=filtro&pagina=2');
+  });
+
+  it('encodes the term so it round-trips through URLSearchParams', () => {
+    for (const term of ['5W-30 aceite', 'a&b=c', '100%', 'año ñ', '<b>x</b>', '😀']) {
+      const url = new URL(searchPath({ term, page: 2 }), 'https://example.test');
+      expect(url.searchParams.get('q')).toBe(term);
+      expect(url.searchParams.get('pagina')).toBe('2');
+      expect(url.pathname).toBe('/buscar');
+    }
+    expect(searchPath({ term: 'a b&c' })).toBe('/buscar?q=a+b%26c');
   });
 });

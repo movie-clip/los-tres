@@ -6,16 +6,50 @@
   background: var(--color-ink);
 }
 
-/* A flex row, so a later control can sit on the right. */
+/* A wrapping flex row: the name, then the search box beside it. When the box
+   does not fit beside the name it takes its own row, and inside it the button
+   wraps under the field; nothing is clipped at any width. */
 .inner {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-0) var(--space-2);
   max-width: var(--content-width);
   margin: 0 auto;
   padding: 0 var(--gutter);
 }
 
+/* The box takes the room beside the name, from 14rem up to 26rem. The search
+   form inside fills it. min-width 0 lets it shrink below 14rem on a narrow
+   viewport instead of overflowing. */
+.search {
+  flex: 1 1 14rem;
+  max-width: 26rem;
+  min-width: 0;
+}
+
+/* A page that carries its own search form (the home hero, /buscar) shows one
+   place to type, not two. The rule keys on the page form's marker, so a page
+   without one, such as home with no categories, keeps the header box. If the
+   rule is ever unsupported the result is two boxes, never a missing one. */
+:global(body:has([data-search-page])) .search {
+  display: none;
+}
+
+/* From 40rem the row never wraps, even beside a long site name, and the box
+   sits against the right edge of the content column. */
+@media (min-width: 40rem) {
+  .inner {
+    flex-wrap: nowrap;
+  }
+
+  .search {
+    margin-left: auto;
+  }
+}
+
 .name {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);

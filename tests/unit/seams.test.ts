@@ -170,6 +170,28 @@ describe('seams (guardrail 1, S5.1 mapped products)', () => {
     expect(code).toContain('visibleProductWhere()');
   });
 
+  it('has the search read go through the shared visibility scope and name no flag of its own (S5.4, AC 13)', () => {
+    const code =
+      sources().find(({ file }) => file === 'src/server/catalogue/search-page.ts')?.code ?? '';
+    expect(code).toContain('visibleProductWhere()');
+    expect(code).toContain('visibleOfferWhere()');
+    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview)\b/);
+    expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
+  });
+
+  it('keeps console output in the search files to the one fixed-code line (S5.4, AC 31)', () => {
+    for (const file of ['src/server/catalogue/search-page.ts', 'src/server/catalogue/search-query.ts']) {
+      const code = sources().find((entry) => entry.file === file)?.code ?? '';
+      expect(code.length).toBeGreaterThan(0);
+      const calls = code.match(/console\.\w+\s*\(/g) ?? [];
+      expect(calls.length).toBe(file.endsWith('search-page.ts') ? 1 : 0);
+      for (const call of calls) expect(call).toBe('console.error(');
+    }
+    const loader =
+      sources().find(({ file }) => file === 'src/server/catalogue/search-page.ts')?.code ?? '';
+    expect(loader).toContain('search: failed');
+  });
+
   it('updates products only in the importer and the seed', () => {
     const found = offenders(
       /\.update\(\s*products\s*\)/,

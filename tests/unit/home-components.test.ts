@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { ILLUSTRATION_KEYS } from '@/components/CategoryIllustration';
 import { CategoryTiles, type CategoryTile } from '@/components/CategoryTiles';
-import { HomeSearch, type HomeSearchProps } from '@/components/HomeSearch';
+import { SearchForm, type SearchFormProps } from '@/components/SearchForm';
 
 // The home components take finished strings and hrefs only. These cover the
 // states the demo data cannot reach: five tiles, one tile, no tile.
@@ -88,19 +88,30 @@ describe('CategoryTiles', () => {
   });
 });
 
-const search = (props: Partial<HomeSearchProps> = {}) =>
+const search = (props: Partial<SearchFormProps> = {}) =>
   renderToStaticMarkup(
-    createElement(HomeSearch, { label: 'Buscar un producto', button: 'Buscar', notice: null, ...props }),
+    createElement(SearchForm, {
+      variant: 'hero',
+      action: '/buscar',
+      formLabel: 'Buscar',
+      fieldLabel: 'Buscar un producto',
+      button: 'Buscar',
+      hint: 'Por nombre, referencia o EAN',
+      value: null,
+      ...props,
+    }),
   );
 
-describe('HomeSearch', () => {
-  it('is a GET search form to / with an input named q', () => {
+describe('SearchForm, hero presentation (the home form)', () => {
+  it('is a GET search form to /buscar with an input named q', () => {
     const html = search();
     expect(html).toMatch(/<form [^>]*role="search"/);
     expect(html).toMatch(/<form [^>]*method="get"/);
-    expect(html).toMatch(/<form [^>]*action="\/"/);
+    expect(html).toMatch(/<form [^>]*action="\/buscar"/);
+    expect(html).toMatch(/<form [^>]*data-testid="home-search"/);
     expect(html).toMatch(/<input [^>]*name="q"/);
     expect(html).toMatch(/<input [^>]*type="search"/);
+    expect(html).toMatch(/<input [^>]*maxLength="100"/i);
     expect(html).toMatch(/<button [^>]*type="submit"[^>]*>Buscar</);
   });
 
@@ -112,23 +123,48 @@ describe('HomeSearch', () => {
     expect(html).toContain('>Buscar un producto<');
   });
 
-  it('renders the input with no value and no placeholder, so a query is never echoed', () => {
-    const html = search({ notice: 'Aviso' });
+  it('renders the input with no value and no placeholder, so a typed query is never echoed', () => {
+    const html = search({ value: 'filtro' });
     const input = html.match(/<input [^>]*>/)?.[0] ?? '';
     expect(input).not.toMatch(/\svalue=/);
     expect(input).not.toMatch(/placeholder=/);
   });
 
-  it('renders no notice when it is null', () => {
-    expect(search()).not.toContain('home-search-notice');
-    expect(search()).not.toContain('role="status"');
+  it('renders the hint and ties it to the input, and renders no status note', () => {
+    const html = search();
+    const describedBy = html.match(/<input [^>]*aria-describedby="([^"]+)"/)?.[1];
+    expect(describedBy).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<p [^>]*id="${describedBy}"[^>]*>Por nombre, referencia o EAN<`));
+    expect(html).not.toContain('role="status"');
+    expect(html).not.toContain('home-search-notice');
+  });
+});
+
+describe('SearchForm, page and header presentations', () => {
+  it('echoes the cleaned term in the page presentation only', () => {
+    const page = search({ variant: 'page', value: 'filtro de aceite' });
+    expect(page).toMatch(/<input [^>]*value="filtro de aceite"/);
+    expect(page).toMatch(/<form [^>]*data-testid="search-form"/);
+    expect(search({ variant: 'header', value: 'filtro', hint: null })).not.toMatch(/<input [^>]*value=/);
   });
 
-  it('renders the notice as a status paragraph when given a string', () => {
-    const html = search({ notice: 'Todavía no disponible.' });
-    expect(html).toMatch(
-      /<p [^>]*role="status"[^>]*data-testid="home-search-notice"[^>]*>Todavía no disponible\.</,
-    );
+  it('gives the header field an accessible name and no visible label or hint', () => {
+    const html = search({ variant: 'header', hint: null });
+    expect(html).not.toContain('<label');
+    expect(html).toMatch(/<input [^>]*aria-label="Buscar un producto"/);
+    expect(html).not.toContain('aria-describedby');
+    expect(html).toMatch(/<form [^>]*data-testid="header-search"/);
+  });
+
+  it('keeps ids per presentation so two forms can share one document', () => {
+    const ids = (html: string) => html.match(/<input [^>]*id="([^"]+)"/)?.[1];
+    expect(new Set(['hero', 'page', 'header'].map((variant) => ids(search({ variant: variant as SearchFormProps['variant'] }))))).toHaveProperty('size', 3);
+  });
+
+  it('marks the forms that own the page search, and not the header form', () => {
+    expect(search({ variant: 'hero' })).toContain('data-search-page');
+    expect(search({ variant: 'page' })).toContain('data-search-page');
+    expect(search({ variant: 'header', hint: null })).not.toContain('data-search-page');
   });
 });
 

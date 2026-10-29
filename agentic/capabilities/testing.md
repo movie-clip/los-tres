@@ -46,6 +46,12 @@ The default host port is 3010 and may be taken, so never write a literal base UR
 
 Home e2e selects `home-panel`, `home-search[-input|-button|-notice]`, `home-all-link`, `home-all-count`, `category-tiles`, `category-tile[-link|-name|-count]` and `site-header-link`; the home count text is `icuPlural(messages.Home.productCount, n)`. Demo state is four tiles (the empty fuel category has none, in position order); the five-tile and one-tile states are unit renders (S11.3).
 
+`search-privacy.spec.ts` is serial and shells out to docker: app logs, a one-off failing container (`compose run -d --no-deps -p 127.0.0.1::3000`, `DATABASE_URL` to a closed port, removed in `finally`), and a `pg_dump --data-only` through `compose exec` on `db`.
+
+Privacy assertions are contains/absent, never counts: the failing search logs its fixed code three times per request.
+
+The Compose app image goes stale across branches: run `npm run stack:up` before iterating on e2e, or /buscar answers 404 from an old build.
+
 A raw-HTML "value never appears" assertion must strip `<script>` blocks first: Next puts the request URL (query included) in the inline flight payload, so the typed `q` is in the raw response even though app code never renders it.
 
 Listing e2e select only by the `data-testid` values of the design contract; the category name is read by `getByRole` heading level 1. Category pages are server pages: parse `request().get` HTML with `openRawHtml` for JS-off checks.
@@ -81,6 +87,7 @@ matching test, and it should be one that would fail if the rule broke:
   - The e2e cannot show a counted row because every e2e offer is a demo offer.
   - The privacy test spies on `console.*` and reads `row_to_json` of the click row.
   - Admin cookie rules: only `signInAction` writes a cookie (`nextRequest.cookieWrites` is empty for every refusal, guard call and expired cookie); `admin_sessions` `ip_address` and `user_agent` are null (`admin-storage.test.ts`); sentinel logs in `admin-logs.test.ts`; the public no-cookie e2e stays on public routes and `admin.spec.ts` asserts the one `admin.session_token` cookie.
+- **Search (S5.4).** `seams.test.ts` pins that `search-page.ts` names no flag and has one `console.error`.
 - **Matching (0008), slice B cut:** EAN attach, EAN with a different brand
   rejected into the report (`ean_brand_conflict`), null brand on either side
   attaches, no EAN creates a product, invalid EAN rejected. Brand + part-number
@@ -109,6 +116,11 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 
 - `tests/support/catalogue.ts`: insert helpers whose defaults are the fully
   VISIBLE state, so a test sets only the one flag it is about. `insertProduct` defaults `categoryId` to a shared test category (`defaultCategoryId`, found by slug so it survives `resetDatabase`); pass `categoryId: null` for the unmapped state. `insertCategory({slug,name,parentId,position})`, `insertCategoryMapping` and `insertListedProduct` (a product with one visible offer per price) live in the same file.
+- `insertListedProduct({..., extra})` spreads any products column (partNumber, eanNormalised); search tests call `getPublicSearchPage(parseSearchTerm(raw), page)`.
+- A migration over objects the test db already has: revert them inside `getDb().transaction`, insert legacy rows by raw SQL, re-run the file, assert, throw a sentinel to roll back (`search-migration.test.ts`).
+- Pagination links render "Siguiente→": assert with `toContainText`, not `toHaveText`. A search e2e term is built with `encodeURIComponent`; hostile terms are written pre-encoded in the path.
+- The header search box (T5.4.5, testids `header-search`, `header-search-input`, `header-search-button`) is on every public page except / and /buscar, where it is `display: none`. Raw-HTML renders carry no stylesheet, so both forms show there: scope label and button queries to the page form. Hide-rule checks need `page.goto`.
+- Home with no public category is proved by `tests/unit/home-no-categories.test.ts` (HomePage rendered with `next-intl/server` and `getPublicCategoryTree` mocked), not e2e.
 - Category feed fixtures are `tests/fixtures/feeds/category-*.csv` (mixed, ean-one/two/three, no-column); demo category expectations are `DEMO_CATEGORY_COUNTS` and `DEMO_CATEGORY_NAMES`, keyed by the six fixed slugs, in `tests/fixtures/demo.ts`, and `DEMO_COUNTS` carries `publicProducts` and `categoryMappings`. `DEMO_NO_BRAND` is the oil (`aceite-de-motor`); `DEMO_DRILL` and `DEMO_WRENCHES` are unmapped and never public; the paging dataset is the root (50, three pages); e2e specs use `rootPageUrls`, never a hardcoded page 2; `filtros-de-combustible` is the empty child. `DEMO_FEED_ROWS` is `{ uno|dos|tres|cuatro: {rows, productsCreated} }`; `DEMO_FILLER` is gone; `DEMO_CHEAPEST`, `DEMO_FOUR_OFFERS` and `DEMO_ILLUSTRATED` are new. `tests/unit/demo-feeds.test.ts` reads `demo/feeds/*.csv` with `parseCsv`, `readHeader` and `validateRow` and pins the CSV invariants; `tests/unit/category-illustration.test.ts` renders all five drawings.
 - `resetDatabase` re-ensures the fixed category tree (`ensureFixedCategoryTree`) after truncating, so tests must not assume an empty `categories` table or ids starting at 1: the six fixed categories take ids 1 to 6. Fixed slugs come from `FIXED_CATEGORY_TREE` in `src/db/category-tree.ts`; e2e specs import it by relative path. Never retype a fixed slug.
 - A migration SQL file is tested by reading it, splitting on `--> statement-breakpoint` and executing each statement with `sql.raw` against legacy rows (`tests/integration/fixed-category-tree.test.ts`, with `tests/unit/category-tree-constant.test.ts` as the template for pinning fixed reference data).

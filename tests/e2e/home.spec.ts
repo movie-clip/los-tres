@@ -54,7 +54,7 @@ test.describe('home page (C-7, S11.3)', () => {
     await expect(page.getByTestId('category-tiles')).toHaveCount(1);
     await expect(page.getByTestId('category-empty')).toHaveCount(0);
     await expect(page.getByTestId('home-search')).toHaveCount(1);
-    // No search notice without a query.
+    // The interim search note is gone.
     await expect(page.getByTestId('home-search-notice')).toHaveCount(0);
     expect(await page.title()).toContain(siteName);
 
@@ -193,8 +193,8 @@ test.describe('home page (C-7, S11.3)', () => {
   });
 });
 
-test.describe('home search form and interim notice (S11.3)', () => {
-  test('is a GET form to / with a labelled q field, no value and no placeholder', async ({
+test.describe('home search form (S11.3, S5.4)', () => {
+  test('is a GET form to /buscar with a labelled q field, the hint, no value and no placeholder', async ({
     request,
     browser,
   }) => {
@@ -203,18 +203,19 @@ test.describe('home search form and interim notice (S11.3)', () => {
     const form = page.getByTestId('home-search');
     await expect(form).toHaveAttribute('role', 'search');
     await expect(form).toHaveAttribute('method', 'get');
-    await expect(form).toHaveAttribute('action', '/');
+    await expect(form).toHaveAttribute('action', '/buscar');
     const input = page.getByTestId('home-search-input');
     await expect(input).toHaveAttribute('name', 'q');
     await expect(input).toHaveValue('');
     await expect(input).not.toHaveAttribute('placeholder', /.*/);
-    await expect(page.getByLabel(messages.Home.searchLabel)).toHaveCount(1);
+    await expect(form.getByLabel(messages.Home.searchLabel)).toHaveCount(1);
     await expect(page.getByTestId('home-search-button')).toHaveText(messages.Home.searchButton);
+    await expect(form.getByText(messages.Home.searchHint)).toHaveCount(1);
     await close();
   });
 
   for (const query of ['?q=filtro', '?q=', '?q=a&q=b']) {
-    test(`${query} shows the notice, an empty field and the tiles unchanged (JavaScript off)`, async ({
+    test(`${query} is the plain home: no note, an empty field and the tiles (JavaScript off)`, async ({
       request,
       browser,
     }) => {
@@ -223,8 +224,8 @@ test.describe('home search form and interim notice (S11.3)', () => {
       expectNoSetCookie(response);
       const { page, close } = await openRawHtml(browser, await response.text());
 
-      await expect(page.getByTestId('home-search-notice')).toHaveText(messages.Home.searchNotice);
-      await expect(page.getByTestId('home-search-notice')).toHaveAttribute('role', 'status');
+      await expect(page.getByTestId('home-search-notice')).toHaveCount(0);
+      await expect(page.getByRole('status')).toHaveCount(0);
       await expect(page.getByTestId('home-search-input')).toHaveValue('');
       await expect(page.getByTestId('category-tile')).toHaveCount(populated.length);
       await close();
@@ -241,21 +242,20 @@ test.describe('home search form and interim notice (S11.3)', () => {
       const response = await request.get('/', { params: { q } });
       expect(response.status()).toBe(200);
       const markup = (await response.text()).replace(/<script\b[\s\S]*?<\/script>/g, '');
-      expect(markup, q).toContain('data-testid="home-search-notice"');
+      expect(markup, q).not.toContain('data-testid="home-search-notice"');
       expect(markup, q).not.toContain(token);
     }
   });
 
-  test('a browser submit lands on /?q=... with the notice and an empty field, no cookie', async ({
+  test('a browser submit lands on /buscar?q=... with the term in the page form, no cookie', async ({
     page,
     context,
   }) => {
     await page.goto('/');
     await page.getByTestId('home-search-input').fill('filtro');
     await page.getByTestId('home-search-button').click();
-    await expect(page).toHaveURL(/\/\?q=filtro$/);
-    await expect(page.getByTestId('home-search-notice')).toHaveText(messages.Home.searchNotice);
-    await expect(page.getByTestId('home-search-input')).toHaveValue('');
+    await expect(page).toHaveURL(/\/buscar\?q=filtro$/);
+    await expect(page.getByTestId('search-input')).toHaveValue('filtro');
     expect(await context.cookies()).toEqual([]);
   });
 

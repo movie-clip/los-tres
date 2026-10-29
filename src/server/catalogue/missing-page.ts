@@ -6,7 +6,10 @@
 import { parseBrandParam, parseSortParam } from './category-query';
 import { getPublicCategoryPage } from './category-page';
 import { parsePageParam } from './page-param';
+import { SEARCH_PATH } from './paths';
 import { getPublicProductBySlug } from './product-page';
+import { getPublicSearchPage } from './search-page';
+import { parseSearchTerm } from './search-query';
 
 type SearchParamValue = string | string[] | undefined;
 
@@ -27,13 +30,20 @@ export function toSearchParamsShape(params: URLSearchParams): Record<string, Sea
 const CATALOGUE_PATH = /^\/(producto|categoria)\/([^/]+)$/;
 
 /**
- * True when `url` is `/producto/<slug>` or `/categoria/<slug>` and the page
- * loader returns `null` for it (unknown, hidden, malformed, or a page or brand
- * listing past the last). Any other path is false, and so is a slug that does
- * not decode: the page decides those. May throw on a database error; the
- * caller falls through to the page.
+ * True when `url` is `/producto/<slug>`, `/categoria/<slug>` or `/buscar` and the
+ * page loader returns `null` for it (unknown, hidden, malformed, or a page or
+ * brand listing past the last; for `/buscar`, a page past the last of a search).
+ * Any other path is false, and so is a slug that does not decode: the page
+ * decides those. May throw on a database error; the caller falls through to the
+ * page. Nothing here logs or keeps the search term.
  */
 export async function isMissingPublicPage(url: URL): Promise<boolean> {
+  if (url.pathname === SEARCH_PATH) {
+    const query = toSearchParamsShape(url.searchParams);
+    const search = await getPublicSearchPage(parseSearchTerm(query.q), parsePageParam(query.pagina));
+    return search === null;
+  }
+
   const match = CATALOGUE_PATH.exec(url.pathname);
   if (!match) return false;
 
