@@ -1,6 +1,6 @@
 # S5.4 Visitor searches by text, EAN or part number
 
-Status: draft (awaiting owner approval; board status Ready follows the human's own move)
+Status: approved (owner, 2026-10-29; board status Ready follows the human's own move)
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: L · Iteration 2
 Issue: #37 · Tickets: #125-#128 and #282 (T5.4.1-T5.4.5)
 Depends on: none (S11.4, the card grid, is closed in #245)

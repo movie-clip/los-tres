@@ -147,8 +147,12 @@ deploy it must be the public https origin**, or all of them point at
 - Canonical keeps only `?pagina=<n>` for n above 1; any other query parameter,
   including any future filter, is dropped from it; `marca` and `orden` on a
   category page (S11.4) are dropped like any other.
-- `/robots.txt` disallows `/go/`, `/api/` and `/buscar` (reserved for search;
-  the search story must use that path). It does not mention the admin area,
+- `/robots.txt` disallows `/go/`, `/api/` and `/buscar` (the search page,
+  which exists since S5.4: disallowed here and also `noindex` with no
+  canonical, and it answers `Referrer-Policy: same-origin`). The search term
+  travels in the URL, which the app never logs or stores; **the S9.1 deploy
+  must keep any reverse proxy from logging the `/buscar` query string**, and a
+  managed PostgreSQL must allow `CREATE EXTENSION unaccent` (0002). It does not mention the admin area,
   which sends its own noindex signals. `/go/<offer>` also answers
   `X-Robots-Tag: noindex, nofollow`.
 

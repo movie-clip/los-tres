@@ -6,7 +6,7 @@ import { getPublicOrigin } from '@/config/site';
 // restart and not a rebuild. Without this, Next would render the file at build.
 export const dynamic = 'force-dynamic';
 
-// /buscar is reserved for the search story (no search page exists yet).
+// /buscar is the search page. It stays disallowed here and also sends noindex.
 // Private areas are kept out of this file on purpose: they send noindex
 // themselves, and a disallow here would stop crawlers from reading it.
 const DISALLOWED = ['/go/', '/api/', '/buscar'];

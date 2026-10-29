@@ -111,7 +111,14 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | a product with offers | `/producto/demo-filtro-de-aceite-oc-1234` (demo data, two shops) |
 | not found | `/producto/no-existe` |
 | home, populated | `/` (the home lists only categories that hold products, so the empty fuel category is not on it; four of the five children are populated, so the five-tile home is not producible; report not checked) |
-| home, interim search submitted | `/?q=filtro` (the amber-ruled note under the form, empty field; interim until S5.4 moves the form to `/buscar`) |
+| home, form | `/` (the hero form with the hint "Por nombre, referencia o EAN" and no header box); `/?q=filtro` renders the plain home, no note |
+| search, results | `/buscar?q=filtro` (34 products on two pages) and `/buscar?q=OC1234` (1 product) |
+| search, three pages | `/buscar?q=demo` (confirmed: 50 products, pages of 24, 24, 2) |
+| search, no result | `/buscar?q=zzzz` (200, no results) |
+| search, empty query | `/buscar`, `/buscar?q=` and `/buscar?q=%20` |
+| search, past last | `/buscar?q=demo&pagina=9` (404) |
+| search, markup term | `/buscar?q=%3Cb%3Ex%3C%2Fb%3E` |
+| header box | any public page except `/` and `/buscar`, including `/categoria/no-existe` (404) |
 | home, no category has products | not producible without wiping the demo database; report not checked unless a separate empty database is available |
 | category, three pages | `/categoria/mantenimiento-del-coche` (the root, 50 products on 3 pages: 24, 24, 2) |
 | category, last page | `/categoria/mantenimiento-del-coche?pagina=3` (2 cards) |
@@ -131,7 +138,8 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | not found, nested | `/categoria/no-existe` and `/producto/no-existe` render one header, one footer and one h1; no longer reproducible |
 | old category slug (404, no redirect) | `/categoria/filtros`, `/categoria/automovil`, `/categoria/herramientas` |
 | legal pages, identity set | `/aviso-legal`, `/privacidad`, `/como-nos-financiamos`; needs the fake-env recreate (§ Running the app and taking screenshots) |
-| legal page, identity blank | `/aviso-legal` returns 500 with Next's default English error page |
+| legal page, identity blank | `/aviso-legal` and `/privacidad` return 500 and render the public error page: header with search box, h1 "Ha ocurrido un error", "No se ha podido mostrar esta página. Inténtalo de nuevo en unos minutos.", "Volver al inicio", footer |
+| public error page | the blank-identity 500 above (no database change needed); "database unreachable" is not producible on the shared stack, report not checked |
 | admin signed in | run the `CLAUDE.md` § Commands `create-admin` command for the e2e admin in `tests/e2e/admin.spec.ts` (credentials are in that file), then sign in with a Playwright script at `/admin/acceso` |
 | admin submitting | `page.route` delays the POST to `/admin/acceso*` |
 | admin 404 | `/admin/no-existe` (signed in: the admin 404; anonymous: redirect to sign-in) |
