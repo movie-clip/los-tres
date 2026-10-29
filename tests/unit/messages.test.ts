@@ -225,6 +225,94 @@ describe('messages/es-ES.json Category namespace (S5.1)', () => {
   });
 });
 
+describe('messages/es-ES.json Search and Error namespaces (S5.4)', () => {
+  it.each([
+    'Search.metaTitle',
+    'Search.metaTitleTerm',
+    'Search.metaTitleTermPaged',
+    'Search.heading',
+    'Search.formLabel',
+    'Search.fieldLabel',
+    'Search.hint',
+    'Search.button',
+    'Search.summary',
+    'Search.summaryPaged',
+    'Search.promptHeading',
+    'Search.promptBody',
+    'Search.noResultsHeading',
+    'Search.noResultsBody',
+    'Search.browseAction',
+    'Error.heading',
+    'Error.body',
+  ])('has a non-empty string at %s', (key) => {
+    const value = lookup(key);
+    expect(typeof value).toBe('string');
+    expect((value as string).trim().length).toBeGreaterThan(0);
+  });
+
+  it('has no Search key the list above does not know', () => {
+    expect(Object.keys((messages as Record<string, unknown>).Search as object).sort()).toEqual(
+      [
+        'metaTitle',
+        'metaTitleTerm',
+        'metaTitleTermPaged',
+        'heading',
+        'formLabel',
+        'fieldLabel',
+        'hint',
+        'button',
+        'summary',
+        'summaryPaged',
+        'promptHeading',
+        'promptBody',
+        'noResultsHeading',
+        'noResultsBody',
+        'browseAction',
+      ].sort(),
+    );
+  });
+
+  it('takes the placeholders the page passes', () => {
+    expect(lookup('Search.metaTitle')).toContain('{siteName}');
+    expect(lookup('Search.metaTitleTerm')).toContain('{term}');
+    expect(lookup('Search.metaTitleTerm')).toContain('{siteName}');
+    expect(lookup('Search.metaTitleTermPaged')).toContain('{term}');
+    expect(lookup('Search.metaTitleTermPaged')).toContain('{page}');
+    expect(lookup('Search.metaTitleTermPaged')).toContain('{siteName}');
+    expect(lookup('Search.summary')).toContain('{term}');
+    expect(lookup('Search.summaryPaged')).toContain('{term}');
+    expect(lookup('Search.summaryPaged')).toContain('{page}');
+    expect(lookup('Search.summaryPaged')).toContain('{pages}');
+    expect(lookup('Search.noResultsBody')).toContain('{term}');
+  });
+
+  it.each(['Search.summary', 'Search.summaryPaged'])(
+    'writes %s as an ICU plural with one and other branches',
+    (key) => {
+      const message = lookup(key) as string;
+      expect(message).toMatch(/^\{count, plural,/);
+      expect(message).toMatch(/one\s*\{[^}]*#[^}]*\}/);
+      expect(message).toMatch(/other\s*\{[^}]*#[^}]*\}/);
+    },
+  );
+
+  it('renders the summary with the term in guillemets and the right plural', () => {
+    const t = createTranslator({ locale: 'es-ES', messages, namespace: 'Search' });
+    expect(t('summary', { count: 1, term: 'filtro' })).toBe('1 producto para «filtro»');
+    expect(t('summary', { count: 5, term: 'filtro' })).toBe('5 productos para «filtro»');
+  });
+
+  it('the prompt and the hint name no placeholder', () => {
+    for (const key of ['Search.promptHeading', 'Search.promptBody', 'Search.hint', 'Error.heading', 'Error.body']) {
+      expect(lookup(key), key).not.toMatch(/\{/);
+    }
+  });
+
+  it('Home.searchNotice is gone', () => {
+    expect((messages.Home as Record<string, unknown>).searchNotice).toBeUndefined();
+  });
+});
+
 describe('legal pages messages (S9.3)', () => {
   const keysOf = (namespace: string): string[] =>
     Object.keys((messages as unknown as Record<string, Record<string, string>>)[namespace] ?? {});
