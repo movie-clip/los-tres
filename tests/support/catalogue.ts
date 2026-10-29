@@ -1,7 +1,16 @@
 import { eq } from 'drizzle-orm';
 
 import { getDb } from '@/db/client';
-import { categories, feedCategoryMappings, feeds, offers, products, shops } from '@/db/schema';
+import {
+  categories,
+  feedCategoryMappings,
+  feeds,
+  fitments,
+  offers,
+  products,
+  shops,
+  vehicles,
+} from '@/db/schema';
 
 import { assertTestDatabase } from './db';
 
@@ -175,6 +184,57 @@ export async function insertFixtureFeed(
   const shop = await insertShop({ name: o.shopName });
   const feedId = await insertFeed(shop.id, { url: fixtureName, isApproved: o.isApproved });
   return { shopId: shop.id, feedId };
+}
+
+/** The id of a vehicle of the migrated list, by slug (ids restart at the reset, so never hard-code one). */
+export async function vehicleIdBySlug(slug: string): Promise<number> {
+  const [row] = await getDb().select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.slug, slug));
+  if (!row) throw new Error(`no vehicle with slug ${slug}`);
+  return row.id;
+}
+
+/**
+ * An extra vehicle outside the list, active by default. Position starts at
+ * 10000, above the list. The next `runMigrations` or `resetDatabase` retires or
+ * truncates it, so use it in one test only.
+ */
+export async function insertVehicle(
+  o: Partial<typeof vehicles.$inferInsert> = {},
+): Promise<{ id: number; slug: string }> {
+  await assertTestDatabase();
+  const n = next();
+  const slug = o.slug ?? `vehiculo-de-prueba-${n}`;
+  const [row] = await getDb()
+    .insert(vehicles)
+    .values({
+      make: 'Marca',
+      makeSlug: 'marca',
+      model: 'Modelo',
+      modelSlug: 'marca-modelo-i',
+      generation: 'I',
+      yearFrom: 2010,
+      yearTo: null,
+      engine: '1.0',
+      engineCode: null,
+      fuel: 'gasolina',
+      powerKw: 50,
+      powerCv: 68,
+      position: 10000 + n,
+      ...o,
+      slug,
+    })
+    .returning({ id: vehicles.id });
+  return { id: row.id, slug };
+}
+
+/** One fitment row: product P fits vehicle V, said by feed F. */
+export async function insertFitment(productId: number, vehicleId: number, feedId: number): Promise<number> {
+  await assertTestDatabase();
+  const [row] = await getDb()
+    .insert(fitments)
+    .values({ productId, vehicleId, feedId })
+    .returning({ id: fitments.id });
+  return row.id;
 }
 
 export async function productBySlug(slug: string) {

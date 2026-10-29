@@ -8,9 +8,11 @@ import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import {
   insertCategory,
   insertFeed,
+  insertFitment,
   insertOffer,
   insertProduct,
   insertShop,
+  insertVehicle,
   insertVisibleOffer,
 } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
@@ -142,6 +144,59 @@ describe('mapped products only (S5.1, guardrail 1)', () => {
     const { offerId } = await insertVisibleOffer({ slug: 'mapeado-en-cola' });
     await getDb().update(offers).set({ inReview: true }).where(eq(offers.id, offerId));
     expect(await getPublicProductBySlug('mapeado-en-cola')).toBeNull();
+  });
+});
+
+describe('a fitment never makes a product public (S5.5, AC 26, guardrail 1)', () => {
+  /** A counted fitment (approved feed and shop, active vehicle) for the product. */
+  async function fitCounted(productId: number) {
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id);
+    const vehicle = await insertVehicle();
+    await insertFitment(productId, vehicle.id, feedId);
+  }
+
+  it('keeps a product with no visible offer non-public', async () => {
+    const product = await insertProduct({ slug: 'solo-fitment' });
+    await fitCounted(product.id);
+    expect(await getPublicProductBySlug('solo-fitment')).toBeNull();
+  });
+
+  it('keeps a hidden product non-public', async () => {
+    const { product } = await insertVisibleOffer({ slug: 'oculto-con-fitment' });
+    await getDb().update(products).set({ isHidden: true }).where(eq(products.id, product.id));
+    await fitCounted(product.id);
+    expect(await getPublicProductBySlug('oculto-con-fitment')).toBeNull();
+  });
+
+  it('keeps an unmapped product non-public', async () => {
+    const { product } = await insertVisibleOffer({ slug: 'sin-categoria-con-fitment', categoryId: null });
+    await fitCounted(product.id);
+    expect(await getPublicProductBySlug('sin-categoria-con-fitment')).toBeNull();
+  });
+
+  it('keeps a product whose only offer is from an unapproved feed non-public, even when that feed gave the fitment', async () => {
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id, { isApproved: false });
+    const product = await insertProduct({ slug: 'feed-sin-aprobar' });
+    await insertOffer({ productId: product.id, feedId });
+    await insertFitment(product.id, (await insertVehicle()).id, feedId);
+    expect(await getPublicProductBySlug('feed-sin-aprobar')).toBeNull();
+  });
+
+  it('does not add an offer to a public product: the offer list is the same with and without a fitment', async () => {
+    const { product, offerId } = await insertVisibleOffer({ slug: 'publico-con-fitment' });
+    const hiddenShop = await insertShop({ isApproved: false });
+    const hiddenFeed = await insertFeed(hiddenShop.id);
+    await insertOffer({ productId: product.id, feedId: hiddenFeed });
+    const before = await getPublicProductBySlug('publico-con-fitment');
+
+    await fitCounted(product.id);
+    await insertFitment(product.id, (await insertVehicle()).id, hiddenFeed);
+
+    const after = await getPublicProductBySlug('publico-con-fitment');
+    expect(after?.offers.map((offer) => offer.offerId)).toEqual([offerId]);
+    expect(after).toEqual(before);
   });
 });
 
