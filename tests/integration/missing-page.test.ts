@@ -175,7 +175,7 @@ describe('isMissingPublicPage agrees with the category loader', () => {
 });
 
 describe('isMissingPublicPage leaves every other path to Next', () => {
-  it.each(['/', '/no-existe', '/buscar', '/go/1', '/producto', '/producto/', '/producto/a/b', '/categoria/a/b', '/admin/tiendas', '/sitemap.xml'])(
+  it.each(['/', '/no-existe', '/go/1', '/producto', '/producto/', '/producto/a/b', '/categoria/a/b', '/admin/tiendas', '/sitemap.xml'])(
     'answers false for %s',
     async (path) => {
       expect(await isMissingPublicPage(at(path))).toBe(false);

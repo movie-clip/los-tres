@@ -1,0 +1,9 @@
+/* The way home from the error page is the secondary button of the system, the
+   rule of the empty-state home link, composed so the two never drift apart. */
+.home {
+  composes: home from '../../components/CategoryEmpty.module.css';
+}
+
+.heading {
+  overflow-wrap: anywhere;
+}

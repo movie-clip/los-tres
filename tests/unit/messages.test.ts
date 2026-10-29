@@ -53,7 +53,6 @@ describe('messages/es-ES.json (C-8)', () => {
     'Home.searchLabel',
     'Home.searchButton',
     'Home.searchHint',
-    'Home.searchNotice',
     'Home.allLink',
     'Home.productCount',
     'Home.emptyHeading',

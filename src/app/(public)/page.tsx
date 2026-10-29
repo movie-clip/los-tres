@@ -4,10 +4,10 @@ import { getTranslations } from 'next-intl/server';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { CategoryTiles } from '@/components/CategoryTiles';
-import { HomeSearch } from '@/components/HomeSearch';
+import { SearchForm } from '@/components/SearchForm';
 import { getPublicOrigin } from '@/config/site';
 import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
-import { categoryPath } from '@/server/catalogue/paths';
+import { categoryPath, SEARCH_PATH } from '@/server/catalogue/paths';
 import { pageSeo } from '@/server/catalogue/seo';
 
 import styles from './page.module.css';
@@ -19,20 +19,13 @@ export function generateMetadata(): Metadata {
   return pageSeo(getPublicOrigin(), '/', true);
 }
 
-type HomePageProps = {
-  searchParams: Promise<{ q?: string | string[] }>;
-};
-
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const [t, groups, { q }] = await Promise.all([
+export default async function HomePage() {
+  const [t, tSearch, groups] = await Promise.all([
     getTranslations('Home'),
+    getTranslations('Search'),
     getPublicCategoryTree(),
-    searchParams,
   ]);
 
-  // Interim search mode (until the search page lands): only whether `q` is present
-  // is read. Its value is never rendered, logged or stored.
-  const showNotice = q !== undefined;
   const root = groups[0];
 
   return (
@@ -42,10 +35,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <h1 className={styles.title}>{t('heading')}</h1>
           <p className={styles.tagline}>{t('tagline')}</p>
           {root === undefined ? null : (
-            <HomeSearch
-              label={t('searchLabel')}
+            <SearchForm
+              variant="hero"
+              action={SEARCH_PATH}
+              formLabel={tSearch('formLabel')}
+              fieldLabel={t('searchLabel')}
               button={t('searchButton')}
-              notice={showNotice ? t('searchNotice') : null}
+              hint={t('searchHint')}
+              value={null}
             />
           )}
         </div>
