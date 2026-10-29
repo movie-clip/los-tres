@@ -148,6 +148,8 @@ export async function insertListedProduct(o: {
   brand?: string | null;
   feedId?: number;
   isHidden?: boolean;
+  /** Any other product column, for example partNumber, partNumberNormalised, eanNormalised (S5.4 search). */
+  extra?: Partial<typeof products.$inferInsert>;
 }): Promise<{ id: number; slug: string; offerIds: number[] }> {
   const product = await insertProduct({
     slug: o.slug,
@@ -155,6 +157,7 @@ export async function insertListedProduct(o: {
     ...(o.title === undefined ? {} : { title: o.title }),
     ...(o.brand === undefined ? {} : { brand: o.brand }),
     ...(o.isHidden === undefined ? {} : { isHidden: o.isHidden }),
+    ...o.extra,
   });
   const offerIds: number[] = [];
   for (const priceCents of o.prices) {
