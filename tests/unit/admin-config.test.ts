@@ -33,13 +33,21 @@ describe('admin response headers (AC 23, AC 24)', () => {
     const rules = (await nextConfig.headers?.()) ?? [];
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) {
-      // The one public rule (S5.4) is the search page's referrer policy and sets nothing else.
-      if (rule.source === '/buscar') {
+      // The public rules are the search page's (S5.4) and the car picker's (S5.7) referrer
+      // policy, and set nothing else.
+      if (rule.source === '/buscar' || rule.source === '/mi-coche') {
         expect(rule.headers).toEqual([{ key: 'Referrer-Policy', value: 'same-origin' }]);
         continue;
       }
       expect(rule.source.startsWith('/admin')).toBe(true);
     }
+  });
+
+  it('gives the car picker the same-origin referrer policy (S5.7)', async () => {
+    const rules = (await nextConfig.headers?.()) ?? [];
+    const picker = rules.filter((rule) => rule.source === '/mi-coche');
+    expect(picker).toHaveLength(1);
+    expect(picker[0].headers).toEqual([{ key: 'Referrer-Policy', value: 'same-origin' }]);
   });
 
   it('declares noindex in the admin layout metadata too', async () => {

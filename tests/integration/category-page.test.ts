@@ -11,9 +11,11 @@ import {
   insertFeed,
   insertListedProduct,
   insertShop,
+  insertVehicle,
 } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 import { unusedPort } from '../support/net';
+import { startRequest } from '../support/next-request';
 
 beforeEach(resetDatabase);
 afterAll(async () => {
@@ -396,6 +398,9 @@ describe('unknown and malformed slugs (AC 15)', () => {
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => (key: string) => key,
 }));
+// The same metadata reads the selected car (S5.7) from the request headers the
+// proxy sets; `startRequest` below gives it a request.
+vi.mock('next/headers', async () => (await import('../support/next-request')).nextHeadersModule);
 
 // ---------------------------------------------------------------------------
 // S11.4: sort, brand filter, brand list and the three listing states.
@@ -1037,7 +1042,12 @@ describe('demoOnly and indexable under a filter (D-10, D-7, S11.4)', () => {
 
 describe('canonical and robots on a filtered or sorted URL (D-7, S11.4)', () => {
   type Metadata = { alternates?: { canonical?: string }; robots?: unknown };
-  async function metadataFor(slug: string, searchParams: Record<string, string | string[] | undefined>): Promise<Metadata> {
+  async function metadataFor(
+    slug: string,
+    searchParams: Record<string, string | string[] | undefined>,
+    requestHeaders: Record<string, string> = {},
+  ): Promise<Metadata> {
+    startRequest(requestHeaders);
     const mod = await import('../../src/app/(public)/categoria/[slug]/page');
     return (await mod.generateMetadata({
       params: Promise.resolve({ slug }),
@@ -1090,6 +1100,28 @@ describe('canonical and robots on a filtered or sorted URL (D-7, S11.4)', () => 
       expect(metadata.alternates, JSON.stringify(searchParams)).toBeUndefined();
       expect(metadata.robots, JSON.stringify(searchParams)).toEqual({ index: false });
     }
+  });
+
+  it('is noindex with no canonical when opened with a coche, in every car state (S5.7, AC 51)', async () => {
+    await realCategory();
+    const { slug } = await insertVehicle();
+    const cases: Record<string, string> = {
+      selected: slug,
+      'a retired or unknown slug': 'no-existe-este-coche',
+      'a malformed or repeated coche': '-',
+    };
+    for (const [label, forwarded] of Object.entries(cases)) {
+      const metadata = await metadataFor('filtros', {}, { 'x-car-slug': forwarded });
+      expect(metadata.robots, label).toEqual({ index: false });
+      expect(metadata.alternates, label).toBeUndefined();
+    }
+  });
+
+  it('stays indexable with its bare canonical when no car header is present (S5.7)', async () => {
+    await realCategory();
+    const metadata = await metadataFor('filtros', {}, { 'x-car-path': '/categoria/filtros' });
+    expect(metadata.robots).toBeUndefined();
+    expect(metadata.alternates?.canonical).toBe(`${origin}/categoria/filtros`);
   });
 
   it('does not change the title or the description under a filter', async () => {

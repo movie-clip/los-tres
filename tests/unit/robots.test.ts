@@ -23,6 +23,11 @@ describe('robots.txt rules', () => {
     expect(disallowed).toEqual(expect.arrayContaining(['/go/', '/api/', '/buscar']));
   });
 
+  it('disallows the car picker, whose volver can hold a search term', () => {
+    vi.stubEnv('SITE_URL', 'https://example.test');
+    expect(rules().flatMap((rule) => asList(rule.disallow))).toContain('/mi-coche');
+  });
+
   it('keeps the admin area out of the file (it sends noindex itself)', () => {
     vi.stubEnv('SITE_URL', 'https://example.test');
     expect(JSON.stringify(robots())).not.toMatch(/admin/i);
