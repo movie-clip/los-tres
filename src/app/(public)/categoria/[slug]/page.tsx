@@ -10,6 +10,7 @@ import {
   type BrandChip,
 } from '@/components/BrandChips';
 import { Breadcrumb } from '@/components/Breadcrumb';
+import { CarNotice } from '@/components/CarNotice';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { CategoryResultsPanel } from '@/components/CategoryResultsPanel';
 import { CategorySort } from '@/components/CategorySort';
@@ -95,12 +96,16 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   );
   if (category === null) notFound();
 
-  const [t, tProduct, tNotFound, tDemo] = await Promise.all([
+  const [t, tProduct, tNotFound, tDemo, tCar, car] = await Promise.all([
     getTranslations('Category'),
     getTranslations('Product'),
     getTranslations('NotFound'),
     getTranslations('DemoNotice'),
+    getTranslations('Car'),
+    getCarContext(),
   ]);
+  // First child of every `main` below, ahead of the demo notice.
+  const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
 
   // The ancestors, root first, the category itself not listed: empty for a root, so no nav renders.
   const breadcrumb = (
@@ -116,6 +121,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   if (category.state === 'empty-category') {
     return (
       <main className="page">
+        {carNotice}
         {breadcrumb}
         <div className={styles.header}>
           <h1 className={styles.title}>{category.name}</h1>
@@ -207,6 +213,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   return (
     <main className="page">
+      {carNotice}
       {category.demoOnly && <DemoNotice text={tDemo('body')} />}
       {breadcrumb}
       <div className={styles.header}>

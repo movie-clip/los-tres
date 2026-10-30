@@ -1,0 +1,24 @@
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+/* One white card holding the step; its width is the dialog panel width (32rem), a
+   constant of the picker, not a global token. Left aligned in the column. */
+.card {
+  max-width: 32rem;
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+/* "Cancelar" is the Secondary button, a space under the card. */
+.cancel {
+  composes: home from '../../../components/CategoryEmpty.module.css';
+  margin-top: var(--space-2);
+}

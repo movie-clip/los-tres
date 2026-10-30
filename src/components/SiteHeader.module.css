@@ -19,6 +19,14 @@
   padding: 0 var(--gutter);
 }
 
+/* Row 2: the car control, in the same column as row 1 (same width and gutter), a quarter
+   step under it. */
+.carRow {
+  max-width: var(--content-width);
+  margin: var(--space-0) auto 0;
+  padding: 0 var(--gutter);
+}
+
 /* The box takes the room beside the name, from 14rem up to 26rem. The search
    form inside fills it. min-width 0 lets it shrink below 14rem on a narrow
    viewport instead of overflowing. */

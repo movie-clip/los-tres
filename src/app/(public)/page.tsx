@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
+import { CarNotice } from '@/components/CarNotice';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { CategoryTiles } from '@/components/CategoryTiles';
@@ -23,16 +24,23 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [t, tSearch, groups] = await Promise.all([
+  const [t, tSearch, tCar, groups, car] = await Promise.all([
     getTranslations('Home'),
     getTranslations('Search'),
+    getTranslations('Car'),
     getPublicCategoryTree(),
+    getCarContext(),
   ]);
 
   const root = groups[0];
 
   return (
     <main>
+      {car.state === 'unrecognised' && (
+        <div className="page">
+          <CarNotice text={tCar('unknownNotice')} />
+        </div>
+      )}
       <section className={styles.panel} data-testid="home-panel">
         <div className={styles.panelInner}>
           <h1 className={styles.title}>{t('heading')}</h1>

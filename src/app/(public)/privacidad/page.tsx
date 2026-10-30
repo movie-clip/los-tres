@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
+import { CarNotice } from '@/components/CarNotice';
 import { getOwnerIdentity } from '@/config/owner';
 import { getSiteName } from '@/config/site';
 import { getCarContext } from '@/server/car/context';
@@ -16,11 +17,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PrivacyPage() {
-  const t = await getTranslations('Privacy');
+  const [t, tCar, car] = await Promise.all([
+    getTranslations('Privacy'),
+    getTranslations('Car'),
+    getCarContext(),
+  ]);
   // Throws, and the page answers 500, when a required owner value is blank.
   const owner = getOwnerIdentity();
   return (
     <main className="page">
+      {car.state === 'unrecognised' && <CarNotice text={tCar('unknownNotice')} />}
       <PrivacyContent t={t} siteName={getSiteName()} owner={owner} />
     </main>
   );

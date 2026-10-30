@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
+import { CarNotice } from '@/components/CarNotice';
 import { DemoNotice } from '@/components/DemoNotice';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
@@ -49,10 +50,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await load(slug);
   if (product === null) notFound();
 
-  const [t, tCategory, tDemo] = await Promise.all([
+  const [t, tCategory, tDemo, tCar, car] = await Promise.all([
     getTranslations('Product'),
     getTranslations('Category'),
     getTranslations('DemoNotice'),
+    getTranslations('Car'),
+    getCarContext(),
   ]);
 
   // A null detail is left out entirely, never shown as empty.
@@ -75,6 +78,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <>
       {jsonLd !== null && <JsonLd data={jsonLd} />}
       <main className="page">
+        {car.state === 'unrecognised' && <CarNotice text={tCar('unknownNotice')} />}
         {product.demoOnly && <DemoNotice text={tDemo('body')} />}
         <Breadcrumb
           label={t('breadcrumbLabel')}

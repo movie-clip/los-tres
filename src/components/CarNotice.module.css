@@ -1,0 +1,9 @@
+/* The Page notice look is the demo notice's: composed, no copied rules. */
+.notice {
+  composes: notice from './DemoNotice.module.css';
+}
+
+/* When the demo notice follows, the two sit a half step apart instead of a full one. */
+.notice:has(+ [role='note']) {
+  margin-bottom: var(--space-1);
+}

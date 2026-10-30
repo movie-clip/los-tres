@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { CarNotice } from '@/components/CarNotice';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { DemoNotice } from '@/components/DemoNotice';
@@ -10,6 +11,7 @@ import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { SearchForm } from '@/components/SearchForm';
 import { getPublicOrigin, getSiteName } from '@/config/site';
+import { getCarContext } from '@/server/car/context';
 import { parsePageParam } from '@/server/catalogue/page-param';
 import { productPath, SEARCH_PATH, searchPath } from '@/server/catalogue/paths';
 import { getPublicSearchPage } from '@/server/catalogue/search-page';
@@ -50,12 +52,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const result = await load(parseSearchTerm(q), parsePageParam(pagina));
   if (result === null) notFound();
 
-  const [t, tProduct, tCategory, tDemo] = await Promise.all([
+  const [t, tProduct, tCategory, tDemo, tCar, car] = await Promise.all([
     getTranslations('Search'),
     getTranslations('Product'),
     getTranslations('Category'),
     getTranslations('DemoNotice'),
+    getTranslations('Car'),
+    getCarContext(),
   ]);
+  // First child of every `main` below, ahead of the demo notice.
+  const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
 
   const form = (
     <SearchForm
@@ -73,6 +79,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (result.state !== 'results') {
     return (
       <main className="page">
+        {carNotice}
         <div className={styles.header}>
           <h1 className={styles.title}>{t('heading')}</h1>
         </div>
@@ -110,6 +117,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <main className="page">
+      {carNotice}
       {result.demoOnly && <DemoNotice text={tDemo('body')} />}
       <div className={styles.header}>
         <h1 className={styles.title}>{t('heading')}</h1>

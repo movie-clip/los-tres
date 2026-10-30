@@ -1,0 +1,85 @@
+/* Row 2 of the site header, on the ink bar. The label takes the room beside the buttons
+   and wraps by words; the buttons keep their size and wrap under the label as a row when
+   the label cannot keep 10rem. The label never stretches past its own text, so on a wide
+   page the buttons sit right after it and not at the far edge. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0) var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  flex: 1 1 10rem;
+  max-width: max-content;
+  min-width: 0;
+  color: var(--color-on-ink-muted);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* The car name is the bold part: light text, heavier weight. */
+.label strong {
+  color: var(--color-on-ink);
+  font-weight: var(--weight-medium);
+}
+
+/* A programmatic focus target: the ring shows only where the platform shows one. */
+.label:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* The one outline button of the bar: the no-car button, "Cambiar" and "Quitar". */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-0) var(--space-2);
+  border: 1px solid var(--color-on-ink-muted);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-on-ink);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* "Cambiar" and "Quitar" keep their text on one line and a tighter padding. */
+.compact {
+  padding-inline: calc(var(--space-1) + var(--space-0));
+  white-space: nowrap;
+}
+
+.button:hover {
+  background: var(--color-on-ink-line);
+  text-decoration: underline;
+}
+
+.button:active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}

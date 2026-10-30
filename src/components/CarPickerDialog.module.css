@@ -1,0 +1,88 @@
+/* The picker dialog: a native modal dialog. Phone: a full-screen sheet with no border,
+   radius or visible backdrop. From 40rem: a centred panel with a border, rounded corners
+   and a dimmed backdrop. Centring is the platform inset and auto margins, so the height
+   is fit-content (an auto height would stretch between the insets). Two constants
+   live here and are not global tokens: the panel width and the backdrop opacity. */
+.dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+/* Only an open dialog is a flex column: `display` on the closed one would show it. */
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog::backdrop {
+  background: var(--color-ink);
+  opacity: 0.6;
+}
+
+@media (min-width: 40rem) {
+  .dialog {
+    width: min(32rem, calc(100% - 2 * var(--gutter)));
+    height: fit-content;
+    max-height: calc(100% - 2 * var(--space-4));
+    margin: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* One column that fills the dialog, so any press on the dialog element itself is a
+   press on the backdrop. */
+.panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.head {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--card-padding);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* "Cerrar" is the Secondary button. */
+.close {
+  composes: home from './CategoryEmpty.module.css';
+  flex: none;
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+/* The body scrolls on its own; the card padding leaves room for the focus rings. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--card-padding);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
