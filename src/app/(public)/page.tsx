@@ -6,6 +6,7 @@ import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { CategoryTiles } from '@/components/CategoryTiles';
 import { SearchForm } from '@/components/SearchForm';
 import { getPublicOrigin } from '@/config/site';
+import { getCarContext, openedWithCoche } from '@/server/car/context';
 import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
 import { categoryPath, SEARCH_PATH } from '@/server/catalogue/paths';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -14,9 +15,11 @@ import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 
-// The home page is always indexable; the title and description come from the root layout.
-export function generateMetadata(): Metadata {
-  return pageSeo(getPublicOrigin(), '/', true);
+// The home page is indexable unless it was opened with `coche` (S5.7); the title and
+// description come from the root layout.
+export async function generateMetadata(): Promise<Metadata> {
+  const car = await getCarContext();
+  return pageSeo(getPublicOrigin(), '/', !openedWithCoche(car));
 }
 
 export default async function HomePage() {

@@ -60,3 +60,24 @@ export function searchPath(state: SearchLinkState): string {
 export function absoluteUrl(origin: string, path: string): string {
   return `${origin}${path}`;
 }
+
+/**
+ * `href` with the selected car (S5.7, C6). Every `coche` is removed first, then a
+ * slug is appended as the last parameter, once; null leaves none. Other
+ * parameters keep their order and their spelling; the fragment is kept. The one
+ * way an internal link gets `coche`. Never applied to a `/go/<offer>` link.
+ */
+export function withCar(href: string, slug: string | null): string {
+  const hashAt = href.indexOf('#');
+  const fragment = hashAt === -1 ? '' : href.slice(hashAt);
+  const beforeFragment = hashAt === -1 ? href : href.slice(0, hashAt);
+  const queryAt = beforeFragment.indexOf('?');
+  const path = queryAt === -1 ? beforeFragment : beforeFragment.slice(0, queryAt);
+  const query = queryAt === -1 ? '' : beforeFragment.slice(queryAt + 1);
+
+  const kept = query
+    .split('&')
+    .filter((part) => part !== '' && new URLSearchParams(part).keys().next().value !== 'coche');
+  if (slug !== null) kept.push(`coche=${encodeURIComponent(slug)}`);
+  return `${path}${kept.length === 0 ? '' : `?${kept.join('&')}`}${fragment}`;
+}

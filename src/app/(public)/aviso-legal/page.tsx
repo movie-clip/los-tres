@@ -3,14 +3,16 @@ import { getTranslations } from 'next-intl/server';
 
 import { getOwnerIdentity } from '@/config/owner';
 import { getSiteName } from '@/config/site';
+import { getCarContext } from '@/server/car/context';
+import { noindexWhenCar } from '@/server/catalogue/seo';
 
 import { LegalNoticeContent } from './content';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('LegalNotice');
-  return { title: t('metaTitle', { siteName: getSiteName() }) };
+  const [t, car] = await Promise.all([getTranslations('LegalNotice'), getCarContext()]);
+  return { title: t('metaTitle', { siteName: getSiteName() }), ...noindexWhenCar(car) };
 }
 
 export default async function LegalNoticePage() {

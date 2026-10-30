@@ -2,6 +2,7 @@
 // no database, no environment. A page spreads the result into its
 // generateMetadata return.
 
+import type { CarContext } from '../car/state';
 import { absoluteUrl } from './paths';
 
 export type PageSeo = {
@@ -19,4 +20,13 @@ export function pageSeo(origin: string | null, path: string, indexable: boolean)
   if (!indexable) return { robots: { index: false } };
   if (origin === null) return {};
   return { alternates: { canonical: absoluteUrl(origin, path) } };
+}
+
+/**
+ * A page opened with `coche` in its URL (S5.7) is not indexed, whatever the car
+ * state: `{ robots: { index: false } }`, else `{}`. For a page whose own metadata
+ * has no canonical (the legal pages); the others fold it into `pageSeo`.
+ */
+export function noindexWhenCar(car: CarContext): PageSeo {
+  return car.state === 'none' ? {} : { robots: { index: false } };
 }

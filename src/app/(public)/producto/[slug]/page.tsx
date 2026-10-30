@@ -11,6 +11,7 @@ import { OfferList } from '@/components/OfferList';
 import { ProductDescription } from '@/components/ProductDescription';
 import { ProductHero, type ProductDetail } from '@/components/ProductHero';
 import { getPublicOrigin, getSiteName } from '@/config/site';
+import { getCarContext, openedWithCoche } from '@/server/car/context';
 import { categoryPath, productPath } from '@/server/catalogue/paths';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
@@ -31,11 +32,15 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { slug } = await params;
   const product = await load(slug);
   if (product === null) return {};
-  const t = await getTranslations('Product');
+  const [t, car] = await Promise.all([getTranslations('Product'), getCarContext()]);
   return {
     title: t('metaTitle', { title: product.title, siteName: getSiteName() }),
     description: t('metaDescription', { title: product.title }),
-    ...pageSeo(getPublicOrigin(), productPath(product.slug), product.indexable),
+    ...pageSeo(
+      getPublicOrigin(),
+      productPath(product.slug),
+      product.indexable && !openedWithCoche(car),
+    ),
   };
 }
 

@@ -19,6 +19,7 @@ import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
+import { getCarContext, openedWithCoche } from '@/server/car/context';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import {
   parseBrandParam,
@@ -70,12 +71,16 @@ export async function generateMetadata({
     parseSortParam(orden),
   );
   if (category === null) return {};
-  const t = await getTranslations('Category');
+  const [t, car] = await Promise.all([getTranslations('Category'), getCarContext()]);
   const values = { category: category.name, page: category.page, siteName: getSiteName() };
   return {
     title: category.page > 1 ? t('metaTitlePaged', values) : t('metaTitle', values),
     description: t('metaDescription', { category: category.name }),
-    ...pageSeo(getPublicOrigin(), categoryPath(category.slug, category.page), category.indexable),
+    ...pageSeo(
+      getPublicOrigin(),
+      categoryPath(category.slug, category.page),
+      category.indexable && !openedWithCoche(car),
+    ),
   };
 }
 

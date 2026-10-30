@@ -6,10 +6,11 @@ import { getPublicOrigin } from '@/config/site';
 // restart and not a rebuild. Without this, Next would render the file at build.
 export const dynamic = 'force-dynamic';
 
-// /buscar is the search page. It stays disallowed here and also sends noindex.
+// /buscar is the search page and /mi-coche the car picker (its `volver` can hold a
+// search term). Both stay disallowed here and also send noindex.
 // Private areas are kept out of this file on purpose: they send noindex
 // themselves, and a disallow here would stop crawlers from reading it.
-const DISALLOWED = ['/go/', '/api/', '/buscar'];
+const DISALLOWED = ['/go/', '/api/', '/buscar', '/mi-coche'];
 
 export default function robots(): MetadataRoute.Robots {
   const origin = getPublicOrigin();
