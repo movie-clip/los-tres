@@ -10,6 +10,15 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => (key: string) => key,
 }));
+// S5.7: the page reads the selected car (request headers). Outside a request there are none: no car.
+vi.mock('@/server/car/context', async () => {
+  const state = await import('@/server/car/state');
+  return {
+    getCarContext: async () => ({ state: 'none', path: null }),
+    openedWithCoche: state.openedWithCoche,
+    selectedSlug: state.selectedSlug,
+  };
+});
 vi.mock('@/server/catalogue/category-tree', () => ({
   getPublicCategoryTree: async () => [],
 }));

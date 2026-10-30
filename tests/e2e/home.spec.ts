@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import messages from '../../messages/es-ES.json';
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import { DEMO_CATEGORY_COUNTS, DEMO_CATEGORY_NAMES } from '../fixtures/demo';
+import { withoutCarLinks } from '../support/car';
 import { loadEnv } from '../support/env';
 import { icuPlural } from '../support/messages';
 import {
@@ -241,7 +242,8 @@ test.describe('home search form (S11.3, S5.4)', () => {
     for (const q of [token, `<b>${token}</b>`, `"${token}"`]) {
       const response = await request.get('/', { params: { q } });
       expect(response.status()).toBe(200);
-      const markup = (await response.text()).replace(/<script\b[\s\S]*?<\/script>/g, '');
+      // The no-script car links return to this page, so their `volver` holds the query (S5.7, AC 20).
+      const markup = withoutCarLinks((await response.text()).replace(/<script\b[\s\S]*?<\/script>/g, ''));
       expect(markup, q).not.toContain('data-testid="home-search-notice"');
       expect(markup, q).not.toContain(token);
     }

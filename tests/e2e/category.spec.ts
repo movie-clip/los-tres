@@ -15,6 +15,7 @@ import {
   DEMO_UNMAPPED_EMPTY,
   DEMO_WRENCHES,
 } from '../fixtures/demo';
+import { withoutCarLinks } from '../support/car';
 import { loadEnv } from '../support/env';
 import { icuPlural, normaliseSpaces } from '../support/messages';
 import {
@@ -877,7 +878,8 @@ test.describe('category no-match, malformed parameters and empty states (S11.4, 
     const response = await request.get(listing(AIR, `?marca=${marker}`));
     expect(response.status()).toBe(200);
     expectNoSetCookie(response);
-    expect(stripScripts(await response.text())).not.toContain(marker);
+    // The no-script car links return to this page, so their `volver` holds the query (S5.7, AC 20).
+    expect(withoutCarLinks(stripScripts(await response.text()))).not.toContain(marker);
   });
 
   test('check 22: no-match on page 2 is a 404, and a brand past its last page is a 404', async ({ request }) => {
@@ -1120,8 +1122,9 @@ test.describe('category breadcrumb (S11.6)', () => {
 
   test('the crumb is the first stop after the site link, before the brand chips', async ({ page }) => {
     await page.goto(listing(AIR));
-    // The header search box (T5.4.5) sits between the site link and the crumb: focus its button.
-    await page.getByTestId('header-search-button').focus();
+    // The header search box (T5.4.5) and the car control (S5.7, row 2) sit between the site link
+    // and the crumb: focus the car control's action.
+    await page.getByTestId('car-select').focus();
     await page.keyboard.press('Tab');
     const active = page.locator(':focus');
     await expect(active).toHaveText(DEMO_CATEGORY_NAMES[ROOT]);
