@@ -1,14 +1,14 @@
 # S5.6 Feeds can say which cars a product fits
 
-Status: draft, awaiting human approval (board status Ready follows the human's own move)
+Status: approved 2026-10-30 (board status Ready follows the human's own move)
 Epic: E5 Browse and search (#13)
 Issue: #265 · Tickets: #266-#268 (T5.6.1-T5.6.3)
 Depends on: S5.5 (#261), merged: the vehicle list, the fitments table and the fit-state question. S5.7 to S5.9 depend on this story for any fitment data to show.
-Source: `docs/product/vehicle-fitment.md` rule 2; decisions 0016 and 0013; `docs/product/stories/US-5.5-vehicle-fitment-model.md` (§ Scope > Out hands S5.6 its slice; OD-2 and OD-3 rulings carried forward); issue #265 acceptance outline; recon `agentic/runs/2026-10-30-s5-6-import-fitment/01-recon.md`; guardrails 1, 2 and 5.
+Source: `docs/product/vehicle-fitment.md` rule 2; decisions 0016 and 0013; `docs/product/stories/US-5.5-vehicle-fitment-model.md` (§ Scope > Out hands S5.6 its slice; OD-2 and OD-3 rulings carried forward); issue #265 acceptance outline; guardrails 1, 2 and 5.
 
 ## Open decisions
 
-None of these has been ruled. They block ticketing. The ACs below follow the **recommended** answer in each; if the human rules otherwise, the named ACs change or go. Rulings already made by the owner (decision 0016, `vehicle-fitment.md` rule 2, S5.5 OD-1 to OD-3) are not reopened here.
+Ruled 2026-10-30. The ACs below follow the recommended answer in each, and the owner confirmed it: OD-6 "count plus codes", OD-2 "clear", OD-3 "yes" (a product dropped from a feed keeps that feed's fitments), AC 20 "yes" (a test enforces that only the import writes fitments), and OD-1, OD-4, OD-5, OD-7 and the exact-match rule not objected to. Rulings already made by the owner (decision 0016, `vehicle-fitment.md` rule 2, S5.5 OD-1 to OD-3) are not reopened here.
 
 - **OD-1. The name of the field.** The spec says "a fitment field: a list of vehicle slugs separated by `|`" and names no column. Recommended: **`fitment`** as the CSV header and as the XML element name, matched like the other columns (trimmed, any case). Reason: it is the word the spec, the decision and the import output (`fitment: unknown vehicle <slug>`) already use, and the other optional columns are single plain words. Alternative: `vehicles` or `compatible_vehicles`. Cost of changing later: every feed file, including the demo feeds, and decision 0013's column list. Affects ACs 1 to 3 and 29.
 - **OD-2. A row with no fitment value, or a feed with no fitment column.** The spec says the import "replaces the fitments a feed gives a product with that row's list" and does not say what an empty list does. Recommended: **an absent column and an empty cell are the same thing, an empty list, and an empty list clears what this feed gave that product.** Reason: it is one rule for CSV and XML (an XML record with no `fitment` element and one with an empty element cannot be told apart once read), and it is what "replace" means. The only case where the alternative differs is a feed that once carried fitment and later drops it: the recommended rule clears that feed's fitments for the products it still lists; the alternative would keep them forever as stale data. Alternative: an absent CSV column means "this feed says nothing", and leaves the feed's fitments alone, while an empty cell clears; XML would need a per-feed notion of "the element appeared anywhere". Affects ACs 6 and 10.

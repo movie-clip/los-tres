@@ -43,8 +43,9 @@ and not objected to.
   record. A record's cells are its direct leaf children's text (CDATA included,
   trimmed), keyed by lower-cased local name, so `g:price` is `price`. Only the
   canonical columns are kept: required `id`, `title`, `price`, `url`, then
-  optional `brand`, `part_number`, `description`, `ean`, `currency`, `category`.
-  The first of a duplicated child wins; unknown children and all attributes are
+  optional `brand`, `part_number`, `description`, `ean`, `currency`, `category`,
+  `fitment` (a `|`-separated list of vehicle slugs, S5.6; an absent or empty
+  element is an empty list, the same as an empty CSV cell). The first of a duplicated child wins; unknown children and all attributes are
   ignored. No record element anywhere is `invalid_xml`. This rule is narrow on
   purpose: field mapping (S3.5) will replace the canonical-name assumption, and
   an Atom-style feed (a `feed` element with a direct `id` child) would pick

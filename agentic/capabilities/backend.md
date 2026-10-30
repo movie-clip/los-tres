@@ -63,7 +63,7 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
   the database, and parses it as CSV or XML feed data. Never add a crawler, a
   headless browser or an HTML parser for shop pages.
   `src/server/importer/source.ts` is the only place that fetches or reads a
-  feed.
+  feed. `src/server/importer/fitments.ts` is the only writer of `fitments` (a seams test fails on any other); a new optional feed column is appended last to `OPTIONAL_COLUMNS` in `validate.ts`, which XML picks up through `CANONICAL_COLUMNS`; new report fields are zeroed in `emptyReport` and printed in `report.ts`.
 - **(3) Roles.** Every route declares whether it is public or admin. Admin
   routes and server actions check the session on the server. The session check is `src/server/auth/guard.ts` (`requireAdminPage`, `requireAdminAction`, `checkAdminSession`); sign-in and sign-out are `src/server/auth/actions.ts`, the only code that writes a cookie. Better Auth runs through `auth.api` only, with no `nextCookies` plugin and no route handler.
 - **(4) Money.** Integer cents, through the single money helper,

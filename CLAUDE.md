@@ -44,7 +44,7 @@ line here is the owner's call: propose it and stop.
   `import-feeds` command (an admin button is deferred); no scraping (0007)
 - **Matching:** EAN, then brand + normalised part number; on a conflict the
   offer stays its own product, the admin queue is deferred (0008)
-- **Vehicle fitment:** own vehicle list in code, fitment from feeds only,
+- **Vehicle fitment:** own vehicle list in code, fitment from feeds only (the `fitment` field, `|`-separated slugs; the import is its only writer),
   selected car in `?coche=` and `localStorage`, never stored on the server (0016)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   no ads (0009); no traffic analytics for now (0014)
@@ -165,7 +165,7 @@ deploy it must be the public https origin**, or all of them point at
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts` and the vehicle list from `src/db/vehicle-catalogue.ts`; every migrate path does both, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
-| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
+| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
