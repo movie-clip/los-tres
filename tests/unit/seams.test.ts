@@ -501,6 +501,35 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     expect(code).not.toMatch(/\.(insert|update|delete)\(/);
   });
 
+  it('writes fitments only in the importer\'s fitments.ts: no admin action, route, seed or script (S5.6, AC 20, guardrail 2)', () => {
+    const WRITER = 'src/server/importer/fitments.ts';
+    expect(offenders(/\.(insert|delete)\(\s*fitments\s*\)/, (file) => file === WRITER)).toEqual([]);
+    expect(offenders(/\.update\(\s*fitments\s*\)/, () => false)).toEqual([]);
+    // Raw SQL, which the query builder rule above cannot see.
+    expect(offenders(/\b(insert\s+into|delete\s+from|update)\s+"?fitments\b/i, () => false)).toEqual([]);
+    expect(offenders(/\.execute\(\s*sql`[^`]*\bfitments\b/i, () => false)).toEqual([]);
+  });
+
+  it('keeps the fitment write rule non-vacuous: the writer matches both patterns and the patterns catch a violation (S5.6, AC 20)', () => {
+    const writer = codeOf('src/server/importer/fitments.ts');
+    expect(writer).toMatch(/\.insert\(\s*fitments\s*\)/);
+    expect(writer).toMatch(/\.delete\(\s*fitments\s*\)/);
+    expect(writer).not.toMatch(/console\.\w+\s*\(/);
+    const write = /\.(insert|delete)\(\s*fitments\s*\)/;
+    const update = /\.update\(\s*fitments\s*\)/;
+    const raw = /\b(insert\s+into|delete\s+from|update)\s+"?fitments\b/i;
+    expect(write.test('await db.insert(fitments).values(rows)')).toBe(true);
+    expect(write.test('await tx.delete( fitments ).where(x)')).toBe(true);
+    expect(update.test('await db.update(fitments).set({})')).toBe(true);
+    expect(raw.test('delete from fitments where 1=1')).toBe(true);
+    expect(raw.test('INSERT INTO "fitments" (a) values (1)')).toBe(true);
+    // A file outside the writer would be reported.
+    const found = [{ file: 'src/app/admin/x.ts', code: 'db.insert(fitments).values(r)' }]
+      .filter(({ code }) => write.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual(['src/app/admin/x.ts']);
+  });
+
   it('keeps the vehicle list free of the server-only marker and the client, so the CLI can run it', () => {
     const code = codeOf('src/db/vehicle-catalogue.ts');
     expect(code).not.toMatch(/server-only/);

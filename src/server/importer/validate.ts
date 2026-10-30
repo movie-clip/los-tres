@@ -13,6 +13,7 @@ const OPTIONAL_COLUMNS = [
   'ean',
   'currency',
   'category',
+  'fitment',
 ] as const;
 
 /**
@@ -60,6 +61,8 @@ export type ValidRow = {
   url: string;
   /** The feed's own category string, trimmed; null when absent or empty. Never rejects a row. */
   feedCategory: string | null;
+  /** Vehicle slugs from the fitment field, trimmed, de-duplicated; [] when absent or empty. Never rejects a row. */
+  fitment: readonly string[];
 };
 
 export type RowResult = { ok: true; row: ValidRow } | { ok: false; reject: RejectedRow };
@@ -104,8 +107,23 @@ export function validateRow(cells: string[], columns: ColumnIndex, record: numbe
       priceCents,
       url,
       feedCategory: optional('category'),
+      fitment: parseFitment(cell('fitment')),
     },
   };
+}
+
+/**
+ * The vehicle slugs of one fitment cell: items separated by `|`, each trimmed,
+ * empty items dropped, repeats dropped keeping the first appearance. No case
+ * folding and no shape check: whether a slug is known is the writer's question.
+ */
+export function parseFitment(text: string): string[] {
+  const slugs: string[] = [];
+  for (const part of text.split('|')) {
+    const slug = part.trim();
+    if (slug !== '' && !slugs.includes(slug)) slugs.push(slug);
+  }
+  return slugs;
 }
 
 function isHttpUrl(value: string): boolean {

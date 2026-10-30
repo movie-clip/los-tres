@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
+import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
 import { formatImportReport, importFeeds } from '@/server/importer';
 
 import { insertFeed, insertShop } from '../support/catalogue';
@@ -63,6 +64,26 @@ describe('importer output holds no URL key and no row content', () => {
     expectClean(formatImportReport(report));
     expectClean(JSON.stringify(report));
     expectClean(consoleCalls());
+  });
+
+  it('on an import whose fitment values are known, unknown and not slug-shaped (S5.6, AC 27, 28)', async () => {
+    const feedId = await registerKeyedFeed();
+    const known = VEHICLE_CATALOGUE[0].slug;
+    const csv =
+      'id,title,description,price,url,fitment\n' +
+      `K-1,${ROW_TITLE},Contacto,5.00,https://shop.example/1,${known}|raro-uno|${EMAIL}\n` +
+      `K-2,Otro,Contacto,5.00,https://shop.example/2,${EMAIL}\n`;
+    const report = await importFeeds(getDb(), { deps: textDeps({ [feedId]: csv }) });
+
+    expect(report.feeds[0]).toMatchObject({ outcome: 'imported', unknownVehicles: 3, unknownVehiclesNotShown: 2 });
+    const text = formatImportReport(report);
+    // The one value the report may echo is a slug-shaped unknown vehicle.
+    expect(text).toContain('  fitment: unknown vehicle raro-uno rows=1');
+    expectClean(text);
+    expectClean(JSON.stringify(report));
+    expectClean(consoleCalls());
+    expect(consoleCalls()).not.toContain('raro-uno');
+    expect(consoleCalls()).not.toContain(known);
   });
 
   it('when the source throws an error that names the URL and key', async () => {

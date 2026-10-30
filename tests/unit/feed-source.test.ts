@@ -34,7 +34,7 @@ async function readText(bytes: AsyncIterable<Uint8Array>): Promise<string> {
 describe('demo-feed: scheme', () => {
   it('reads demo/feeds/<name>.csv for a demo feed', async () => {
     const text = await readText(await readFeedSource(feed('demo-feed:tienda-demo-uno.csv', true)));
-    expect(text.split(/\r?\n/)[0]).toBe('id,title,brand,part_number,ean,price,currency,url,description,category');
+    expect(text.split(/\r?\n/)[0]).toBe('id,title,brand,part_number,ean,price,currency,url,description,category,fitment');
     expect(fetchStub).not.toHaveBeenCalled();
   });
 

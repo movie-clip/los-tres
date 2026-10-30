@@ -6,6 +6,7 @@ import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
 import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
+import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
 import { formatImportReport, importExitCode } from './report';
 import { readFeedSource, SourceError } from './source';
@@ -28,6 +29,9 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // Product text is written once (TD-23). `products.category_id` is the one
 // product column it may set later, and only from null: the first mapped feed
 // category wins and nothing is ever cleared or overwritten (D-3).
+// The only writer of `fitments` (through ./fitments.ts); a feed replaces only
+// its own fitments for the products its accepted rows name; products it does
+// not name keep theirs.
 
 export { FeedNotRegisteredError, formatImportReport, importExitCode };
 export type { FeedImportReport, ImportDeps, ImportReport, RejectedRow };
@@ -92,6 +96,9 @@ function emptyReport(feed: FeedRow): FeedImportReport {
     offersCreated: 0,
     offersUpdated: 0,
     rejected: [],
+    unknownVehicles: 0,
+    unknownVehicleSlugs: [],
+    unknownVehiclesNotShown: 0,
   };
 }
 
@@ -151,6 +158,7 @@ async function importRecords(
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
   const mappings = await loadMappings(tx, feed.id);
+  const fitmentsOfFeed = new FeedFitments(await loadVehicleIds(tx));
 
   for await (const { record, cells } of records) {
     report.rows += 1;
@@ -171,6 +179,7 @@ async function importRecords(
     if (known) {
       await writeOffer(tx, feed.id, known.productId, row, startedAt);
       await assignCategory(tx, known.productId, mappedCategory(mappings, row));
+      fitmentsOfFeed.add(known.productId, row.fitment);
       report.offersUpdated += 1;
       continue;
     }
@@ -191,8 +200,11 @@ async function importRecords(
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
     await assignCategory(tx, productId, mappedCategory(mappings, row));
+    fitmentsOfFeed.add(productId, row.fitment);
     report.offersCreated += 1;
   }
+  await replaceFeedFitments(tx, feed.id, fitmentsOfFeed.wanted);
+  fitmentsOfFeed.fillReport(report);
   return report;
 }
 

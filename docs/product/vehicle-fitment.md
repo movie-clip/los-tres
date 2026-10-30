@@ -35,15 +35,35 @@ that device until they change or remove it.
      Volkswagen, Renault, Peugeot, Citroën, Toyota, Dacia, Ford, Opel, Kia,
      Hyundai), enough to show the feature.
 2. **Fitment enters through feeds only** (guardrail 2). A feed row may carry a
-   fitment field: a list of vehicle slugs separated by `|`. The demo feeds
+   fitment field: a list of vehicle slugs separated by `|`. The field is named
+   `fitment`, as the CSV header and as the XML element, matched like the other
+   columns (trimmed, any case). Spaces around a slug and empty items are
+   ignored, a repeated slug counts once, and a slug is matched exactly as
+   written (a slug differing only in letter case is unknown). The demo feeds
    carry it. A real network's field mapping (S3.5) may map its own fitment
    field later; until then real offers have no fitment, so their products are
    `unknown`.
    - The import replaces the fitments a feed gives a product with that row's
      list. Fitments from other feeds stay. A product's fitment set is the union
      over its offers' feeds.
+   - An absent column, an empty cell and an absent or empty XML element are the
+     same thing, an empty list, and an empty list clears what that feed gave
+     the product. Several rows of one import that resolve to one product give
+     it the union of their lists. A product the import does not mention keeps
+     the fitments that feed gave it; nothing is removed for absent products. A
+     slug of a retired vehicle is stored and not reported as unknown. Importing
+     the same feed again changes no fitment row (same ids and creation times).
    - An unknown slug does not reject the row: it is skipped and counted in the
-     import output as `fitment: unknown vehicle <slug>`.
+     import output. The feed's `imported` line ends `unknown_vehicles=<n>` (0
+     included; one per row per distinct unknown slug). Under its rejected-row
+     lines come `  fitment: unknown vehicle <slug> rows=<n>`, one per distinct
+     slug-shaped unknown slug (lowercase letters, digits and hyphens, at most 80
+     characters), in first-seen order and at most 20 per feed, then, only when
+     some occurrences were not listed, `  fitment: unknown vehicle values not
+     shown rows=<n>` (other values and slugs past the 20th are counted, never
+     printed). An unknown slug does not change the exit code. Only the import
+     writes fitments (`src/server/importer/fitments.ts`; a seams test fails
+     on any other writer).
    - A fitment counts only while its feed and that feed's shop are both
      approved (guardrail 1); a feed an admin disables is an unapproved one, and
      there is no separate enabled flag. Whether the product's offers are hidden

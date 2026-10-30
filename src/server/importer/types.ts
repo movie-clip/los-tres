@@ -17,6 +17,9 @@ export type RejectCode =
  */
 export type RejectedRow = { record: number; code: RejectCode; field?: string };
 
+/** A slug-shaped fitment value that names no vehicle, and the accepted rows that carried it. */
+export type UnknownVehicleSlug = { slug: string; rows: number };
+
 export type FeedFailure =
   | 'fetch_failed'
   | 'unsupported_url'
@@ -38,6 +41,12 @@ export type FeedImportReport = {
   offersCreated: number;
   offersUpdated: number;
   rejected: RejectedRow[];
+  /** Every unknown vehicle slug occurrence: one per accepted row per distinct slug. */
+  unknownVehicles: number;
+  /** Printable unknown slugs only, first-seen order, at most 20. */
+  unknownVehicleSlugs: UnknownVehicleSlug[];
+  /** Occurrences not in the list: not slug-shaped, or past the 20th distinct slug. */
+  unknownVehiclesNotShown: number;
 };
 
 export type ImportReport = { startedAt: Date; feeds: FeedImportReport[] };

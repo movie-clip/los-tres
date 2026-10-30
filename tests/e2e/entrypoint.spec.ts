@@ -54,7 +54,10 @@ test.describe('app image entrypoint', () => {
     for (const line of feedLines) {
       expect(line).toContain('products_created=0');
       expect(line).toContain('offers_created=0');
+      // S5.6, AC 29: the demo feeds name only vehicles of the list.
+      expect(line).toMatch(/ unknown_vehicles=0$/);
     }
+    expect(second.stdout).not.toContain('fitment: unknown vehicle');
   });
 
   test('import-feeds prints no feed URL', () => {

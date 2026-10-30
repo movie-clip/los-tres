@@ -1,5 +1,6 @@
 // The CLI's stdout for an import (C-16). Pure. Prints ids, shop names, counts
-// and codes; never a URL and never the content of a row.
+// and codes; never a URL and never the content of a row, except the slug-shaped
+// unknown vehicle slugs of the fitment field (bounded by fitments.ts).
 
 import type { FeedImportReport, ImportReport } from './types';
 
@@ -10,10 +11,16 @@ function feedLines(feed: FeedImportReport): string[] {
   return [
     `${head} imported rows=${feed.rows} products_created=${feed.productsCreated} ` +
       `offers_created=${feed.offersCreated} offers_updated=${feed.offersUpdated} ` +
-      `rejected=${feed.rejected.length}`,
+      `rejected=${feed.rejected.length} unknown_vehicles=${feed.unknownVehicles}`,
     ...feed.rejected.map(
       (row) => `  record ${row.record}: ${row.code}${row.field ? ` (${row.field})` : ''}`,
     ),
+    ...feed.unknownVehicleSlugs.map(
+      (unknown) => `  fitment: unknown vehicle ${unknown.slug} rows=${unknown.rows}`,
+    ),
+    ...(feed.unknownVehiclesNotShown > 0
+      ? [`  fitment: unknown vehicle values not shown rows=${feed.unknownVehiclesNotShown}`]
+      : []),
   ];
 }
 

@@ -35,8 +35,9 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
 
 ## Consequences
 
-- New tables for vehicles and product–vehicle fitments, and a fitment column in
-  the demo feeds.
+- New tables for vehicles and product–vehicle fitments, and a `fitment` column
+  in the demo feeds (shipped in S5.6; the import is the only writer of
+  fitments).
 - Every internal link must carry `coche` while one is selected; a page with
   `coche` is `noindex`.
 - The privacy page gains one sentence about the stored car choice.
