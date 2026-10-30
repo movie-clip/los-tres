@@ -7,7 +7,7 @@
 //    Reads only through the page loaders, so the one visibility scope applies
 //    (guardrail 1).
 // 2. It forwards the selected car (`?coche=`) to the page as two request headers,
-//    `x-lostres-coche` and `x-lostres-path`, deleting any copy the client sent
+//    `x-car-slug` and `x-car-path`, deleting any copy the client sent
 //    (src/server/car/request.ts). Only getCarContext() reads them. The check is the
 //    shape of the value; no database is read for the car here.
 //

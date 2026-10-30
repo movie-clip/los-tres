@@ -5,10 +5,10 @@
 
 import { isWellFormedSlug } from '../slug';
 
-export const CAR_HEADER = 'x-lostres-coche';
-export const PATH_HEADER = 'x-lostres-path';
+export const CAR_HEADER = 'x-car-slug';
+export const PATH_HEADER = 'x-car-path';
 
-/** The `x-lostres-coche` value for a `coche` that is empty, malformed or repeated. Never slug-shaped. */
+/** The `x-car-slug` value for a `coche` that is empty, malformed or repeated. Never slug-shaped. */
 export const CAR_UNRECOGNISED = '-';
 
 const PATH_MAX_LENGTH = 512;
@@ -31,9 +31,9 @@ export function isForwardablePath(value: string): boolean {
  * A copy of `incoming` for the page request: both car headers deleted first, so a
  * client cannot inject them, then set from `url`.
  *
- * - `x-lostres-coche`: absent without a `coche`; the value when exactly one is
+ * - `x-car-slug`: absent without a `coche`; the value when exactly one is
  *   present and a well-formed slug; `-` otherwise.
- * - `x-lostres-path`: path and query with every `coche` removed (parameter order
+ * - `x-car-path`: path and query with every `coche` removed (parameter order
  *   kept), absent when it would not fit `isForwardablePath`.
  */
 export function carRequestHeaders(url: URL, incoming: Headers): Headers {
@@ -60,14 +60,14 @@ export type ForwardedCar =
   | { kind: 'slug'; slug: string }
   | { kind: 'invalid' };
 
-/** Reads the `x-lostres-coche` value the proxy set. Anything unexpected is `invalid`. */
+/** Reads the `x-car-slug` value the proxy set. Anything unexpected is `invalid`. */
 export function readForwardedCar(value: string | null): ForwardedCar {
   if (value === null) return { kind: 'none' };
   if (isWellFormedSlug(value)) return { kind: 'slug', slug: value };
   return { kind: 'invalid' };
 }
 
-/** Reads the `x-lostres-path` value the proxy set; null when absent or unusable. */
+/** Reads the `x-car-path` value the proxy set; null when absent or unusable. */
 export function readForwardedPath(value: string | null): string | null {
   return value !== null && isForwardablePath(value) ? value : null;
 }
