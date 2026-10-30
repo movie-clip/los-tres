@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
 import { parseEan } from '@/server/matching';
 import { parseCsv } from '@/server/importer/csv';
 import { readHeader, validateRow, type ValidRow } from '@/server/importer/validate';
@@ -15,7 +16,7 @@ import { DEMO_CATEGORY_COUNTS, DEMO_COUNTS, DEMO_FEED_ROWS } from '../fixtures/d
 // fixtures in tests/fixtures/demo.ts and the e2e rely on. No database, no network.
 
 const FEED_DIR = path.resolve(import.meta.dirname, '../../demo/feeds');
-const HEADER = 'id,title,brand,part_number,ean,price,currency,url,description,category';
+const HEADER = 'id,title,brand,part_number,ean,price,currency,url,description,category,fitment';
 const PAGE_SIZE = 24;
 
 type DemoRow = ValidRow & { feedFile: string; leaf: string | null };
@@ -156,5 +157,85 @@ describe('shipped demo feeds (demo/feeds/*.csv)', () => {
       expect(count, leaf).toBe(DEMO_CATEGORY_COUNTS[leaf as keyof typeof DEMO_CATEGORY_COUNTS]);
       expect(count, `${leaf} stays on one page`).toBeLessThanOrEqual(PAGE_SIZE);
     }
+  });
+});
+
+// S5.6, AC 29 to 33: the fitment of the demo feeds, computed from the files.
+describe('fitment in the shipped demo feeds (S5.6)', () => {
+  const known = new Set(VEHICLE_CATALOGUE.map((vehicle) => vehicle.slug));
+  const publicGroups = [...groupProducts().values()].filter((rows) => rows[0].leaf !== null);
+
+  /** The union of the lists of every row of a product, as the importer builds it (D-6). */
+  const listOf = (rows: DemoRow[]): Set<string> => new Set(rows.flatMap((row) => [...row.fitment]));
+
+  /** The fit state of a product for one vehicle, from the lists alone. */
+  const stateOf = (rows: DemoRow[], slug: string): 'fits' | 'no-fit' | 'unknown' => {
+    const list = listOf(rows);
+    if (list.size === 0) return 'unknown';
+    return list.has(slug) ? 'fits' : 'no-fit';
+  };
+
+  it('puts fitment last in the header of every demo file', () => {
+    for (const feed of feeds) expect(feed.header.split(',').at(-1)).toBe('fitment');
+  });
+
+  it('names only slugs of the vehicle list, so the first import prints 0 unknown slugs (AC 29)', () => {
+    const used = new Set(allRows.flatMap((row) => [...row.fitment]));
+    expect(used.size).toBeGreaterThan(0);
+    for (const slug of used) expect(known.has(slug), slug).toBe(true);
+  });
+
+  it('writes every list as clean slugs: lowercase, no spaces, no repeat, no empty item', () => {
+    for (const feed of feeds) {
+      const text = readFileSync(path.join(FEED_DIR, feed.shop.feedFile), 'utf8');
+      const [header, ...records] = parseCsv(text).filter((cells) => cells.some((cell) => cell.trim() !== ''));
+      const at = header.indexOf('fitment');
+      for (const cells of records) {
+        const cell = cells[at];
+        if (cell === '') continue;
+        const items = cell.split('|');
+        expect(items.every((item) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(item)), cell).toBe(true);
+        expect(new Set(items).size, cell).toBe(items.length);
+      }
+    }
+  });
+
+  it('gives most public filters a fitment, at least two oils, and leaves some public products without (AC 30)', () => {
+    const inLeaf = (leaf: string) => publicGroups.filter((rows) => rows[0].leaf === leaf);
+    for (const leaf of ['filtros-de-aceite', 'filtros-de-aire', 'filtros-de-habitaculo']) {
+      const group = inLeaf(leaf);
+      const withList = group.filter((rows) => listOf(rows).size > 0);
+      expect(withList.length * 2, `${leaf} mostly carries fitment`).toBeGreaterThan(group.length);
+    }
+    expect(inLeaf('aceite-de-motor').filter((rows) => listOf(rows).size > 0).length).toBeGreaterThanOrEqual(2);
+    expect(publicGroups.some((rows) => listOf(rows).size === 0)).toBe(true);
+  });
+
+  it('shows all three fit states for at least one vehicle of the list among public products (AC 31)', () => {
+    const states = (slug: string) => new Set(publicGroups.map((rows) => stateOf(rows, slug)));
+    const complete = VEHICLE_CATALOGUE.filter((vehicle) => states(vehicle.slug).size === 3);
+    expect(complete.length).toBeGreaterThan(0);
+    // The screen vehicle of the later fitment stories is one of them.
+    expect(states('seat-leon-iii-2012-2020-1-6-tdi-115cv').size).toBe(3);
+  });
+
+  it('has a product two feeds sell, with a list from each feed that share a vehicle (AC 32)', () => {
+    const shared = publicGroups.filter((rows) => {
+      const given = rows.filter((row) => row.fitment.length > 0);
+      if (new Set(given.map((row) => row.feedFile)).size < 2) return false;
+      const counts = new Map<string, number>();
+      for (const file of new Set(given.map((row) => row.feedFile))) {
+        const ofFile = new Set(given.filter((row) => row.feedFile === file).flatMap((row) => [...row.fitment]));
+        for (const slug of ofFile) counts.set(slug, (counts.get(slug) ?? 0) + 1);
+      }
+      return [...counts.values()].some((n) => n >= 2);
+    });
+    expect(shared.length).toBeGreaterThan(0);
+  });
+
+  it('gives no fitment to a row that is not a car part: the unmapped rows (AC 33)', () => {
+    const unmapped = allRows.filter((row) => row.leaf === null);
+    expect(unmapped.length).toBeGreaterThan(0);
+    for (const row of unmapped) expect(row.fitment, row.externalId).toEqual([]);
   });
 });

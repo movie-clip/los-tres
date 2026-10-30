@@ -54,20 +54,28 @@ export function textDeps(byFeedId: Record<number, string | Uint8Array | Error>):
 }
 
 /** One feed row for the generators below; every key is a canonical column. */
-export type FeedRow = Partial<Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'ean' | 'currency', string>>;
+export type FeedRow = Partial<
+  Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'ean' | 'currency' | 'fitment', string>
+>;
 
 const ROW_COLUMNS = ['id', 'title', 'price', 'url', 'brand', 'ean', 'currency'] as const;
+const ROW_COLUMNS_WITH_FITMENT = [...ROW_COLUMNS, 'fitment'] as const;
 
-/** The rows as CSV text (header first). Values must not need quoting. */
+/**
+ * The rows as CSV text (header first). Values must not need quoting. The
+ * `fitment` column is written only when some row defines `fitment`, so a caller
+ * that never sets it keeps a feed with no fitment column (S5.6, AC 6, 7).
+ */
 export function csvOf(rows: FeedRow[]): string {
-  const lines = rows.map((row) => ROW_COLUMNS.map((column) => row[column] ?? '').join(','));
-  return `${ROW_COLUMNS.join(',')}\n${lines.join('\n')}\n`;
+  const columns = rows.some((row) => row.fitment !== undefined) ? ROW_COLUMNS_WITH_FITMENT : ROW_COLUMNS;
+  const lines = rows.map((row) => columns.map((column) => row[column] ?? '').join(','));
+  return `${columns.join(',')}\n${lines.join('\n')}\n`;
 }
 
-/** The same rows as an XML document with one `product` element per row. */
+/** The same rows as an XML document with one `product` element per row; an undefined key writes no element. */
 export function xmlOf(rows: FeedRow[]): string {
   const products = rows.map((row) => {
-    const children = ROW_COLUMNS.filter((column) => row[column] !== undefined)
+    const children = ROW_COLUMNS_WITH_FITMENT.filter((column) => row[column] !== undefined)
       .map((column) => `<${column}>${row[column]}</${column}>`)
       .join('');
     return `<product>${children}</product>`;

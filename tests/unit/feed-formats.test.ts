@@ -6,7 +6,7 @@ import { decodeFeed } from '@/server/importer/decode';
 import { openRecords } from '@/server/importer/records';
 import { SourceError } from '@/server/importer/source';
 import { FeedFormatError, type FeedBytes } from '@/server/importer/types';
-import { CANONICAL_COLUMNS } from '@/server/importer/validate';
+import { CANONICAL_COLUMNS, readHeader, validateRow } from '@/server/importer/validate';
 import { xmlRecords } from '@/server/importer/xml';
 
 import { bytesOf, csvOf, gzipOf, lazyBytes, readFeedFixture, xmlOf } from '../support/feeds';
@@ -341,6 +341,61 @@ describe('XML record rule (D4)', () => {
   it('yields absent cells as empty strings', async () => {
     const result = await recordsOf(bytesOf('<r><p><id>1</id></p></r>'));
     expect(result.records[0].cells.slice(1)).toEqual(Array(CANONICAL_COLUMNS.length - 1).fill(''));
+  });
+
+  describe('the fitment element (S5.6, AC 2, 3, 6)', () => {
+    const fitmentOf = async (xml: string): Promise<string[]> => {
+      const result = await recordsOf(bytesOf(xml));
+      const at = CANONICAL_COLUMNS.indexOf('fitment');
+      return result.records.map((r) => r.cells[at]);
+    };
+
+    it('puts fitment last in the cell order, after every older column', () => {
+      expect(CANONICAL_COLUMNS.at(-1)).toBe('fitment');
+    });
+
+    it('reads the text of the element, trimmed, with the | kept for the row validator', async () => {
+      expect(await fitmentOf('<r><p><id>1</id><fitment> a-1|b-2 </fitment></p></r>')).toEqual(['a-1|b-2']);
+    });
+
+    it('finds it with a prefix and in any letter case', async () => {
+      const xml =
+        '<r><p><id>1</id><g:fitment>a-1</g:fitment></p><p><id>2</id><FITMENT>b-2</FITMENT></p></r>';
+      expect(await fitmentOf(xml)).toEqual(['a-1', 'b-2']);
+    });
+
+    it('lets the first of two fitment children win', async () => {
+      expect(await fitmentOf('<r><p><id>1</id><fitment>a-1</fitment><fitment>b-2</fitment></p></r>')).toEqual([
+        'a-1',
+      ]);
+    });
+
+    it('reads an empty element and an absent element alike, as an empty cell', async () => {
+      const xml = '<r><p><id>1</id><fitment></fitment></p><p><id>2</id><fitment/></p><p><id>3</id></p></r>';
+      expect(await fitmentOf(xml)).toEqual(['', '', '']);
+    });
+
+    it('gives the same list as the CSV column for the same text (AC 3)', async () => {
+      const row = { id: 'F-1', title: 'T', price: '1.00', url: 'https://a.example/1', fitment: ' a-1 |b-2|a-1' };
+      const fromXml = await recordsOf(bytesOf(xmlOf([row])));
+      const fromCsv = await recordsOf(bytesOf(csvOf([row])));
+      const csvIndex = (fromCsv.header ?? []).indexOf('fitment');
+      expect(csvIndex).toBeGreaterThan(-1);
+      const xmlCell = fromXml.records[0].cells[CANONICAL_COLUMNS.indexOf('fitment')];
+      const columnsOf = (header: string[]) => readHeader(header);
+      const parse = (cells: string[], header: string[]) => {
+        const columns = columnsOf(header);
+        if (!columns) throw new Error('header');
+        const result = validateRow(cells, columns, 2);
+        if (!result.ok) throw new Error(result.reject.code);
+        return result.row.fitment;
+      };
+      expect(xmlCell.trim()).toBe(fromCsv.records[0].cells[csvIndex].trim());
+      expect(parse(fromXml.records[0].cells, fromXml.header ?? [])).toEqual(
+        parse(fromCsv.records[0].cells, fromCsv.header ?? []),
+      );
+      expect(parse(fromXml.records[0].cells, fromXml.header ?? [])).toEqual(['a-1', 'b-2']);
+    });
   });
 
   it('fails a DOCTYPE as invalid_xml, so no entity can be defined', async () => {
