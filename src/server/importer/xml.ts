@@ -18,7 +18,8 @@ import { CANONICAL_COLUMNS } from './validate';
 //   - a record's cells are its direct leaf children's text (CDATA included,
 //     trimmed), keyed by lower-cased local name, so `g:price` is `price`; the
 //     first of a repeated name wins; attributes and non-leaf children are ignored;
-//   - cells come out as `string[]` in CANONICAL_COLUMNS order, '' when absent.
+//   - cells come out as `string[]` in CANONICAL_COLUMNS order, '' when absent
+//     (so an absent `fitment` element is an empty cell, as in CSV).
 // "Met" is in document order of the child: the element whose `id` child opens
 // first becomes the record element.
 
