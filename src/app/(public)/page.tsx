@@ -38,13 +38,13 @@ export default async function HomePage() {
 
   return (
     <main>
-      {car.state === 'unrecognised' && (
-        <div className="page">
-          <CarNotice text={tCar('unknownNotice')} />
-        </div>
-      )}
       <section className={styles.panel} data-testid="home-panel">
         <div className={styles.panelInner}>
+          {car.state === 'unrecognised' && (
+            <div className={styles.notice}>
+              <CarNotice text={tCar('unknownNotice')} />
+            </div>
+          )}
           <h1 className={styles.title}>{t('heading')}</h1>
           <p className={styles.tagline}>{t('tagline')}</p>
           {root === undefined ? null : (
