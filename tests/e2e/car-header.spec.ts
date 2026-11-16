@@ -189,17 +189,36 @@ test.describe('the notice for a car the site does not know (ACs 39 to 41)', () =
       await expect(page.getByRole('note').filter({ hasText: messages.Car.unknownNotice })).toHaveCount(1);
       await expect(page.getByTestId('car-select')).toBeVisible();
       await expect(page.getByTestId('car-label')).toHaveCount(0);
-      // First child of main: nothing visible precedes it inside main.
+      // First in main, wherever the page nests it (the home page puts it inside the masthead):
+      // the text of main starts with the notice, and no link, button, field or heading precedes it.
       const first = await page.locator('main').first().evaluate((main) => {
-        const node = main.firstElementChild;
-        if (node === null) return '';
-        if (node.getAttribute('data-testid') === 'car-notice') return 'car-notice';
-        // The home page wraps the notice in the page div, ahead of the masthead.
-        return node.firstElementChild?.getAttribute('data-testid') ?? node.getAttribute('data-testid') ?? '';
+        const notice = main.querySelector('[data-testid="car-notice"]');
+        const before = Array.from(main.querySelectorAll('a, button, input, h1, h2')).filter(
+          (node) => notice !== null && (node.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        );
+        return {
+          text: (main.textContent ?? '').replace(/\s+/g, ' ').trim(),
+          interactiveBefore: before.map((node) => node.tagName.toLowerCase()),
+        };
       });
-      expect(first).toBe('car-notice');
+      expect(first.text.startsWith(messages.Car.unknownNotice)).toBe(true);
+      expect(first.interactiveBefore).toEqual([]);
     });
   }
+
+  test('AC 40: on home the notice sits inside the masthead, below the header and above the h1', async ({ page }) => {
+    await page.goto(join('/', `coche=${UNKNOWN_SLUG}`));
+    const panel = page.getByTestId('home-panel');
+    const notice = panel.getByTestId('car-notice');
+    await expect(notice).toHaveCount(1);
+    await expect(notice).toBeVisible();
+    await expect(page.getByTestId('car-notice')).toHaveCount(1);
+    const header = (await page.getByRole('banner').boundingBox())!;
+    const noticeBox = (await notice.boundingBox())!;
+    const h1 = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+    expect(noticeBox.y).toBeGreaterThanOrEqual(header.y + header.height);
+    expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(h1.y);
+  });
 
   for (const [badName, query] of BAD) {
     test(`AC 39, 40: ${badName} renders the product page as without coche, apart from the notice`, async ({ page, request }) => {
@@ -326,6 +345,40 @@ test.describe('the page query in the no-script links (AC 20)', () => {
         }
       }
     }
+  });
+});
+
+// The header with a car is two rows (112.8 px at 390, 112 at 1280); with no car it is one row of 64 px.
+// A third row, or a wrapped row, adds 40 px or more, so a 4 px tolerance catches it. The first-card
+// ceiling is not the 700 px budget of category.spec.ts (no car, 64 px header): the extra row pushes
+// the card to about 741 px on filtros-de-aire at 390, and this pin stops it growing past that.
+test.describe('the header height with a car (ceiling for the first card)', () => {
+  const TOLERANCE = 4;
+  for (const [width, height, expected] of [
+    [390, 844, 112.8],
+    [1280, 800, 112],
+  ] as const) {
+    test.describe(`at ${width}x${height}`, () => {
+      test.use({ viewport: { width, height } });
+
+      test('the header is about two rows tall', async ({ page }) => {
+        await page.goto(withCoche('/', CAR.slug));
+        await expect(page.getByTestId('car-label')).toBeVisible();
+        const header = (await page.getByRole('banner').boundingBox())!;
+        expect(Math.abs(header.height - expected)).toBeLessThanOrEqual(TOLERANCE);
+      });
+    });
+  }
+
+  test.describe('first card on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('filtros-de-aire with a car: the first card top stays near 741, above the 700 of the no-car state', async ({ page }) => {
+      await page.goto(withCoche('/categoria/filtros-de-aire', CAR.slug));
+      await expect(page.getByTestId('car-label')).toBeVisible();
+      const card = (await page.getByTestId('category-card').first().boundingBox())!;
+      expect(card.y).toBeLessThanOrEqual(741 + TOLERANCE);
+    });
   });
 });
 
