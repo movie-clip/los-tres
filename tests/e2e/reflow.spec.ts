@@ -352,3 +352,52 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// S5.8 follow-up (D-14): the counts line wraps between its parts. For each part of the line with the longest
+// car: when the part fits a line on its own, it must sit on one line (no break inside it); and the page never
+// scrolls sideways. A part wider than the line may break (overflow-wrap anywhere), which is not asserted away.
+const partProblems = (page: Page, testId: string) =>
+  page.evaluate((id) => {
+    const line = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+    const style = getComputedStyle(line);
+    const room = line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const parts = [...line.querySelectorAll<HTMLElement>('span')];
+    const problems: string[] = [];
+    if (parts.length < 2) problems.push(`only ${parts.length} part spans in ${id}`);
+    for (const part of parts) {
+      const clone = part.cloneNode(true) as HTMLElement;
+      clone.style.whiteSpace = 'nowrap';
+      clone.style.position = 'absolute';
+      clone.style.visibility = 'hidden';
+      line.appendChild(clone);
+      const natural = clone.getBoundingClientRect().width;
+      clone.remove();
+      const range = document.createRange();
+      range.selectNodeContents(part);
+      const tops = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
+      if (natural <= room && tops.size > 1) problems.push(`"${part.textContent}" fits a line (${natural.toFixed(0)} <= ${room.toFixed(0)}) but breaks into ${tops.size} lines`);
+    }
+    return problems;
+  }, testId);
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the counts line with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    const LINES: { name: string; url: string; testId: string }[] = [
+      { name: 'category counts line', url: `/categoria/${ROOT}`, testId: 'category-summary' },
+      { name: 'air filters counts line', url: '/categoria/filtros-de-aire', testId: 'category-summary' },
+      { name: 'search counts line', url: '/buscar?q=OF-1124', testId: 'search-summary' },
+    ];
+
+    for (const { name, url, testId } of LINES) {
+      test(`${name}: no break inside a part that fits a line, no sideways scroll`, async ({ page }) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(testId)).toBeVisible();
+        expect(await partProblems(page, testId)).toEqual([]);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      });
+    }
+  });
+}
