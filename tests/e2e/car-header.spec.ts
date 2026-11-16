@@ -373,11 +373,14 @@ test.describe('the header height with a car (ceiling for the first card)', () =>
   test.describe('first card on a phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('filtros-de-aire with a car: the first card top stays near 741, above the 700 of the no-car state', async ({ page }) => {
+    test('filtros-de-aire with a car: the first card top stays at or under 840, below the 700 of the no-car state', async ({ page }) => {
       await page.goto(withCoche('/categoria/filtros-de-aire', CAR.slug));
       await expect(page.getByTestId('car-label')).toBeVisible();
       const card = (await page.getByTestId('category-card').first().boundingBox())!;
-      expect(card.y).toBeLessThanOrEqual(741 + TOLERANCE);
+      // Raised from 741 + 4 to 840 by the human's ruling D-12 (S5.8): the grouped
+      // view puts a group heading and a longer counts line above the first card
+      // (measured 837.34 at 390). The header-height tests above stay the header guard.
+      expect(card.y).toBeLessThanOrEqual(840);
     });
   });
 });

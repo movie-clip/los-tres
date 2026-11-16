@@ -242,6 +242,9 @@ describe('messages/es-ES.json Search and Error namespaces (S5.4)', () => {
     'Search.noResultsHeading',
     'Search.noResultsBody',
     'Search.browseAction',
+    'Search.summaryCarPrefix',
+    'Search.allOutHeading',
+    'Search.allOutBody',
     'Error.heading',
     'Error.body',
   ])('has a non-empty string at %s', (key) => {
@@ -268,6 +271,9 @@ describe('messages/es-ES.json Search and Error namespaces (S5.4)', () => {
         'noResultsHeading',
         'noResultsBody',
         'browseAction',
+        'summaryCarPrefix',
+        'allOutHeading',
+        'allOutBody',
       ].sort(),
     );
   });
