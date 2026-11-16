@@ -63,7 +63,7 @@ English in code, Spanish only in URLs and messages (owner ruling D-8): the rule 
 
 Tokens live only in `src/app/globals.css` `:root`. No `*.module.css` writes a raw colour (hex, `rgb()`, `hsl()`), `box-shadow`, `transition`, `transform` or `animation`, and a comment in a module must not contain those words either, because the static guard reads comments: avoid the banned property words in module comments (S11.1, #242; the owner ruled out shadows and motion). A chevron is a `clip-path` polygon on an empty `::after`, not a rotated border. A chevron that must flip when a `details` element opens is two `clip-path` polygons (down, and up under `[open]`); `transform` is banned, so never rotate it. The check mark on a selected chip is a `clip-path` polygon too (S11.4).
 
-The home `main` has no `.page`: the masthead section is full width and its inner div carries `max-width: var(--content-width)` and `padding-inline: var(--gutter)`; the rest of the page sits in a `div.page` (S11.1, #242). Never use `100vw` for a full-bleed band.
+The home `main` has no `.page`: the masthead section is full width and its inner div carries `max-width: var(--content-width)` and `padding-inline: var(--gutter)`; the rest of the page sits in a `div.page` (S11.1, #242); with an unrecognised car, the notice is the first element of `panelInner`, in `.notice` capped at 36rem, above the h1. Never use `100vw` for a full-bleed band.
 
 A CSS Module file next to a component is imported as `styles` and typed by Next's `*.module.css` declaration. Class names are hashed in the HTML, so tests select by `data-testid` or role, never by class.
 

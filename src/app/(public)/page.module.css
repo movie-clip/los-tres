@@ -12,6 +12,11 @@
   padding: clamp(2rem, 1.2rem + 3vw, 3.5rem) var(--gutter);
 }
 
+/* The unknown-car notice, first in the column: the same 36rem measure as the title. */
+.notice {
+  max-width: 36rem;
+}
+
 .title {
   max-width: 36rem;
   margin: 0;
