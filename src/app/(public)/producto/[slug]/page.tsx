@@ -12,8 +12,8 @@ import { OfferList } from '@/components/OfferList';
 import { ProductDescription } from '@/components/ProductDescription';
 import { ProductHero, type ProductDetail } from '@/components/ProductHero';
 import { getPublicOrigin, getSiteName } from '@/config/site';
-import { getCarContext, openedWithCoche } from '@/server/car/context';
-import { categoryPath, productPath } from '@/server/catalogue/paths';
+import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
+import { categoryPath, productPath, withCar } from '@/server/catalogue/paths';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -84,7 +84,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           label={t('breadcrumbLabel')}
           items={product.categoryTrail.map((crumb) => ({
             name: crumb.name,
-            href: categoryPath(crumb.slug),
+            href: withCar(categoryPath(crumb.slug), selectedSlug(car)),
           }))}
         />
         <div className={styles.layout}>

@@ -20,7 +20,7 @@ import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
-import { getCarContext, openedWithCoche } from '@/server/car/context';
+import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import {
   parseBrandParam,
@@ -29,7 +29,7 @@ import {
   type CategorySort as CategorySortValue,
 } from '@/server/catalogue/category-query';
 import { parsePageParam } from '@/server/catalogue/page-param';
-import { categoryListingPath, categoryPath, productPath } from '@/server/catalogue/paths';
+import { categoryListingPath, categoryPath, productPath, withCar } from '@/server/catalogue/paths';
 import { pageSeo } from '@/server/catalogue/seo';
 import { formatEuroCents } from '@/server/money';
 
@@ -106,6 +106,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   ]);
   // First child of every `main` below, ahead of the demo notice.
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
+  // What every internal link carries: the selected car, else nothing (D11).
+  const carSlug = selectedSlug(car);
 
   // The ancestors, root first, the category itself not listed: empty for a root, so no nav renders.
   const breadcrumb = (
@@ -113,7 +115,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       label={tProduct('breadcrumbLabel')}
       items={category.ancestors.map((crumb) => ({
         name: crumb.name,
-        href: categoryPath(crumb.slug),
+        href: withCar(categoryPath(crumb.slug), carSlug),
       }))}
     />
   );
@@ -130,6 +132,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           heading={t('emptyHeading')}
           body={t('emptyBody')}
           homeLabel={tNotFound('backHome')}
+          homeHref={withCar('/', carSlug)}
         />
       </main>
     );
@@ -139,7 +142,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const sort = category.sort;
   // Every link keeps the sort and the brand it does not change. A page below 2 is the clean path.
   const pageHref = (page: number) =>
-    categoryListingPath(category.slug, { brand: selectedBrandSlug, sort, page });
+    withCar(categoryListingPath(category.slug, { brand: selectedBrandSlug, sort, page }), carSlug);
   const counts = {
     count: category.productCount,
     page: category.page,
@@ -162,7 +165,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     return {
       key: brand.slug,
       // The selected chip toggles the filter off; the others select their brand. Both start at page 1.
-      href: categoryListingPath(category.slug, { brand: selected ? null : brand.slug, sort }),
+      href: withCar(
+        categoryListingPath(category.slug, { brand: selected ? null : brand.slug, sort }),
+        carSlug,
+      ),
       label: brand.label,
       count: countFormat.format(brand.productCount),
       ariaLabel: selected ? t('brandChipSelectedLabel', values) : t('brandChipLabel', values),
@@ -185,7 +191,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         groupLabel={t('brandGroupLabel')}
         // No chip is selected when the filter matched nothing: the way out is the action button.
         all={{
-          href: categoryListingPath(category.slug, { sort }),
+          href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
           label: t('brandAll'),
           selected: category.state === 'results' && selectedBrandSlug === null,
         }}
@@ -207,7 +213,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           label: t(option.labelKey),
         }))}
         selected={sortParamValue(sort)}
-        hidden={selectedBrandSlug === null ? null : { name: 'marca', value: selectedBrandSlug }}
+        hidden={[
+          ...(selectedBrandSlug === null ? [] : [{ name: 'marca', value: selectedBrandSlug }]),
+          ...(carSlug === null ? [] : [{ name: 'coche', value: carSlug }]),
+        ]}
       />
     ) : null;
 
@@ -230,7 +239,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           heading={t('noMatchHeading')}
           body={t('noMatchBody')}
           action={{
-            href: categoryListingPath(category.slug, { sort }),
+            href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
             label: t('noMatchAction'),
           }}
         />
@@ -238,7 +247,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         <ProductGrid
           cards={category.products.map((product) => ({
             key: product.slug,
-            href: productPath(product.slug),
+            href: withCar(productPath(product.slug), carSlug),
             title: product.title,
             brand: product.brand,
             spec:

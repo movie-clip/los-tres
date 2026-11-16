@@ -17,6 +17,11 @@ export type SearchFormProps = {
   hint: string | null;
   /** The cleaned term, page variant only. Hero and header never echo a term. */
   value: string | null;
+  /**
+   * The selected car's slug (S5.7). When set the form submits one hidden `coche` field, so the
+   * choice survives the search without script; null or omitted adds none.
+   */
+  car?: string | null;
 };
 
 // Test ids per presentation. The hero keeps the ids the home page always had.
@@ -38,6 +43,7 @@ export function SearchForm({
   button,
   hint,
   value,
+  car = null,
 }: SearchFormProps) {
   // Per variant: the header form and a page form can share one document.
   const inputId = `search-${variant}-q`;
@@ -62,6 +68,7 @@ export function SearchForm({
           {fieldLabel}
         </label>
       ) : null}
+      {car === null ? null : <input type="hidden" name="coche" value={car} />}
       <div className={styles.row}>
         <input
           id={inputId}

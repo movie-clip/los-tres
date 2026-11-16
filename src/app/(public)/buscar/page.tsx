@@ -11,9 +11,9 @@ import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { SearchForm } from '@/components/SearchForm';
 import { getPublicOrigin, getSiteName } from '@/config/site';
-import { getCarContext } from '@/server/car/context';
+import { getCarContext, selectedSlug } from '@/server/car/context';
 import { parsePageParam } from '@/server/catalogue/page-param';
-import { productPath, SEARCH_PATH, searchPath } from '@/server/catalogue/paths';
+import { productPath, SEARCH_PATH, searchPath, withCar } from '@/server/catalogue/paths';
 import { getPublicSearchPage } from '@/server/catalogue/search-page';
 import { parseSearchTerm } from '@/server/catalogue/search-query';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -62,6 +62,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   ]);
   // First child of every `main` below, ahead of the demo notice.
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
+  // What every internal link carries: the selected car, else nothing (D11).
+  const slug = selectedSlug(car);
 
   const form = (
     <SearchForm
@@ -72,9 +74,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       button={t('button')}
       hint={t('hint')}
       value={result.term}
+      car={slug}
     />
   );
-  const browse = { href: '/', label: t('browseAction') };
+  const browse = { href: withCar('/', slug), label: t('browseAction') };
 
   if (result.state !== 'results') {
     return (
@@ -105,7 +108,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     page: result.page,
     pages: result.pageCount,
   };
-  const pageHref = (page: number) => searchPath({ term: result.term, page });
+  const pageHref = (page: number) => withCar(searchPath({ term: result.term, page }), slug);
   const previous: PaginationLink | null =
     result.page > 1
       ? { href: pageHref(result.page - 1), label: tCategory('previousPage') }
@@ -132,7 +135,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <ProductGrid
         cards={result.products.map((product) => ({
           key: product.slug,
-          href: productPath(product.slug),
+          href: withCar(productPath(product.slug), slug),
           title: product.title,
           brand: product.brand,
           spec:

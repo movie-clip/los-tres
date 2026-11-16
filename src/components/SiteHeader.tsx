@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { CarControl, type CarControlProps } from './CarControl';
 import { SearchForm, type SearchFormProps } from './SearchForm';
 import styles from './SiteHeader.module.css';
@@ -10,23 +8,26 @@ import styles from './SiteHeader.module.css';
  * box hides itself on a page that carries its own search form (SiteHeader.module.css).
  * `car` is the car control (S5.7); null or absent draws none, as on the picker page, which
  * is the picker itself. With no car selected the control is the last item of row 1; with
- * a car selected it is row 2.
+ * a car selected it is row 2. `homeHref` is the site-name link target, finished by the
+ * caller (`/` or `/?coche=<slug>`); a plain anchor, so a change of car is a full load (D8).
  */
 export function SiteHeader({
   siteName,
   search,
   car = null,
+  homeHref = '/',
 }: {
   siteName: string;
   search: SearchFormProps | null;
   car?: CarControlProps | null;
+  homeHref?: string;
 }) {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
-        <Link href="/" className={styles.name} data-testid="site-header-link">
+        <a className={styles.name} data-testid="site-header-link" href={homeHref}>
           {siteName}
-        </Link>
+        </a>
         {search === null ? null : (
           <div className={styles.search}>
             <SearchForm {...search} />

@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { NotFoundContent } from '@/components/NotFoundContent';
 import { getSiteName } from '@/config/site';
+import { getCarContext, selectedSlug } from '@/server/car/context';
+import { withCar } from '@/server/catalogue/paths';
 
 import { PublicChrome } from './PublicChrome';
 
@@ -15,10 +17,11 @@ export async function generateMetadata(): Promise<Metadata> {
 // unmatched top-level URL, /admin/* included, ends here (the ordinary public
 // 404). A notFound() raised inside (public) ends in (public)/not-found.tsx,
 // which sets its title differently (see there).
-export default function NotFound() {
+export default async function NotFound() {
+  const car = await getCarContext();
   return (
     <PublicChrome>
-      <NotFoundContent />
+      <NotFoundContent homeHref={withCar('/', selectedSlug(car))} />
     </PublicChrome>
   );
 }

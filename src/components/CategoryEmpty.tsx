@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import styles from './CategoryEmpty.module.css';
 
 export type CategoryEmptyProps = {
@@ -11,6 +9,11 @@ export type CategoryEmptyProps = {
    */
   homeLabel?: string;
   /**
+   * The home link target, finished: `/` or `/?coche=<slug>` (S5.7). Defaults to `/`. A plain
+   * anchor, not next/link, so a change of car is always a full load (D8).
+   */
+  homeHref?: string;
+  /**
    * An action link with its own target, for example "Quitar el filtro" back to the
    * clean category URL. Both fields are finished: a label and a path. Omitted when
    * the state has no way out other than the home link.
@@ -19,7 +22,13 @@ export type CategoryEmptyProps = {
 };
 
 /** An empty listing state: no products, or no products for a filter. Display strings only. */
-export function CategoryEmpty({ heading, body, homeLabel, action }: CategoryEmptyProps) {
+export function CategoryEmpty({
+  heading,
+  body,
+  homeLabel,
+  homeHref = '/',
+  action,
+}: CategoryEmptyProps) {
   return (
     <section className={styles.empty} data-testid="category-empty">
       <h2 className={styles.heading}>{heading}</h2>
@@ -33,9 +42,9 @@ export function CategoryEmpty({ heading, body, homeLabel, action }: CategoryEmpt
       )}
       {homeLabel === undefined ? null : (
         <p className={styles.text}>
-          <Link href="/" className={styles.home}>
+          <a href={homeHref} className={styles.home}>
             {homeLabel}
-          </Link>
+          </a>
         </p>
       )}
     </section>

@@ -6,11 +6,11 @@ import { PublicFallbackProvider } from '@/components/PublicFallbackContext';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import { getSiteName } from '@/config/site';
-import { getCarContext, openedWithCoche } from '@/server/car/context';
+import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
 import { buildPickerOptions, type PickerFormat, type PickerMake } from '@/server/car/picker';
 import { carLinks } from '@/server/car/return-path';
 import { readActiveVehicles } from '@/server/car/vehicles';
-import { SEARCH_PATH } from '@/server/catalogue/paths';
+import { SEARCH_PATH, withCar } from '@/server/catalogue/paths';
 import { errorCode } from '@/server/error-code';
 
 const PICKER_PATH = '/mi-coche';
@@ -114,11 +114,13 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
           },
         },
       };
+  // What every internal link carries: the selected car's slug, else nothing (D11).
+  const slug = selectedSlug(car);
   // The three legal pages, in the owner's order. Plain paths, no configuration.
   const footerLinks = [
-    { href: '/aviso-legal', label: t('legalNotice') },
-    { href: '/privacidad', label: t('privacy') },
-    { href: '/como-nos-financiamos', label: t('funding') },
+    { href: withCar('/aviso-legal', slug), label: t('legalNotice') },
+    { href: withCar('/privacidad', slug), label: t('privacy') },
+    { href: withCar('/como-nos-financiamos', slug), label: t('funding') },
   ];
   return (
     <PublicFallbackProvider
@@ -134,8 +136,10 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
           button: tSearch('button'),
           hint: null,
           value: null,
+          car: slug,
         }}
         car={carControl}
+        homeHref={withCar('/', slug)}
       />
       {children}
       <SiteFooter links={footerLinks} />
