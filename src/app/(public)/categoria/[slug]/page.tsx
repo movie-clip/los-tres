@@ -15,9 +15,11 @@ import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { CategoryResultsPanel } from '@/components/CategoryResultsPanel';
 import { CategorySort } from '@/components/CategorySort';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
+import { CountsLine } from '@/components/CountsLine';
 import { DemoNotice } from '@/components/DemoNotice';
 import { fitMarkKind } from '@/components/FitMark';
-import { ListingGroup, groupRuns, type ListingGroupKind } from '@/components/ListingGroup';
+import { ListingGroup, groupRuns } from '@/components/ListingGroup';
+import { groupCopy } from '@/components/listing-group-copy';
 import { ListingNote } from '@/components/ListingNote';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
@@ -51,9 +53,6 @@ const SORT_OPTIONS: { sort: CategorySortValue; labelKey: 'sortPriceAsc' | 'sortP
 
 // Counts can reach four digits; es-ES drops the separator there unless asked.
 const countFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
-
-// Between the parts of the counts line, and before the page indicator: a middle dot with a space each side.
-const COUNTS_SEPARATOR = ' \u00b7 ';
 
 // One database read per request, shared by generateMetadata and the page.
 const load = cache(getPublicCategoryPage);
@@ -244,16 +243,22 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   // The counts line: one product count without a car; with one, fits, no data and hidden, then the page.
   const countsLine =
-    carFit === null
-      ? category.pageCount > 1
-        ? t('summaryPaged', counts)
-        : t('summary', counts)
-      : [
+    carFit === null ? (
+      category.pageCount > 1 ? (
+        t('summaryPaged', counts)
+      ) : (
+        t('summary', counts)
+      )
+    ) : (
+      <CountsLine
+        parts={[
           tFit('countFits', { count: carFit.counts.fitsCount }),
           tFit('countUnknown', { count: countFormat.format(carFit.counts.unknownCount) }),
           tFit('countLeftOut', { count: carFit.counts.leftOutCount }),
           ...(category.pageCount > 1 ? [t('pageIndicator', counts)] : []),
-        ].join(COUNTS_SEPARATOR);
+        ]}
+      />
+    );
 
   const removeFilter = {
     href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
@@ -281,21 +286,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           : { kind, label: kind === 'fits' ? tFit('markFits') : tFit('markNoFit') },
       headingLevel: product.fitGroup === null ? (2 as const) : (3 as const),
     };
-  };
-
-  const groupCopy = (group: ListingGroupKind, name: string, cardCount: number) => {
-    switch (group) {
-      case 'fits':
-        return { heading: tFit('fitsHeading', { car: name }), help: null };
-      case 'unknown':
-        return { heading: tFit('unknownHeading'), help: tFit('unknownHelp') };
-      case 'no-fit-exact':
-        // The category listing never returns this group (search does); counted by the page's cards.
-        return {
-          heading: tFit('exactHeading'),
-          help: tFit('exactHelp', { car: name, count: cardCount }),
-        };
-    }
   };
 
   let listing;
@@ -334,7 +324,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           <ListingGroup
             key={run.group}
             group={run.group}
-            {...groupCopy(run.group, carFit.name, run.items.length)}
+            {...groupCopy(tFit, run.group, carFit.name, null)}
           >
             <ProductGrid cards={run.items.map(toCard)} />
           </ListingGroup>

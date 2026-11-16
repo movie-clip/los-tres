@@ -1,0 +1,6 @@
+/* One part of the counts line. An inline block does not break at its own spaces,
+   so the line wraps between parts; a part wider than the line still breaks. */
+.part {
+  display: inline-block;
+  overflow-wrap: anywhere;
+}

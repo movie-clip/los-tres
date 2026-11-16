@@ -6,9 +6,11 @@ import { getTranslations } from 'next-intl/server';
 import { CarNotice } from '@/components/CarNotice';
 import { CategoryEmpty } from '@/components/CategoryEmpty';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
+import { CountsLine } from '@/components/CountsLine';
 import { DemoNotice } from '@/components/DemoNotice';
 import { fitMarkKind } from '@/components/FitMark';
-import { ListingGroup, groupRuns, type ListingGroupKind } from '@/components/ListingGroup';
+import { ListingGroup, groupRuns } from '@/components/ListingGroup';
+import { groupCopy } from '@/components/listing-group-copy';
 import { ListingNote } from '@/components/ListingNote';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
@@ -31,9 +33,6 @@ export const dynamic = 'force-dynamic';
 
 // Counts can reach four digits; es-ES drops the separator there unless asked.
 const countFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
-
-// Between the parts of the counts line, and before the page indicator: a middle dot with a space each side.
-const COUNTS_SEPARATOR = ' · ';
 
 // One database read per request, shared by generateMetadata and the page.
 // Positional primitives, so the two calls share one cache entry.
@@ -99,14 +98,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     term: string,
     parts: { fits: number; unknown: number; leftOut: number; exact: number },
     pageIndicator: string | null,
-  ) =>
-    `${t('summaryCarPrefix', { term })} ${[
-      tFit('countFits', { count: parts.fits }),
-      tFit('countUnknown', { count: countFormat.format(parts.unknown) }),
-      tFit('countLeftOut', { count: parts.leftOut }),
-      ...(parts.exact > 0 ? [tFit('countExact', { count: parts.exact })] : []),
-      ...(pageIndicator === null ? [] : [pageIndicator]),
-    ].join(COUNTS_SEPARATOR)}`;
+  ) => (
+    <CountsLine
+      prefix={t('summaryCarPrefix', { term })}
+      parts={[
+        tFit('countFits', { count: parts.fits }),
+        tFit('countUnknown', { count: countFormat.format(parts.unknown) }),
+        tFit('countLeftOut', { count: parts.leftOut }),
+        ...(parts.exact > 0 ? [tFit('countExact', { count: parts.exact })] : []),
+        ...(pageIndicator === null ? [] : [pageIndicator]),
+      ]}
+    />
+  );
 
   if (result.state === 'all-left-out') {
     // The loader returns this state only with a car (page 1 only); anything else is a fault, never a mislabelled card.
@@ -230,21 +233,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     };
   };
 
-  const groupCopy = (group: ListingGroupKind, name: string, exactCount: number) => {
-    switch (group) {
-      case 'fits':
-        return { heading: tFit('fitsHeading', { car: name }), help: null };
-      case 'unknown':
-        return { heading: tFit('unknownHeading'), help: tFit('unknownHelp') };
-      case 'no-fit-exact':
-        // The count is the group's total across all pages, not the cards of this page.
-        return {
-          heading: tFit('exactHeading'),
-          help: tFit('exactHelp', { car: name, count: exactCount }),
-        };
-    }
-  };
-
   let listing;
   if (carFit !== null) {
     const runs = groupRuns(result.products, (product) => {
@@ -261,7 +249,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <ListingGroup
             key={run.group}
             group={run.group}
-            {...groupCopy(run.group, carFit.name, carFit.counts.exactNoFitCount)}
+            {...groupCopy(tFit, run.group, carFit.name, carFit.counts.exactNoFitCount)}
           >
             <ProductGrid cards={run.items.map(toCard)} />
           </ListingGroup>
