@@ -30,6 +30,14 @@ export function openedWithCoche(car: CarContext): boolean {
   return car.state !== 'none';
 }
 
+/**
+ * The selected vehicle's id, else null: what a listing loader takes (S5.8). Only a
+ * selected car filters; none, unrecognised and unavailable all list as without a car.
+ */
+export function selectedVehicleId(car: CarContext): number | null {
+  return car.state === 'selected' ? car.vehicle.id : null;
+}
+
 /** The selected vehicle's slug, else null: what a link carries (D11). */
 export function selectedSlug(car: CarContext): string | null {
   return car.state === 'selected' ? car.vehicle.slug : null;

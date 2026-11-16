@@ -129,6 +129,7 @@ export async function getPublicSearchPage(
         offerCount: row.offerCount,
         categorySlug: row.categorySlug,
         partNumber: row.partNumber?.trim() || null,
+        fitGroup: null,
       })),
       demoOnly: rows.every((row) => row.allDemo),
     };

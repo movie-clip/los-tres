@@ -3,6 +3,8 @@
 // server-rendered 404 (S11.7). "Missing" is whatever the page's own loader says:
 // this file adds no query and no visibility rule of its own (guardrail 1).
 
+import { carSlugFromUrl } from '../car/request';
+import { readActiveVehicles } from '../car/vehicles';
 import { parseBrandParam, parseSortParam } from './category-query';
 import { getPublicCategoryPage } from './category-page';
 import { parsePageParam } from './page-param';
@@ -64,6 +66,25 @@ export async function isMissingPublicPage(url: URL): Promise<boolean> {
     parsePageParam(query.pagina),
     parseBrandParam(query.marca),
     parseSortParam(query.orden),
+    await vehicleIdFor(url),
   );
   return category === null;
+}
+
+/**
+ * The id of the car the URL selects, by the rule the page uses (S5.8): exactly one
+ * well-formed `coche` that names an active vehicle, read from the same
+ * `readActiveVehicles()` as getCarContext(). Anything else, and a failed read
+ * (the car is unavailable, D-4), is no car, so the check decides as the page lists.
+ * Logs nothing here: getCarContext() logs the failed read once, on the page.
+ */
+async function vehicleIdFor(url: URL): Promise<number | null> {
+  const slug = carSlugFromUrl(url);
+  if (slug === null) return null;
+  try {
+    const found = (await readActiveVehicles()).find((vehicle) => vehicle.slug === slug);
+    return found?.id ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -21,6 +21,7 @@ import { ProductGrid } from '@/components/ProductGrid';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
 import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
+import { selectedVehicleId } from '@/server/car/state';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import {
   parseBrandParam,
@@ -65,14 +66,16 @@ export async function generateMetadata({
 }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
   const { pagina, marca, orden } = await searchParams;
+  const car = await getCarContext();
   const category = await load(
     slug,
     parsePageParam(pagina),
     parseBrandParam(marca),
     parseSortParam(orden),
+    selectedVehicleId(car),
   );
   if (category === null) return {};
-  const [t, car] = await Promise.all([getTranslations('Category'), getCarContext()]);
+  const t = await getTranslations('Category');
   const values = { category: category.name, page: category.page, siteName: getSiteName() };
   return {
     title: category.page > 1 ? t('metaTitlePaged', values) : t('metaTitle', values),
@@ -88,21 +91,22 @@ export async function generateMetadata({
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { slug } = await params;
   const { pagina, marca, orden } = await searchParams;
+  const car = await getCarContext();
   const category = await load(
     slug,
     parsePageParam(pagina),
     parseBrandParam(marca),
     parseSortParam(orden),
+    selectedVehicleId(car),
   );
   if (category === null) notFound();
 
-  const [t, tProduct, tNotFound, tDemo, tCar, car] = await Promise.all([
+  const [t, tProduct, tNotFound, tDemo, tCar] = await Promise.all([
     getTranslations('Category'),
     getTranslations('Product'),
     getTranslations('NotFound'),
     getTranslations('DemoNotice'),
     getTranslations('Car'),
-    getCarContext(),
   ]);
   // First child of every `main` below, ahead of the demo notice.
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
