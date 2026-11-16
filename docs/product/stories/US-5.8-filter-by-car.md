@@ -1,6 +1,6 @@
 # S5.8 With a car selected, category pages and search show what fits it first, then what is unknown, and say what was left out
 
-Status: draft 2026-11-16, awaiting the human's approval (board status Ready follows the human's own move)
+Status: approved 2026-11-16 (the human, D-7) and built on branch `274-filter-by-car`; the review gate passed with all 43 ACs satisfied (`agentic/runs/2026-11-16-s5-8-filter-by-car/18-review.md`, which carries the other 42 from `16-review.md`). Rulings since approval that changed what the text below says: D-1 (the exact-code exception, now written into `docs/product/vehicle-fitment.md` rule 3 and decision 0016, marked for the owner to review), D-4 (OD-1 as proposed: an unavailable car lists as without a car, a failed fit read fails the page), D-9 and D-11 (AC 43's threshold was set, missed on 8 of 8 rows and the numbers accepted; the 3,000 ms test ceiling stays) and D-12 (the first-card pin in `car-header.spec.ts` raised to about 840 px at 390). Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: set on the board
 Issue: #274 · Tickets: #275-#277 (T5.8.1-T5.8.3)
 Depends on: S5.5 (#261), S5.6 (#265), S5.7 (#269), S5.4 (#37) and S11.4 (#245), all merged: the fit state, the fitment data, the selected car in the URL, search, and the category brand chips and sort. S5.9 (#278) is independent of this story.
