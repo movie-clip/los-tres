@@ -69,6 +69,11 @@ export function selectedText(entry: VehicleEntry): string {
   return `Mi coche: ${carName(entry)}`;
 }
 
+/** The vehicle whose finished "Mi coche: ..." label is the longest of the list (first on a tie). */
+export const LONGEST_CAR: VehicleEntry = VEHICLE_CATALOGUE.reduce((longest, entry) =>
+  selectedText(entry).length > selectedText(longest).length ? entry : longest,
+);
+
 /** The query string of a URL without the leading `?`, as an ordered list of [name, value]. */
 export function queryOf(url: string): [string, string][] {
   return [...new URL(url, 'http://h.invalid').searchParams.entries()];
