@@ -419,6 +419,7 @@ describe('the card (AC 16, 20)', () => {
       lowestPriceCents: 2499,
       offerCount: 3,
       categorySlug: 'aceites',
+      fitGroup: null,
     });
   });
 

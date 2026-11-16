@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openedWithCoche, selectedSlug, type CarContext, type SelectedVehicle } from '@/server/car/state';
+import { openedWithCoche, selectedSlug, selectedVehicleId, type CarContext, type SelectedVehicle } from '@/server/car/state';
 import { withCar } from '@/server/catalogue/paths';
 import { noindexWhenCar } from '@/server/catalogue/seo';
 
@@ -78,6 +78,10 @@ describe('car state helpers', () => {
 
   it('selectedSlug is the slug only when selected', () => {
     expect(states.map(selectedSlug)).toEqual([null, 'seat-leon', null, null, null]);
+  });
+
+  it('selectedVehicleId is the id only when selected: none, unrecognised and unavailable list as without a car (S5.8)', () => {
+    expect(states.map(selectedVehicleId)).toEqual([null, vehicle.id, null, null, null]);
   });
 });
 

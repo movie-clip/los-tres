@@ -5,6 +5,7 @@ import {
   CAR_UNRECOGNISED,
   PATH_HEADER,
   carRequestHeaders,
+  carSlugFromUrl,
   isForwardablePath,
   readForwardedCar,
   readForwardedPath,
@@ -155,5 +156,39 @@ describe('readForwardedPath', () => {
 
   it('returns a usable path unchanged', () => {
     expect(readForwardedPath('/categoria/f?pagina=2')).toBe('/categoria/f?pagina=2');
+  });
+});
+
+describe('carSlugFromUrl (S5.8: the one rule of the header and of the missing-page check)', () => {
+  const slugOf = (url: string) => carSlugFromUrl(new URL(url, 'http://site.test'));
+
+  it('is the slug of exactly one well-formed coche', () => {
+    expect(slugOf('/categoria/f?coche=seat-leon-iii-1-6-tdi')).toBe('seat-leon-iii-1-6-tdi');
+    expect(slugOf('/categoria/f?orden=nombre&coche=a&pagina=2')).toBe('a');
+  });
+
+  it('is null when there is no coche', () => {
+    expect(slugOf('/categoria/f')).toBeNull();
+    expect(slugOf('/categoria/f?cochez=a&xcoche=b')).toBeNull();
+  });
+
+  it.each([
+    ['empty', '/?coche='],
+    ['malformed (upper case)', '/?coche=Seat'],
+    ['malformed (underscore)', '/?coche=a_b'],
+    ['malformed (encoded slash)', '/?coche=a%2Fb'],
+    ['repeated', '/?coche=a&coche=b'],
+    ['repeated, same value', '/?coche=a&coche=a'],
+    ['repeated, one empty', '/?coche=a&coche='],
+  ])('is null for a %s coche', (_label, url) => {
+    expect(slugOf(url)).toBeNull();
+  });
+
+  it('agrees with x-car-slug: the slug when it returns one, "-" when it returns null on a URL that has coche', () => {
+    for (const url of ['/?coche=a', '/?coche=', '/?coche=a&coche=b', '/?coche=A', '/?coche=a-b-c']) {
+      const parsed = new URL(url, 'http://site.test');
+      const header = carRequestHeaders(parsed, new Headers()).get(CAR_HEADER);
+      expect(header, url).toBe(carSlugFromUrl(parsed) ?? CAR_UNRECOGNISED);
+    }
   });
 });
