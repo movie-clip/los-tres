@@ -2,7 +2,7 @@
    hero (home band, on ink), page (the /buscar panel, on white) and header (the
    site header, on ink). Sizes here are this component's own, not global tokens:
    40rem the hero and page row width, 3.5rem their field and button height,
-   14rem and 26rem the header form basis and maximum, 8rem its field minimum. */
+   14rem and 26rem the header form basis and maximum, 5rem its field basis. */
 .form {
   margin: 0;
 }
@@ -137,8 +137,16 @@
 }
 
 .header .input {
-  flex-basis: 8rem;
+  flex-basis: 5rem;
   font-size: var(--text-md);
+}
+
+/* Below 40rem the button's inline padding is a step smaller, so the car control
+   fits beside the form in the header's first row. */
+@media (max-width: 39.99rem) {
+  .header .button {
+    padding-inline: var(--space-2);
+  }
 }
 
 .header .input,

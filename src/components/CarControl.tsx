@@ -138,16 +138,22 @@ export function CarControl({ car, unrecognised, cochePresent, options, links, st
           scripted ? (
             <button
               type="button"
-              className={styles.button}
+              className={`${styles.button} ${styles.select}`}
               aria-haspopup="dialog"
               data-testid="car-select"
               onClick={(event) => openDialog(false, event.currentTarget)}
             >
-              {strings.select}
+              <span className={styles.glyph} aria-hidden="true" />
+              <span className={styles.words}>{strings.select}</span>
             </button>
           ) : (
-            <a href={links.select} className={styles.button} data-testid="car-select">
-              {strings.select}
+            <a
+              href={links.select}
+              className={`${styles.button} ${styles.select}`}
+              data-testid="car-select"
+            >
+              <span className={styles.glyph} aria-hidden="true" />
+              <span className={styles.words}>{strings.select}</span>
             </a>
           )
         ) : (
