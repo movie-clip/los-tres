@@ -483,7 +483,7 @@ describe('CategorySort (S11.4)', () => {
     { value: 'precio-desc', label: 'Mayor precio' },
     { value: 'nombre', label: 'Nombre (A a Z)' },
   ];
-  const render = (props: { selected?: string; hidden?: { name: string; value: string } | null } = {}) =>
+  const render = (props: { selected?: string; hidden?: { name: string; value: string }[] } = {}) =>
     renderToStaticMarkup(
       createElement(CategorySort, {
         action: '/categoria/x',
@@ -492,7 +492,7 @@ describe('CategorySort (S11.4)', () => {
         name: 'orden',
         options,
         selected: props.selected ?? 'precio-asc',
-        hidden: props.hidden ?? null,
+        hidden: props.hidden ?? [],
       }),
     );
 
@@ -532,16 +532,45 @@ describe('CategorySort (S11.4)', () => {
   });
 
   it('carries the selected brand in a hidden field', () => {
-    const html = render({ hidden: { name: 'marca', value: 'bosch' } });
+    const html = render({ hidden: [{ name: 'marca', value: 'bosch' }] });
     expect(html).toMatch(/<input\b[^>]*type="hidden"/);
     expect(html).toMatch(/name="marca"/);
     expect(html).toMatch(/value="bosch"/);
     expect(html.match(/type="hidden"/g)).toHaveLength(1);
   });
 
-  it('escapes the value of the hidden field', () => {
-    const html = render({ hidden: { name: 'marca', value: '"><script>x()</script>' } });
+  it('carries the brand then the car, in list order, after the select', () => {
+    const html = render({
+      hidden: [
+        { name: 'marca', value: 'bosch' },
+        { name: 'coche', value: 'seat-leon' },
+      ],
+    });
+    const names = [...html.matchAll(/<input\b[^>]*type="hidden"[^>]*>/g)].map(
+      (match) => /name="([^"]+)"/.exec(match[0])?.[1],
+    );
+    expect(names).toEqual(['marca', 'coche']);
+    expect(html.indexOf('<select')).toBeLessThan(html.indexOf('name="marca"'));
+    expect(html.indexOf('name="coche"')).toBeLessThan(html.indexOf('<button'));
+  });
+
+  it('carries the car alone when no brand is chosen', () => {
+    const html = render({ hidden: [{ name: 'coche', value: 'seat-leon' }] });
+    expect(html.match(/type="hidden"/g)).toHaveLength(1);
+    expect(html).toMatch(/name="coche"[^>]*value="seat-leon"|value="seat-leon"[^>]*name="coche"/);
+    expect(html).not.toContain('name="marca"');
+  });
+
+  it('escapes the value of every hidden field', () => {
+    const html = render({
+      hidden: [
+        { name: 'marca', value: '"><script>x()</script>' },
+        { name: 'coche', value: '"><img src=x>' },
+      ],
+    });
     expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img');
+    expect(html.match(/type="hidden"/g)).toHaveLength(2);
   });
 });
 

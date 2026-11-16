@@ -248,8 +248,9 @@ test.describe('after a selection (AC 28, D-12, R1)', () => {
 
     await page.getByTestId('site-header-link').click();
     await page.waitForURL((url) => url.pathname === '/');
-    // The logo is a plain link with no coche (link carrying is T5.7.5). Whatever the navigation
-    // kind, the header must still name the stored car and never fall back to the no-car state.
+    // The logo is a plain anchor carrying the car (T5.7.5): a full load, so the header names it
+    // and never falls back to the no-car state.
+    expect(new URL(page.url()).searchParams.getAll('coche')).toEqual([CAR.slug]);
     await expect(page.getByTestId('car-label')).toHaveText(selectedText(CAR));
     await expect(page.getByTestId('car-select')).toHaveCount(0);
     expect(await page.evaluate((key) => window.localStorage.getItem(key), CAR_STORAGE_KEY)).toBe(CAR.slug);
