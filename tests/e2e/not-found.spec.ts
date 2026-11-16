@@ -204,25 +204,26 @@ test.describe('public 404 (S11.6)', () => {
     }
   });
 
-  test('the Tab walk on a nested 404 is the site link, the header search, the button, then the footer links only', async ({ page }) => {
+  test('the Tab walk on a nested 404 is the site link, the header search, the button, the car control, then the footer links only', async ({ page }) => {
     await page.goto('/producto/no-existe');
     await expect(homeLink(page)).toBeVisible();
     await page.waitForLoadState('networkidle');
     const stops: string[] = [];
-    for (let stop = 0; stop < 7; stop += 1) {
+    for (let stop = 0; stop < 8; stop += 1) {
       await page.keyboard.press('Tab');
       stops.push(await page.evaluate(() => (document.activeElement as HTMLAnchorElement).getAttribute('href') ?? ''));
     }
     // Stop 1 is the site link, stops 2 and 3 the header search field and button (no href), stop 4
-    // the 404 button; the links go home. The rest sit in the footer.
+    // the car control's select button (S5.7, no href), stop 5 the 404 button; the links go home.
+    // The rest sit in the footer.
     expect(stops[0]).toBe('/');
-    expect(stops.slice(1, 3)).toEqual(['', '']);
-    expect(stops[3]).toBe('/');
+    expect(stops.slice(1, 4)).toEqual(['', '', '']);
+    expect(stops[4]).toBe('/');
     const footerHrefs = await page.getByRole('contentinfo').getByRole('link').evaluateAll((nodes) =>
       nodes.map((node) => node.getAttribute('href')),
     );
     expect(footerHrefs).toHaveLength(3);
-    expect(stops.slice(4)).toEqual(footerHrefs);
+    expect(stops.slice(5)).toEqual(footerHrefs);
   });
 
   test('the way back home leads to the home page', async ({ page }) => {

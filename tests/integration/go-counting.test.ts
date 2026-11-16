@@ -114,6 +114,22 @@ describe('source page (S1.1)', () => {
     expect(stored).toBe('/producto/filtro-1');
   });
 
+  it('S5.7 AC 49: a Referer whose query carries coche stores the same page as the one without it', async () => {
+    const page = `http://${GO_HOST}/producto/filtro-1`;
+    const without = await sourceOf({ referer: page });
+    const withCoche = await sourceOf({ referer: `${page}?coche=un-coche-cualquiera&pagina=2#x` });
+    expect(withCoche).toBe('/producto/filtro-1');
+    expect(withCoche).toBe(without);
+  });
+
+  it('S5.7 AC 48: a request that carries coche in its own query answers a Location with no coche', async () => {
+    const { offerId, url } = await insertGoOffer();
+    const response = await callGo(offerId, { headers: { referer: `http://${GO_HOST}/producto/x?coche=abc` } });
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(new URL(url).href);
+    expect(response.headers.get('location')).not.toContain('coche');
+  });
+
   it('stores null for a cross-origin Referer', async () => {
     expect(await sourceOf({ referer: 'https://elsewhere.example/producto/filtro-1' })).toBeNull();
   });

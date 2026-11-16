@@ -224,9 +224,11 @@ test.describe('demo notice (S9.3)', () => {
   test('sets no cookie and asks for no consent on a visit', async ({ page, context }) => {
     await page.goto(`/producto/${DEMO_SHARED.slug}`);
     await expect(page.getByRole('note')).toBeVisible();
-    // The only button is the header search submit (T5.4.5); a consent control would be another.
-    await expect(page.getByRole('button')).toHaveCount(1);
+    // The only buttons are the header search submit (T5.4.5) and the car control's select action
+    // (S5.7); a consent control would be another.
+    await expect(page.getByRole('button')).toHaveCount(2);
     await expect(page.getByTestId('header-search-button')).toBeVisible();
+    await expect(page.getByTestId('car-select')).toBeVisible();
     expect(await context.cookies()).toEqual([]);
   });
 });

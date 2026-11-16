@@ -1,0 +1,132 @@
+/* Row 2 of the site header, on the ink bar. The label takes the room beside the buttons
+   and wraps by words; the buttons keep their size and wrap under the label as a row when
+   the label cannot keep 10rem. The label never stretches past its own text, so on a wide
+   page the buttons sit right after it and not at the far edge. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0) var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  flex: 1 1 10rem;
+  max-width: max-content;
+  min-width: 0;
+  color: var(--color-on-ink-muted);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* The car name is the bold part: light text, heavier weight. */
+.label strong {
+  color: var(--color-on-ink);
+  font-weight: var(--weight-medium);
+}
+
+/* A programmatic focus target: the ring shows only where the platform shows one. */
+.label:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* The one outline button of the bar: the no-car button, "Cambiar" and "Quitar". */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-0) var(--space-2);
+  border: 1px solid var(--color-on-ink-muted);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-on-ink);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* "Cambiar" and "Quitar" keep their text on one line and a tighter padding. */
+.compact {
+  padding-inline: calc(var(--space-1) + var(--space-0));
+  white-space: nowrap;
+}
+
+/* The no-car control: a car glyph, then the words. Words show from 40rem and below
+   22rem; between them (phones) the control is a square tap target with the glyph alone
+   and the words stay in the accessible name. */
+.select {
+  gap: var(--space-1);
+}
+
+/* A car seen from the front, drawn with a clip path like the chevrons: roof, a
+   windscreen hole and two headlight holes. It takes the text colour, so it follows
+   hover and pressed. The path is in pixels, so the box is 24 CSS px and does not scale. */
+.glyph {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  clip-path: path(evenodd, "M7.2 4.5H16.8Q18 4.5 18.4 5.7L20 10Q21.5 10.4 21.5 12V19Q21.5 19.8 20.7 19.8H19.3Q18.5 19.8 18.5 19V17.5H5.5V19Q5.5 19.8 4.7 19.8H3.3Q2.5 19.8 2.5 19V12Q2.5 10.4 4 10L5.6 5.7Q6 4.5 7.2 4.5ZM7.4 6.3H16.6L17.7 9.5H6.3ZM4.5 14a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0ZM16.5 14a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0Z");
+}
+
+@media (min-width: 22rem) and (max-width: 39.99rem) {
+  .select {
+    width: var(--tap-target);
+    padding: 0;
+  }
+
+  /* Visually hidden, not removed: the words are the button's name. */
+  .words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Below 22rem the control sits on its own row; the words wrap inside it when the
+   column is narrower than the button. */
+@media (max-width: 21.99rem) {
+  .select {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+.button:hover {
+  background: var(--color-on-ink-line);
+  text-decoration: underline;
+}
+
+.button:active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}

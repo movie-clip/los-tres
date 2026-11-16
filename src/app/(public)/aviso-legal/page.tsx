@@ -1,24 +1,32 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
+import { CarNotice } from '@/components/CarNotice';
 import { getOwnerIdentity } from '@/config/owner';
 import { getSiteName } from '@/config/site';
+import { getCarContext } from '@/server/car/context';
+import { noindexWhenCar } from '@/server/catalogue/seo';
 
 import { LegalNoticeContent } from './content';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('LegalNotice');
-  return { title: t('metaTitle', { siteName: getSiteName() }) };
+  const [t, car] = await Promise.all([getTranslations('LegalNotice'), getCarContext()]);
+  return { title: t('metaTitle', { siteName: getSiteName() }), ...noindexWhenCar(car) };
 }
 
 export default async function LegalNoticePage() {
-  const t = await getTranslations('LegalNotice');
+  const [t, tCar, car] = await Promise.all([
+    getTranslations('LegalNotice'),
+    getTranslations('Car'),
+    getCarContext(),
+  ]);
   // Throws, and the page answers 500, when a required owner value is blank.
   const owner = getOwnerIdentity();
   return (
     <main className="page">
+      {car.state === 'unrecognised' && <CarNotice text={tCar('unknownNotice')} />}
       <LegalNoticeContent t={t} siteName={getSiteName()} owner={owner} />
     </main>
   );

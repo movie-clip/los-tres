@@ -67,7 +67,7 @@ Two adaptations for this site:
   pack and `mvp.md` win.
 
 If the skill is not available in your session, say so in `risks` and work from
-this pack.
+this pack. If the session lists no such skill, say so in `skill_calls` and `risks` and work from this pack.
 
 Do not call any `mattpocock-skills:*` skill from this lane. `prototype` writes
 throwaway app code and needs a human flipping variants in the browser, which
@@ -151,6 +151,14 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, failed (returned) | `page.route` fulfils the action POST with a `text/x-component` body `0:{a:$@1,f:'',b:<buildId>}` then `1:{status:failed,kind:feed,id:1}` |
 | admin shops and feeds, session expired | clear cookies in the context, then press a button; expect `/admin/acceso?aviso=sesion` with the notice |
 | admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
+| car selected | `?coche=seat-leon-iii-2012-2020-1-6-tdi-115cv`, or localStorage key `mi-coche` set to that slug (an init script; not `lostres.coche`, renamed by D-21), which reloads the page once to `?coche=` |
+| car, longest label | `?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |
+| unknown car | `?coche=no-existe` (the page renders as without a car, plus the notice "No reconocemos ese coche") |
+| car picker, steps without script | a Playwright context with `javaScriptEnabled: false`, open any page, press the car link: it lands on `/mi-coche?volver=...`; the make and model steps add `marca` and `modelo` (`/mi-coche?marca=seat&modelo=seat-leon-iii`; slugs are `makeSlug` and `modelSlug` in `src/db/vehicle-catalogue.ts`) |
+| car picker, dialog | with script, click `[data-testid=car-select]` (or `car-change` with a car); wait for `aria-haspopup="dialog"` first, since before hydration it is a link |
+| car header on the 404 and error page | with a stored car, the page reloads once to `?coche=` (D-18); the error page cannot resolve a car without a database, so it is not e2e-reachable with one |
+| car header heights | no car: one 64 px row with the control at its right edge (glyph only from 352 to 639 px); below 352 px the control wraps to its own row (112 px at 320 and 351); a selected car adds a 44 px row 2 (112 to 112.8 px at 375 to 1280) |
+| retired car | not producible on the demo database (no retired vehicle in the shipped list); report not checked |
 | demo notice | shown on the demo product, `/categoria/mantenimiento-del-coche`, `?pagina=2`, `/categoria/aceite-de-motor`; absent on home, the empty category, 404 and the legal pages |
 
 Every demo category is demo-only, so a rendered page never carries a canonical (noindex, no canonical): the canonical half of any check on `?marca=` is not observable in a screenshot or curl; the integration test carries it.

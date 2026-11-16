@@ -12,6 +12,8 @@ export type PublicFallbackValue = {
   body: string;
   /** The way home: NotFound.backHome. */
   home: string;
+  /** The finished home href, carrying the selected car (withCar('/', slug)); '/' with no car. */
+  homeHref: string;
 };
 
 const PublicFallbackContext = createContext<PublicFallbackValue | null>(null);

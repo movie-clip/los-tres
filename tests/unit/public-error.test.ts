@@ -11,14 +11,17 @@ import PublicError from '../../src/app/(public)/error';
 // The public error page (S5.4, AC 31): finished strings come from a context the
 // server fills, and nothing about the failure is rendered.
 
-const value = { heading: 'Titulo de error', body: 'Cuerpo de error.', home: 'Ir al inicio' };
+const value = { heading: 'Titulo de error', body: 'Cuerpo de error.', home: 'Ir al inicio', homeHref: '/' };
 
-const render = (withProvider: boolean) =>
+const render = (withProvider: boolean, homeHref = value.homeHref) =>
   renderToStaticMarkup(
     withProvider
       ? // The provider types children as a prop; the lint rule wants them as an argument.
         // eslint-disable-next-line react/no-children-prop
-        createElement(PublicFallbackProvider, { value, children: createElement(PublicError) })
+        createElement(PublicFallbackProvider, {
+          value: { ...value, homeHref },
+          children: createElement(PublicError),
+        })
       : createElement(PublicError),
   );
 
@@ -29,6 +32,23 @@ describe('(public)/error.tsx', () => {
     expect(html).toContain('Cuerpo de error.');
     expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Ir al inicio</);
     expect(html).toContain('data-testid="public-error"');
+  });
+
+  it('links home with the finished homeHref, a plain anchor carrying the car', () => {
+    const html = render(true, '/?coche=seat-leon-iii-2012-2020-1-6-tdi-105cv');
+    expect(html).toMatch(/<a [^>]*href="\/\?coche=seat-leon-iii-2012-2020-1-6-tdi-105cv"[^>]*>Ir al inicio</);
+    expect(html).not.toContain('href="/"');
+  });
+
+  it('links home with no coche when homeHref is "/"', () => {
+    const html = render(true, '/');
+    expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Ir al inicio</);
+    expect(html).not.toContain('coche');
+  });
+
+  it('uses no next/link for the home link', () => {
+    const source = readFileSync(path.resolve(process.cwd(), 'src/app/(public)/error.tsx'), 'utf8');
+    expect(source).not.toMatch(/next\/link/);
   });
 
   it('renders nothing when no provider is above it', () => {

@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { NotFoundContent } from '@/components/NotFoundContent';
 import { getSiteName } from '@/config/site';
+import { getCarContext, selectedSlug } from '@/server/car/context';
+import { withCar } from '@/server/catalogue/paths';
 
 // The served head carries this title for a crawler or a visitor without script.
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,11 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
 // the flight payload, which carries the layout's default title and not this
 // file's metadata, so the tab would show the default. React hoists the element.
 export default async function PublicNotFound() {
-  const t = await getTranslations('NotFound');
+  const [t, car] = await Promise.all([getTranslations('NotFound'), getCarContext()]);
   return (
     <>
       <title>{t('metaTitle', { siteName: getSiteName() })}</title>
-      <NotFoundContent />
+      <NotFoundContent homeHref={withCar('/', selectedSlug(car))} />
     </>
   );
 }

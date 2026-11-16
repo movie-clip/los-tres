@@ -5,13 +5,15 @@ import { getTranslations } from 'next-intl/server';
 
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
+import { CarNotice } from '@/components/CarNotice';
 import { DemoNotice } from '@/components/DemoNotice';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
 import { ProductDescription } from '@/components/ProductDescription';
 import { ProductHero, type ProductDetail } from '@/components/ProductHero';
 import { getPublicOrigin, getSiteName } from '@/config/site';
-import { categoryPath, productPath } from '@/server/catalogue/paths';
+import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
+import { categoryPath, productPath, withCar } from '@/server/catalogue/paths';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -31,11 +33,15 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { slug } = await params;
   const product = await load(slug);
   if (product === null) return {};
-  const t = await getTranslations('Product');
+  const [t, car] = await Promise.all([getTranslations('Product'), getCarContext()]);
   return {
     title: t('metaTitle', { title: product.title, siteName: getSiteName() }),
     description: t('metaDescription', { title: product.title }),
-    ...pageSeo(getPublicOrigin(), productPath(product.slug), product.indexable),
+    ...pageSeo(
+      getPublicOrigin(),
+      productPath(product.slug),
+      product.indexable && !openedWithCoche(car),
+    ),
   };
 }
 
@@ -44,10 +50,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await load(slug);
   if (product === null) notFound();
 
-  const [t, tCategory, tDemo] = await Promise.all([
+  const [t, tCategory, tDemo, tCar, car] = await Promise.all([
     getTranslations('Product'),
     getTranslations('Category'),
     getTranslations('DemoNotice'),
+    getTranslations('Car'),
+    getCarContext(),
   ]);
 
   // A null detail is left out entirely, never shown as empty.
@@ -70,12 +78,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <>
       {jsonLd !== null && <JsonLd data={jsonLd} />}
       <main className="page">
+        {car.state === 'unrecognised' && <CarNotice text={tCar('unknownNotice')} />}
         {product.demoOnly && <DemoNotice text={tDemo('body')} />}
         <Breadcrumb
           label={t('breadcrumbLabel')}
           items={product.categoryTrail.map((crumb) => ({
             name: crumb.name,
-            href: categoryPath(crumb.slug),
+            href: withCar(categoryPath(crumb.slug), selectedSlug(car)),
           }))}
         />
         <div className={styles.layout}>

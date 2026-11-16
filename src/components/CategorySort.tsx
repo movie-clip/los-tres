@@ -19,8 +19,11 @@ export type CategorySortProps = {
   options: CategorySortOption[];
   /** The `value` of the option shown as chosen. */
   selected: string;
-  /** A field kept across the submit, for example the selected brand. Null adds none. */
-  hidden: { name: string; value: string } | null;
+  /**
+   * Fields kept across the submit, in order: the selected brand (`marca`), then the selected
+   * car (`coche`). Empty adds none.
+   */
+  hidden: { name: string; value: string }[];
 };
 
 const SELECT_ID = 'category-sort';
@@ -58,7 +61,9 @@ export function CategorySort({
             </option>
           ))}
         </select>
-        {hidden !== null ? <input type="hidden" name={hidden.name} value={hidden.value} /> : null}
+        {hidden.map((field) => (
+          <input key={field.name} type="hidden" name={field.name} value={field.value} />
+        ))}
         <button type="submit" className={styles.button} data-testid="category-sort-submit">
           {submitLabel}
         </button>

@@ -19,13 +19,44 @@
   padding: 0 var(--gutter);
 }
 
-/* The box takes the room beside the name, from 14rem up to 26rem. The search
-   form inside fills it. min-width 0 lets it shrink below 14rem on a narrow
+/* Row 2: the car control, in the same column as row 1 (same width and gutter), a quarter
+   step under it. */
+.carRow {
+  max-width: var(--content-width);
+  margin: var(--space-0) auto 0;
+  padding: 0 var(--gutter);
+}
+
+/* The box takes the room beside the name, from 11rem (phones) or 14rem up to
+   26rem. The search form inside fills it. min-width 0 lets it shrink on a narrow
    viewport instead of overflowing. */
 .search {
-  flex: 1 1 14rem;
+  flex: 1 1 11rem;
   max-width: 26rem;
   min-width: 0;
+}
+
+/* With no car selected the car control is the last item of row 1, against the
+   right edge of the column. It keeps its own size; below 22rem it is wide (words
+   showing) and wraps onto its own row, left aligned, capped at the column. */
+.carInline {
+  flex: none;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* Phones: a tighter column gap in row 1 gives the 44 px control its room. */
+@media (max-width: 39.99rem) {
+  .inner {
+    column-gap: var(--space-1);
+  }
+}
+
+@media (max-width: 21.99rem) {
+  .carInline {
+    max-width: 100%;
+    margin-left: 0;
+  }
 }
 
 /* A page that carries its own search form (the home hero, /buscar) shows one
@@ -44,8 +75,21 @@
   }
 
   .search {
+    flex-basis: 14rem;
     margin-left: auto;
   }
+
+  /* The search form's own auto margin places the pair; the control follows it
+     with the row gap between. */
+  .carInline {
+    margin-left: 0;
+  }
+}
+
+/* Without the header search (the home hero, /buscar) the control itself is pushed to the
+   right edge of row 1, at every width. */
+:global(body:has([data-search-page])) .carInline {
+  margin-left: auto;
 }
 
 .name {

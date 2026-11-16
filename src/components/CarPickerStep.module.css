@@ -1,0 +1,195 @@
+/* One picker step: back action, counter, prompt, option list. Used inside the dialog
+   and inside the card of the /mi-coche page, so it sets no width or padding of its own. */
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* A step is its list form's parent; the form takes the full width. */
+.form {
+  width: 100%;
+}
+
+/* Back action: a text button (a link without script) with a left chevron. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  margin: 0 0 var(--space-0);
+  padding: 0 var(--space-0);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-link);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.back:hover {
+  text-decoration-thickness: 2px;
+}
+
+.back:active {
+  background: var(--color-chip-bg);
+  text-decoration-thickness: 2px;
+}
+
+.back:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.backChevron {
+  flex: none;
+  width: 0.5rem;
+  height: 0.875rem;
+  background: var(--color-ink);
+  clip-path: polygon(100% 0, 65% 0, 0 50%, 65% 100%, 100% 100%, 35% 50%);
+}
+
+/* `.page p` in globals.css is muted grey; the counter is meant to be muted. */
+.counter {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.prompt {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* The programmatic focus target shows a ring only where the platform shows one. */
+.prompt:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+/* Rows are told apart by a hairline above each one and one below the last. */
+.list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.item {
+  border-top: 1px solid var(--color-border);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.texts {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.first {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.second {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* The chevron and the check mark are filled shapes clipped from an empty box: decorative. */
+.first::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.875rem;
+  margin-top: 0.25rem;
+  background: var(--color-ink);
+  clip-path: polygon(0 0, 35% 0, 100% 50%, 35% 100%, 0 100%, 65% 50%);
+}
+
+.option:hover {
+  background: var(--color-canvas);
+}
+
+.option:hover .first {
+  text-decoration: underline;
+}
+
+/* The car's own row: ink fill. Still pressable. Declared after hover so it keeps its fill. */
+.option[aria-current='true'] {
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.option[aria-current='true'] .second {
+  color: var(--color-on-ink-muted);
+}
+
+.option[aria-current='true'] .first::after {
+  background: var(--color-on-ink);
+}
+
+/* On the engine step the current row ends in a check mark instead of the chevron. */
+.engine[aria-current='true'] .first::after {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: 0.1875rem;
+  clip-path: polygon(0 55%, 15% 40%, 38% 62%, 85% 10%, 100% 25%, 38% 92%);
+}
+
+/* Pressed wins over current: amber fill, dark text, in every row. */
+.option:active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.option:active .second {
+  color: var(--color-on-accent);
+}
+
+.option:active .first::after {
+  background: var(--color-on-accent);
+}
+
+.option:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}

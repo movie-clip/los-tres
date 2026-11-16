@@ -78,7 +78,7 @@ test.describe('header search box (S5.4 T5.4.5)', () => {
     expect(new URL(page.url()).search).toBe(`?q=${TERM}`);
   });
 
-  test('AC 39: Tab order is the site-name link, then the box field, then its button', async ({ page }) => {
+  test('AC 39, 61: Tab order is the site-name link, then the box field, then its button, then the car control', async ({ page }) => {
     await page.goto(`/producto/${DEMO_SHARED.slug}`);
     await expect(page.getByTestId('header-search-button')).toBeVisible();
     await page.waitForLoadState('networkidle');
@@ -88,6 +88,9 @@ test.describe('header search box (S5.4 T5.4.5)', () => {
     await expect(page.getByTestId('header-search-input')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('header-search-button')).toBeFocused();
+    // S5.7 (AC 61): the car control is row 2 of the header, so it follows the search button.
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('car-select')).toBeFocused();
   });
 
   test('AC 38: works with JavaScript disabled', async ({ browser, baseURL }) => {

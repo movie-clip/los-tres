@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
       // The search term is in the URL: a click to a shop must not carry it in the Referer.
       // The click log keeps only the source path (S5.4).
       { source: '/buscar', headers: [{ key: 'Referrer-Policy', value: 'same-origin' }] },
+      // The picker's `volver` can carry a search term (S5.7): same rule as /buscar.
+      { source: '/mi-coche', headers: [{ key: 'Referrer-Policy', value: 'same-origin' }] },
     ];
   },
 };

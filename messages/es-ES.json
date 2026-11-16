@@ -101,6 +101,41 @@
   "DemoNotice": {
     "body": "Esta página muestra datos de demostración: los productos, los precios y las tiendas no son reales."
   },
+  "Car": {
+    "groupLabel": "Tu coche",
+    "select": "Selecciona tu coche",
+    "selected": "Mi coche: <name>{car}</name>",
+    "name": "{make} {model} {generation} {engine}",
+    "change": "Cambiar",
+    "changeLabel": "Cambiar mi coche",
+    "remove": "Quitar",
+    "removeLabel": "Quitar mi coche",
+    "unknownNotice": "No reconocemos ese coche. Selecciona el tuyo de nuevo."
+  },
+  "CarPicker": {
+    "title": "Selecciona tu coche",
+    "metaTitle": "Selecciona tu coche | {siteName}",
+    "close": "Cerrar",
+    "closeLabel": "Cerrar el selector de coche",
+    "cancel": "Cancelar",
+    "stepCounter": "Paso {step} de {total}",
+    "makeHeading": "Elige la marca",
+    "modelHeading": "Elige el modelo de {make}",
+    "engineHeading": "Elige el motor de {model}",
+    "backToMakes": "Cambiar de marca",
+    "backToModels": "Cambiar de modelo",
+    "years": "{from}–{to}",
+    "yearsOngoing": "desde {from}",
+    "engineDetail": "{fuel} · {power} CV",
+    "fuel": {
+      "gasolina": "Gasolina",
+      "diesel": "Diésel",
+      "hibrido": "Híbrido",
+      "electrico": "Eléctrico",
+      "glp": "GLP"
+    },
+    "empty": "Todavía no hay coches para elegir."
+  },
   "LegalNotice": {
     "metaTitle": "Aviso legal | {siteName}",
     "heading": "Aviso legal",
