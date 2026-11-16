@@ -42,7 +42,11 @@ const CATALOGUE_PATH = /^\/(producto|categoria)\/([^/]+)$/;
 export async function isMissingPublicPage(url: URL): Promise<boolean> {
   if (url.pathname === SEARCH_PATH) {
     const query = toSearchParamsShape(url.searchParams);
-    const search = await getPublicSearchPage(parseSearchTerm(query.q), parsePageParam(query.pagina));
+    const search = await getPublicSearchPage(
+      parseSearchTerm(query.q),
+      parsePageParam(query.pagina),
+      await vehicleIdFor(url),
+    );
     return search === null;
   }
 

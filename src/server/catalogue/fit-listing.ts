@@ -33,9 +33,16 @@ export function fitScope(vehicleId: number, where: SQL | undefined) {
     .as('fit_scope');
 }
 
-/** Sort key: fits 0, unknown 1, no-fit 2. */
-export function groupRankSql(fit: FitColumn): SQL<number> {
-  return sql<number>`case when ${fit} = 'fits' then 0 when ${fit} = 'unknown' then 1 else 2 end`;
+/**
+ * Sort key: fits 0, unknown 1, no-fit 2. With `exact` (search, S5.8 D-1): fits 0,
+ * unknown 1, no-fit listed by an exact code 2, any other no-fit 3. `exact` must be
+ * a non-null boolean, so the caller wraps its code match in `coalesce(..., false)`.
+ */
+export function groupRankSql(fit: FitColumn, exact?: SQL): SQL<number> {
+  if (exact === undefined) {
+    return sql<number>`case when ${fit} = 'fits' then 0 when ${fit} = 'unknown' then 1 else 2 end`;
+  }
+  return sql<number>`case when ${fit} = 'fits' then 0 when ${fit} = 'unknown' then 1 when ${exact} then 2 else 3 end`;
 }
 
 /** `fit <> 'no-fit'`: the product is listed under a car. */
@@ -43,12 +50,42 @@ export function listedFitSql(fit: FitColumn): SQL<boolean> {
   return sql<boolean>`${fit} <> 'no-fit'`;
 }
 
-/** The three counts of a listed scope, as columns of one aggregate select. */
-export function fitCountsSql(fit: FitColumn) {
+/**
+ * The counts of a listed scope, as columns of one aggregate select: fits, unknown
+ * and left out. With `exact` (search, S5.8 D-1) a no-fit product matched by an exact
+ * code is counted in `exactNoFitCount` and not in `leftOutCount`, so the four sum to
+ * the scope. `exact` must be a non-null boolean (`coalesce(..., false)`): a null
+ * inside `not exact` would drop rows from the left-out filter.
+ */
+export function fitCountsSql(fit: FitColumn): {
+  fitsCount: SQL<number>;
+  unknownCount: SQL<number>;
+  leftOutCount: SQL<number>;
+};
+export function fitCountsSql(
+  fit: FitColumn,
+  exact: SQL,
+): {
+  fitsCount: SQL<number>;
+  unknownCount: SQL<number>;
+  leftOutCount: SQL<number>;
+  exactNoFitCount: SQL<number>;
+};
+export function fitCountsSql(fit: FitColumn, exact?: SQL) {
+  const fitsCount = sql<number>`count(*) filter (where ${fit} = 'fits')::int`;
+  const unknownCount = sql<number>`count(*) filter (where ${fit} = 'unknown')::int`;
+  if (exact === undefined) {
+    return {
+      fitsCount,
+      unknownCount,
+      leftOutCount: sql<number>`count(*) filter (where ${fit} = 'no-fit')::int`,
+    };
+  }
   return {
-    fitsCount: sql<number>`count(*) filter (where ${fit} = 'fits')::int`,
-    unknownCount: sql<number>`count(*) filter (where ${fit} = 'unknown')::int`,
-    leftOutCount: sql<number>`count(*) filter (where ${fit} = 'no-fit')::int`,
+    fitsCount,
+    unknownCount,
+    leftOutCount: sql<number>`count(*) filter (where ${fit} = 'no-fit' and not ${exact})::int`,
+    exactNoFitCount: sql<number>`count(*) filter (where ${fit} = 'no-fit' and ${exact})::int`,
   };
 }
 

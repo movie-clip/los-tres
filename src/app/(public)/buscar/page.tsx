@@ -12,6 +12,7 @@ import { ProductGrid } from '@/components/ProductGrid';
 import { SearchForm } from '@/components/SearchForm';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { getCarContext, selectedSlug } from '@/server/car/context';
+import { selectedVehicleId } from '@/server/car/state';
 import { parsePageParam } from '@/server/catalogue/page-param';
 import { productPath, SEARCH_PATH, searchPath, withCar } from '@/server/catalogue/paths';
 import { getPublicSearchPage } from '@/server/catalogue/search-page';
@@ -33,7 +34,8 @@ type SearchPageProps = {
 
 export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
   const { q, pagina } = await searchParams;
-  const result = await load(parseSearchTerm(q), parsePageParam(pagina));
+  const car = await getCarContext();
+  const result = await load(parseSearchTerm(q), parsePageParam(pagina), selectedVehicleId(car));
   if (result === null) return {};
   const t = await getTranslations('Search');
   const siteName = getSiteName();
@@ -49,16 +51,16 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q, pagina } = await searchParams;
-  const result = await load(parseSearchTerm(q), parsePageParam(pagina));
+  const car = await getCarContext();
+  const result = await load(parseSearchTerm(q), parsePageParam(pagina), selectedVehicleId(car));
   if (result === null) notFound();
 
-  const [t, tProduct, tCategory, tDemo, tCar, car] = await Promise.all([
+  const [t, tProduct, tCategory, tDemo, tCar] = await Promise.all([
     getTranslations('Search'),
     getTranslations('Product'),
     getTranslations('Category'),
     getTranslations('DemoNotice'),
     getTranslations('Car'),
-    getCarContext(),
   ]);
   // First child of every `main` below, ahead of the demo notice.
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
