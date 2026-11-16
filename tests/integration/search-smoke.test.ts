@@ -6,10 +6,12 @@ import { getPublicSearchPage } from '@/server/catalogue/search-page';
 import {
   insertCategory,
   insertFeed,
+  insertFitment,
   insertListedProduct,
   insertOffer,
   insertProduct,
   insertShop,
+  insertVehicle,
 } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 
@@ -111,5 +113,44 @@ describe('getPublicSearchPage smoke (S5.4)', () => {
     expect(line).not.toContain(marker);
     vi.unstubAllEnvs();
     await closeDb();
+  });
+});
+
+describe('getPublicSearchPage with a car smoke (S5.8)', () => {
+  it('without a car a results page has fit null and cards with fitGroup null, whole shape', async () => {
+    await insertListedProduct({ slug: 'filtro-a', title: 'Filtro A', prices: [1000] });
+    const page = await getPublicSearchPage('filtro', 1);
+    expect(page).toMatchObject({ state: 'results', fit: null });
+    expect(page?.state === 'results' && page.products.map((card) => card.fitGroup)).toEqual([null]);
+    expect(await getPublicSearchPage('filtro', 1, null)).toEqual(page);
+  });
+
+  it('with a car the SQL runs: fits first, a no-fit text match is counted, an exact no-fit is listed', async () => {
+    const car = await insertVehicle();
+    const other = await insertVehicle();
+    const feed = await insertFeed((await insertShop()).id);
+    const fits = await insertListedProduct({ slug: 'ajusta', title: 'Filtro ajusta', prices: [900] });
+    await insertListedProduct({ slug: 'desconocido', title: 'Filtro desconocido', prices: [100] });
+    const exact = await insertListedProduct({
+      slug: 'exacto',
+      title: 'Filtro exacto',
+      prices: [50],
+      extra: { partNumberNormalised: 'SM1' },
+    });
+    const out = await insertListedProduct({ slug: 'descartado', title: 'Filtro descartado', prices: [10] });
+    await insertFitment(fits.id, car.id, feed);
+    await insertFitment(exact.id, other.id, feed);
+    await insertFitment(out.id, other.id, feed);
+
+    const text = await getPublicSearchPage('filtro', 1, car.id);
+    expect(slugsOf(text)).toEqual(['ajusta', 'desconocido']);
+    expect(text).toMatchObject({ fit: { fitsCount: 1, unknownCount: 1, leftOutCount: 2, exactNoFitCount: 0 } });
+
+    const byCode = await getPublicSearchPage('SM1', 1, car.id);
+    expect(slugsOf(byCode)).toEqual(['exacto']);
+    expect(byCode).toMatchObject({ fit: { exactNoFitCount: 1 } });
+
+    const allOut = await getPublicSearchPage('descartado', 1, car.id);
+    expect(allOut).toEqual({ state: 'all-left-out', term: 'descartado', leftOutCount: 1 });
   });
 });

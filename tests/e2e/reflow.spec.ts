@@ -284,3 +284,71 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// S5.8 (#277, 04-ux checks 30 and 33): the search page with the longest car, at the four widths. The
+// counts line (term, four parts), the fits-empty note, the exact-hit group heading and explanation and the
+// all-left-out card wrap and are not cut. The demo's longest car fits no product, so the fits group is not
+// reached (same limit as the category block above); the exact-hit group and the all-left-out card are.
+const SEARCH_FIT_PAGES: { name: string; url: string; marker: string }[] = [
+  { name: 'text term, note and no-data group', url: '/buscar?q=filtro', marker: 'listing-note' },
+  { name: 'exact part number, note and exact-hit group', url: '/buscar?q=OF-1124', marker: 'listing-group' },
+  { name: 'exact EAN, exact-hit group', url: '/buscar?q=2000000100203', marker: 'listing-group' },
+  { name: 'all left out', url: '/buscar?q=bosch+aire', marker: 'category-empty' },
+  { name: 'no results, 100-character term', url: `/buscar?q=${'w'.repeat(100)}`, marker: 'category-empty' },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the search page with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, url, marker } of SEARCH_FIT_PAGES) {
+      test(`${name}: no sideways scroll and no text cut`, async ({ page }) => {
+        await page.goto(`${url}&coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(marker).first()).toBeVisible();
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+        expect(await cutText(page)).toEqual([]);
+      });
+    }
+
+    test('the counts line carries the term and the fit parts, inside the viewport', async ({ page }) => {
+      await page.goto(`/buscar?q=OF-1124&coche=${LONGEST_CAR.slug}`);
+      const line = page.getByTestId('search-summary');
+      await expect(line).toContainText(messages.Search.summaryCarPrefix.replace('{term}', 'OF-1124'));
+      await expect(line).toContainText(messages.Fit.countUnknown.replace('{count}', '0'));
+      const box = (await line.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+    });
+
+    test('the note, the exact-hit explanation and the all-left-out heading name the longest car and stay inside the viewport', async ({
+      page,
+    }) => {
+      const inside = async (url: string, pick: (page: Page) => ReturnType<Page['locator']>) => {
+        await page.goto(`${url}&coche=${LONGEST_CAR.slug}`);
+        const element = pick(page);
+        await expect(element).toContainText(LONGEST_CAR.engine);
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      };
+      await inside('/buscar?q=filtro', (p) => p.getByTestId('listing-note'));
+      await inside('/buscar?q=OF-1124', (p) => p.getByTestId('listing-group-help'));
+      await inside('/buscar?q=bosch+aire', (p) => p.getByTestId('category-empty').getByRole('heading', { level: 2 }));
+    });
+
+    test('the all-left-out action is inside the viewport and at least 44px tall', async ({ page }) => {
+      await page.goto(`/buscar?q=bosch+aire&coche=${LONGEST_CAR.slug}`);
+      const action = page.getByTestId('fit-change-car');
+      await expect(action).toBeVisible();
+      const box = (await action.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(await cutText(page)).toEqual([]);
+    });
+  });
+}

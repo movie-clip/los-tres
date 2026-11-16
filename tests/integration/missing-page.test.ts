@@ -7,6 +7,7 @@ import { products } from '@/db/schema';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { isMissingPublicPage } from '@/server/catalogue/missing-page';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
+import { getPublicSearchPage } from '@/server/catalogue/search-page';
 
 import {
   insertCategory,
@@ -345,5 +346,108 @@ describe('isMissingPublicPage under a car agrees with the category loader (S5.8,
     await insertListedProduct({ slug: 'presente', prices: [1000] });
     expect(await isMissingPublicPage(at(`/producto/presente?coche=${w.car.slug}`))).toBe(false);
     expect(await isMissingPublicPage(at(`/producto/no-existe?coche=${w.car.slug}`))).toBe(true);
+  });
+});
+
+// S5.8 (#277): the search half. With a selected car the page count is the combined list's (fits,
+// unknown, exact-code no-fit), so the check resolves ?coche exactly as the page does and decides as
+// the loader does. An unrecognised, retired or unavailable car is no car.
+
+describe('isMissingPublicPage under a car agrees with the search loader (S5.8)', () => {
+  async function world() {
+    const car = await insertVehicle();
+    const other = await insertVehicle();
+    const feed = await insertFeed((await insertShop()).id);
+    return { car, other, feed };
+  }
+
+  type World = Awaited<ReturnType<typeof world>>;
+
+  async function add(w: World, slug: string, fit: 'fits' | 'no-fit' | 'unknown') {
+    const product = await insertListedProduct({ slug, title: `Filtro ${slug}`, prices: [1000] });
+    if (fit === 'fits') await insertFitment(product.id, w.car.id, w.feed);
+    if (fit === 'no-fit') await insertFitment(product.id, w.other.id, w.feed);
+    return product;
+  }
+
+  async function agree(path: string, term: string, page: number, vehicleId: number | null) {
+    const loader = await getPublicSearchPage(term, page, vehicleId);
+    const missing = await isMissingPublicPage(at(path));
+    expect(missing, path).toBe(loader === null);
+    return missing;
+  }
+
+  it('is true for a page past the end of the combined list and false for the last page, though the no-car list is longer', async () => {
+    const w = await world();
+    for (let n = 0; n < PAGE_SIZE; n += 1) await add(w, `f-${n}`, 'fits');
+    for (let n = 0; n < 6; n += 1) await add(w, `n-${n}`, 'no-fit');
+
+    expect(await agree('/buscar?q=filtro&pagina=2', 'filtro', 2, null)).toBe(false);
+    expect(await agree(`/buscar?q=filtro&coche=${w.car.slug}`, 'filtro', 1, w.car.id)).toBe(false);
+    expect(await agree(`/buscar?q=filtro&pagina=2&coche=${w.car.slug}`, 'filtro', 2, w.car.id)).toBe(true);
+    expect(await agree(`/buscar?coche=${w.car.slug}&pagina=2&q=filtro`, 'filtro', 2, w.car.id)).toBe(true);
+  });
+
+  it('is false for page 1 when every match is left out (all-left-out) and true for its page 2', async () => {
+    const w = await world();
+    await add(w, 'n-1', 'no-fit');
+    expect((await getPublicSearchPage('filtro', 1, w.car.id))?.state).toBe('all-left-out');
+    expect(await agree(`/buscar?q=filtro&coche=${w.car.slug}`, 'filtro', 1, w.car.id)).toBe(false);
+    expect(await agree(`/buscar?q=filtro&pagina=2&coche=${w.car.slug}`, 'filtro', 2, w.car.id)).toBe(true);
+  });
+
+  it('counts the exact-code no-fit product in the combined list', async () => {
+    const w = await world();
+    const product = await add(w, 'exacto', 'no-fit');
+    await getDb().update(products).set({ partNumberNormalised: 'EX1' }).where(eq(products.id, product.id));
+    expect(await agree(`/buscar?q=EX1&coche=${w.car.slug}`, 'EX1', 1, w.car.id)).toBe(false);
+    expect(await agree(`/buscar?q=EX1&pagina=2&coche=${w.car.slug}`, 'EX1', 2, w.car.id)).toBe(true);
+  });
+
+  it('is false for page 1 of a term with no match and true for its page 2, with a car', async () => {
+    const w = await world();
+    expect(await agree(`/buscar?q=zzzz&coche=${w.car.slug}`, 'zzzz', 1, w.car.id)).toBe(false);
+    expect(await agree(`/buscar?q=zzzz&pagina=2&coche=${w.car.slug}`, 'zzzz', 2, w.car.id)).toBe(true);
+  });
+
+  it('an empty query with a car is not missing', async () => {
+    const w = await world();
+    expect(await isMissingPublicPage(at(`/buscar?coche=${w.car.slug}`))).toBe(false);
+  });
+
+  describe('decides as without a car when the car is not a selected one', () => {
+    async function pastTheCombinedList(w: World) {
+      for (let n = 0; n < PAGE_SIZE; n += 1) await add(w, `f-${n}`, 'fits');
+      for (let n = 0; n < 6; n += 1) await add(w, `n-${n}`, 'no-fit');
+    }
+
+    it('for a retired vehicle, an unknown slug, a malformed value and a repeated coche', async () => {
+      const w = await world();
+      const retired = await insertVehicle({ isRetired: true });
+      await pastTheCombinedList(w);
+      expect(await isMissingPublicPage(at('/buscar?q=filtro&pagina=2'))).toBe(false);
+      for (const query of [
+        `coche=${retired.slug}`,
+        'coche=coche-que-no-existe',
+        'coche=Mal_Formado',
+        'coche=',
+        `coche=${w.car.slug}&coche=${w.car.slug}`,
+      ]) {
+        expect(await isMissingPublicPage(at(`/buscar?q=filtro&pagina=2&${query}`)), query).toBe(false);
+      }
+      expect(await isMissingPublicPage(at(`/buscar?q=filtro&pagina=2&coche=${w.car.slug}`))).toBe(true);
+    });
+
+    it('for a car the vehicle read cannot give (unavailable), without throwing', async () => {
+      const w = await world();
+      await pastTheCombinedList(w);
+      vehicleRead.fail = true;
+      try {
+        expect(await isMissingPublicPage(at(`/buscar?q=filtro&pagina=2&coche=${w.car.slug}`))).toBe(false);
+        expect(await isMissingPublicPage(at(`/buscar?q=filtro&pagina=3&coche=${w.car.slug}`))).toBe(true);
+      } finally {
+        vehicleRead.fail = false;
+      }
+    });
   });
 });

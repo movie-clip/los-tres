@@ -12,11 +12,13 @@ import {
   insertCategory,
   insertCategoryMapping,
   insertFeed,
+  insertFitment,
   insertFixtureFeed,
   insertListedProduct,
   insertOffer,
   insertProduct,
   insertShop,
+  insertVehicle,
   insertVisibleOffer,
 } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
@@ -752,5 +754,382 @@ describe('failure handling (AC 31, guardrail 5)', () => {
       expect(String(call[0])).toMatch(/^search: failed \([A-Za-z0-9_]{1,32}\)$/);
       expect(JSON.stringify(call)).not.toContain('zqmarkerdos');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S5.8 (#277): the search with a selected car. With a car the results are the
+// products that fit, then the unknown ones, then the no-fit ones reached by an
+// exact EAN (8 or 13 digits) or exact normalised part number (D-1); a no-fit
+// product reached by text only is left out and counted. Without a car nothing
+// changes: `fit` is null and every card's fitGroup is null.
+// ---------------------------------------------------------------------------
+
+/** One selected car, one other vehicle and one approved feed that says the fitments. */
+async function carWorld() {
+  const car = await insertVehicle();
+  const other = await insertVehicle();
+  const fitFeed = await insertFeed((await insertShop()).id);
+  return { carId: car.id, otherId: other.id, fitFeed };
+}
+
+type World = Awaited<ReturnType<typeof carWorld>>;
+
+/** A listed product with the fit state asked for; `extra` carries any product column (EAN, part number). */
+async function carProduct(
+  world: World,
+  o: {
+    slug: string;
+    fit: 'fits' | 'no-fit' | 'unknown';
+    title?: string;
+    prices?: number[];
+    isHidden?: boolean;
+    extra?: Partial<typeof products.$inferInsert>;
+  },
+) {
+  const product = await insertListedProduct({
+    slug: o.slug,
+    title: o.title ?? `Filtro ${o.slug}`,
+    prices: o.prices ?? [1000],
+    isHidden: o.isHidden,
+    extra: o.extra,
+  });
+  if (o.fit === 'fits') await insertFitment(product.id, world.carId, world.fitFeed);
+  if (o.fit === 'no-fit') await insertFitment(product.id, world.otherId, world.fitFeed);
+  return product;
+}
+
+const carSearch = (raw: string, vehicleId: number | null, page = 1): Promise<Result> =>
+  getPublicSearchPage(parseSearchTerm(raw), page, vehicleId);
+
+const groupsOf = (result: Result): (string | null)[] =>
+  result?.state === 'results' ? result.products.map((card) => card.fitGroup) : [];
+
+describe('without a car the shape is unchanged (S5.8, AC 30)', () => {
+  it('a results page carries fit: null and every card fitGroup: null, whole shape', async () => {
+    await insertListedProduct({ slug: 'forma', title: 'Filtro forma', prices: [1200] });
+    const result = await search('forma');
+    expect(result).toEqual({
+      state: 'results',
+      term: 'forma',
+      page: 1,
+      pageCount: 1,
+      productCount: 1,
+      products: [
+        {
+          slug: 'forma',
+          title: 'Filtro forma',
+          brand: null,
+          partNumber: null,
+          lowestPriceCents: 1200,
+          offerCount: 1,
+          categorySlug: expect.any(String),
+          fitGroup: null,
+        },
+      ],
+      demoOnly: false,
+      fit: null,
+    });
+  });
+
+  it('an explicit null vehicle id answers exactly what no argument answers', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'a', fit: 'fits', prices: [900] });
+    await carProduct(world, { slug: 'b', fit: 'no-fit', prices: [100] });
+    expect(await getPublicSearchPage('filtro', 1, null)).toEqual(await getPublicSearchPage('filtro', 1));
+    expect(slugsOf(await carSearch('filtro', null))).toEqual(['b', 'a']);
+  });
+});
+
+describe('with a selected car: text (S5.8, AC 29 to 33)', () => {
+  it('lists fits, then unknown, leaves the text-only no-fit out and counts it', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'sin-datos', fit: 'unknown', prices: [100] });
+    await carProduct(world, { slug: 'compatible', fit: 'fits', prices: [500] });
+    await carProduct(world, { slug: 'no-compatible', fit: 'no-fit', prices: [50] });
+
+    const result = await carSearch('filtro', world.carId);
+    expect(slugsOf(result)).toEqual(['compatible', 'sin-datos']);
+    expect(groupsOf(result)).toEqual(['fits', 'unknown']);
+    expect(result).toMatchObject({
+      state: 'results',
+      productCount: 2,
+      pageCount: 1,
+      fit: { fitsCount: 1, unknownCount: 1, leftOutCount: 1, exactNoFitCount: 0 },
+    });
+  });
+
+  it('AC 30: the four counts sum to the no-car product count of the same term', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'f1', fit: 'fits' });
+    await carProduct(world, { slug: 'f2', fit: 'fits' });
+    await carProduct(world, { slug: 'u1', fit: 'unknown' });
+    await carProduct(world, { slug: 'n1', fit: 'no-fit' });
+    await carProduct(world, { slug: 'n2', fit: 'no-fit' });
+
+    const without = await search('filtro');
+    const withCar = await carSearch('filtro', world.carId);
+    expect(without).toMatchObject({ productCount: 5 });
+    const fit = withCar?.state === 'results' ? withCar.fit : null;
+    expect(fit).not.toBeNull();
+    expect(fit!.fitsCount + fit!.unknownCount + fit!.leftOutCount + fit!.exactNoFitCount).toBe(5);
+    expect(withCar).toMatchObject({ productCount: fit!.fitsCount + fit!.unknownCount + fit!.exactNoFitCount });
+  });
+
+  it('AC 33: the group order wins over a cheaper price, and the no-car order holds inside a group', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'u-barato', fit: 'unknown', prices: [100] });
+    await carProduct(world, { slug: 'u-caro', fit: 'unknown', prices: [300] });
+    await carProduct(world, { slug: 'f-caro', fit: 'fits', prices: [900] });
+    await carProduct(world, { slug: 'f-barato', fit: 'fits', prices: [800] });
+    expect(slugsOf(await carSearch('filtro', world.carId))).toEqual(['f-barato', 'f-caro', 'u-barato', 'u-caro']);
+  });
+
+  it('AC 33: a tie inside a group breaks on the product id', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'z', fit: 'fits', prices: [700] });
+    await carProduct(world, { slug: 'a', fit: 'fits', prices: [700] });
+    expect(slugsOf(await carSearch('filtro', world.carId))).toEqual(['z', 'a']);
+  });
+
+  it('a product fitting another car only is left out, one fitting the selected car and another is a fit', async () => {
+    const world = await carWorld();
+    const both = await carProduct(world, { slug: 'ambos', fit: 'fits' });
+    await insertFitment(both.id, world.otherId, world.fitFeed);
+    await carProduct(world, { slug: 'solo-otro', fit: 'no-fit' });
+    const result = await carSearch('filtro', world.carId);
+    expect(slugsOf(result)).toEqual(['ambos']);
+    expect(result).toMatchObject({ fit: { fitsCount: 1, leftOutCount: 1 } });
+  });
+
+  it('pages hold 24 over the combined list and a page past its end is null', async () => {
+    const world = await carWorld();
+    for (let n = 0; n < SEARCH_PAGE_SIZE; n += 1) {
+      await carProduct(world, { slug: `f-${n}`, fit: 'fits', prices: [100 + n] });
+    }
+    await carProduct(world, { slug: 'u-0', fit: 'unknown', prices: [50] });
+    for (let n = 0; n < 5; n += 1) await carProduct(world, { slug: `n-${n}`, fit: 'no-fit' });
+
+    const first = await carSearch('filtro', world.carId, 1);
+    const second = await carSearch('filtro', world.carId, 2);
+    expect(first).toMatchObject({ state: 'results', pageCount: 2, productCount: SEARCH_PAGE_SIZE + 1 });
+    expect(slugsOf(first)).toHaveLength(SEARCH_PAGE_SIZE);
+    expect(slugsOf(second)).toEqual(['u-0']);
+    expect(groupsOf(second)).toEqual(['unknown']);
+    // The no-car list holds 30 products (two pages) but the combined list is 25: page 3 is null either way.
+    expect(await carSearch('filtro', world.carId, 3)).toBeNull();
+  });
+});
+
+describe('with a selected car: the exact-code exception (D-1, S5.8)', () => {
+  it('lists a no-fit product matched by a 13-digit EAN after the unknown ones, as no-fit-exact', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'por-ean', fit: 'no-fit', prices: [100], extra: { eanNormalised: EAN } });
+    await carProduct(world, { slug: 'sin-datos', fit: 'unknown', prices: [900], title: `Kit ${EAN}` });
+
+    const result = await carSearch(EAN, world.carId);
+    expect(slugsOf(result)).toEqual(['sin-datos', 'por-ean']);
+    expect(groupsOf(result)).toEqual(['unknown', 'no-fit-exact']);
+    expect(result).toMatchObject({
+      productCount: 2,
+      fit: { fitsCount: 0, unknownCount: 1, leftOutCount: 0, exactNoFitCount: 1 },
+    });
+  });
+
+  it('lists a no-fit product matched by an 8-digit EAN', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'ean-corto', fit: 'no-fit', extra: { eanNormalised: '96385074' } });
+    const result = await carSearch('9638-5074', world.carId);
+    expect(slugsOf(result)).toEqual(['ean-corto']);
+    expect(groupsOf(result)).toEqual(['no-fit-exact']);
+    expect(result).toMatchObject({ fit: { exactNoFitCount: 1, leftOutCount: 0 } });
+  });
+
+  it('lists a no-fit product matched by an exact normalised part number, whatever the spelling', async () => {
+    const world = await carWorld();
+    await carProduct(world, {
+      slug: 'por-pn',
+      fit: 'no-fit',
+      extra: { partNumber: 'OC-1234', partNumberNormalised: 'OC1234' },
+    });
+    for (const term of ['OC1234', 'oc-12.34', 'OC 1234']) {
+      const result = await carSearch(term, world.carId);
+      expect(slugsOf(result), term).toEqual(['por-pn']);
+      expect(groupsOf(result), term).toEqual(['no-fit-exact']);
+    }
+  });
+
+  it('a fitting or unknown exact match is in its own group, not flagged and not in exactNoFitCount', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'ajusta', fit: 'fits', extra: { partNumberNormalised: 'ZX1' } });
+    await carProduct(world, { slug: 'desconocido', fit: 'unknown', extra: { partNumberNormalised: 'ZX1' } });
+    const result = await carSearch('zx1', world.carId);
+    expect(slugsOf(result)).toEqual(['ajusta', 'desconocido']);
+    expect(groupsOf(result)).toEqual(['fits', 'unknown']);
+    expect(result).toMatchObject({ fit: { fitsCount: 1, unknownCount: 1, leftOutCount: 0, exactNoFitCount: 0 } });
+  });
+
+  it('a no-fit product reached by text only, beside an exact one, stays left out', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'exacto', fit: 'no-fit', prices: [500], extra: { eanNormalised: EAN } });
+    await carProduct(world, { slug: 'solo-texto', fit: 'no-fit', prices: [100], title: `Kit ${EAN}` });
+    const result = await carSearch(EAN, world.carId);
+    expect(slugsOf(result)).toEqual(['exacto']);
+    expect(result).toMatchObject({ fit: { exactNoFitCount: 1, leftOutCount: 1 } });
+  });
+
+  it('AC 33: the group order wins over the code-match tier: a fitting text match precedes an exact no-fit', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'exacto-no-fit', fit: 'no-fit', prices: [100], extra: { eanNormalised: EAN } });
+    await carProduct(world, { slug: 'texto-fits', fit: 'fits', prices: [9000], title: `Kit ${EAN}` });
+    expect(slugsOf(await carSearch(EAN, world.carId))).toEqual(['texto-fits', 'exacto-no-fit']);
+  });
+
+  it('AC 33: inside the exact group the lowest price comes first, then the id', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'caro', fit: 'no-fit', prices: [900], extra: { partNumberNormalised: 'ZX9' } });
+    await carProduct(world, { slug: 'barato', fit: 'no-fit', prices: [300], extra: { partNumberNormalised: 'ZX9' } });
+    await carProduct(world, { slug: 'empate-a', fit: 'no-fit', prices: [600], extra: { partNumberNormalised: 'ZX9' } });
+    await carProduct(world, { slug: 'empate-b', fit: 'no-fit', prices: [600], extra: { partNumberNormalised: 'ZX9' } });
+    expect(slugsOf(await carSearch('zx9', world.carId))).toEqual(['barato', 'empate-a', 'empate-b', 'caro']);
+  });
+
+  it('the coalesce case: a no-fit product with null codes found by an EAN term through its title is left out and counted', async () => {
+    const world = await carWorld();
+    // ean_normalised and part_number_normalised are null: a null code match must not drop it from the counts.
+    await carProduct(world, { slug: 'sin-codigos', fit: 'no-fit', title: `Filtro ${EAN}` });
+    await carProduct(world, { slug: 'compatible', fit: 'fits', title: `Filtro ${EAN}` });
+    const result = await carSearch(EAN, world.carId);
+    expect(slugsOf(result)).toEqual(['compatible']);
+    expect(result).toMatchObject({ fit: { fitsCount: 1, unknownCount: 0, leftOutCount: 1, exactNoFitCount: 0 } });
+  });
+
+  it('the coalesce case with a part-number-only term (not an EAN)', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'sin-codigos', fit: 'no-fit', title: 'Filtro OC7777' });
+    await carProduct(world, { slug: 'compatible', fit: 'fits', title: 'Filtro OC7777' });
+    const result = await carSearch('OC7777', world.carId);
+    expect(slugsOf(result)).toEqual(['compatible']);
+    expect(result).toMatchObject({ fit: { fitsCount: 1, leftOutCount: 1, exactNoFitCount: 0 } });
+  });
+
+  it('a term that is no code at all has no exception: a no-fit text match is left out', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'no-compatible', fit: 'no-fit', extra: { eanNormalised: EAN, partNumberNormalised: 'ZX1' } });
+    expect(await carSearch('filtro', world.carId)).toEqual({ state: 'all-left-out', term: 'filtro', leftOutCount: 1 });
+  });
+});
+
+describe('with a selected car: all left out, no results and 404 (S5.8)', () => {
+  it('every match no-fit by text only is all-left-out with the count on page 1 and null on page 2', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n1', fit: 'no-fit' });
+    await carProduct(world, { slug: 'n2', fit: 'no-fit' });
+    expect(await carSearch('filtro', world.carId)).toEqual({ state: 'all-left-out', term: 'filtro', leftOutCount: 2 });
+    expect(await carSearch('filtro', world.carId, 2)).toBeNull();
+  });
+
+  it('no match at all is no-results, not all-left-out, with and without a car', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n1', fit: 'no-fit' });
+    expect(await carSearch('zzzz', world.carId)).toEqual({ state: 'no-results', term: 'zzzz' });
+    expect(await carSearch('zzzz', world.carId, 2)).toBeNull();
+    expect(await carSearch('zzzz', null)).toEqual({ state: 'no-results', term: 'zzzz' });
+  });
+
+  it('an empty term with a car is empty-query and reads no database', async () => {
+    const world = await carWorld();
+    const port = await unusedPort();
+    await closeDb();
+    vi.stubEnv('DATABASE_URL', `postgres://nobody:pw@127.0.0.1:${port}/nothing`);
+    expect(await getPublicSearchPage('', 1, world.carId)).toEqual({ state: 'empty-query', term: '' });
+  });
+
+  it('a hidden-only match with a car is no-results, never all-left-out (it must not reveal the product)', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'oculto', fit: 'no-fit', isHidden: true });
+    await carProduct(world, { slug: 'oculto-fit', fit: 'fits', isHidden: true });
+    expect(await carSearch('filtro', world.carId)).toEqual({ state: 'no-results', term: 'filtro' });
+  });
+});
+
+describe('with a selected car: visibility (guardrail 1)', () => {
+  it('a hidden product never reaches the listing, the counts or the exact-code exception', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'oculto-exacto', fit: 'no-fit', isHidden: true, extra: { eanNormalised: EAN } });
+    await carProduct(world, { slug: 'oculto-fit', fit: 'fits', isHidden: true, extra: { eanNormalised: EAN } });
+    await carProduct(world, { slug: 'visible', fit: 'unknown', extra: { eanNormalised: EAN } });
+    const result = await carSearch(EAN, world.carId);
+    expect(slugsOf(result)).toEqual(['visible']);
+    expect(result).toMatchObject({ fit: { fitsCount: 0, unknownCount: 1, leftOutCount: 0, exactNoFitCount: 0 } });
+  });
+
+  it('a product whose only offers are hidden or from an unapproved feed never appears, by any route', async () => {
+    const world = await carWorld();
+    const hiddenOffer = await carProduct(world, { slug: 'oferta-oculta', fit: 'fits', extra: { eanNormalised: EAN } });
+    await getDb().update(offers).set({ isHidden: true }).where(eq(offers.id, hiddenOffer.offerIds[0]));
+
+    const unapprovedFeed = await insertFeed((await insertShop()).id, { isApproved: false });
+    const unapproved = await insertProduct({ slug: 'feed-sin-aprobar', title: `Filtro ${EAN}`, eanNormalised: EAN });
+    await insertOffer({ productId: unapproved.id, feedId: unapprovedFeed });
+    await insertFitment(unapproved.id, world.carId, world.fitFeed);
+
+    expect(await carSearch(EAN, world.carId)).toEqual({ state: 'no-results', term: EAN });
+    expect(await carSearch('filtro', world.carId)).toEqual({ state: 'no-results', term: 'filtro' });
+  });
+
+  it('a fitment said by an unapproved feed does not make a product fit', async () => {
+    const world = await carWorld();
+    const product = await insertListedProduct({ slug: 'fitment-sin-aprobar', title: 'Filtro uno', prices: [1000] });
+    const badFeed = await insertFeed((await insertShop()).id, { isApproved: false });
+    await insertFitment(product.id, world.carId, badFeed);
+    const result = await carSearch('filtro', world.carId);
+    expect(groupsOf(result)).not.toContain('fits');
+  });
+
+  it('a product with no category is never found, with a car or not', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'sin-categoria', fit: 'fits', extra: { categoryId: null, eanNormalised: EAN } });
+    expect(await carSearch(EAN, world.carId)).toEqual({ state: 'no-results', term: EAN });
+  });
+});
+
+describe('with a selected car: a failed read (S5.8, AC 31, guardrail 5)', () => {
+  it('a vehicle id out of the integer range throws the fixed error and logs only the code, never the id or the term', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const others = (['log', 'warn', 'info', 'debug'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => undefined),
+    );
+    await insertListedProduct({ slug: 'presente', title: 'Filtro presente', prices: [1000] });
+    const hugeId = 9_999_999_999_999;
+    const marker = 'zqmarkerterm';
+
+    let thrown: unknown;
+    try {
+      await getPublicSearchPage(marker, 1, hugeId);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe('search: failed');
+    expect((thrown as Error).cause).toBeUndefined();
+    expect(String((thrown as Error).stack)).not.toContain(String(hugeId));
+    expect(String((thrown as Error).stack)).not.toContain(marker);
+
+    expect(errors).toHaveBeenCalledTimes(1);
+    const line = String(errors.mock.calls[0]?.[0]);
+    expect(errors.mock.calls[0]).toHaveLength(1);
+    expect(line).toMatch(/^search: failed \([A-Za-z0-9_]{1,32}\)$/);
+    expect(line).not.toContain(String(hugeId));
+    expect(line).not.toContain(marker);
+    for (const spy of others) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('a failed read with a matching term fails the same way (the fit read is the one that breaks)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await insertListedProduct({ slug: 'presente', title: 'Filtro presente', prices: [1000] });
+    await expect(getPublicSearchPage('filtro', 1, 9_999_999_999_999)).rejects.toThrow(/^search: failed$/);
+    expect(errors).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(errors.mock.calls)).not.toContain('9999999999999');
   });
 });
