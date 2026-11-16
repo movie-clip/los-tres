@@ -164,7 +164,8 @@ test.describe('closing without a selection (ACs 27, 28)', () => {
     await expect(page.getByTestId('car-select')).toBeFocused();
     await expect(page.getByTestId('car-label')).toHaveCount(0);
     expect(await page.evaluate(() => window.localStorage.length)).toBe(0);
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    // The scroll lock is released in an unmount cleanup that runs after the close event: wait for it.
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('');
   });
 
   test('AC 27: Escape from step 3 changes nothing about the selected car', async ({ page }) => {
