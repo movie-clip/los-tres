@@ -222,3 +222,65 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// S5.8 (#276, ACs 41, 42; 04-ux checks 30 and 33): the category page with a selected car, with the longest
+// car label, at the four widths. Group headings, the counts line, the fits-empty note, the marks and the
+// all-left-out card wrap and are not cut. The cases are the ones the demo data reaches with the longest car's
+// own fit. The demo's longest car fits no product, so it reaches the fits-empty note, the no-data group and
+// the all-left-out card, but never the fits group (its heading naming the longest car, and the marks): that
+// state is not faked here and is named in the run report.
+const FIT_PAGES: { name: string; url: string; marker: string }[] = [
+  { name: 'root, note and no-data group', url: `/categoria/${ROOT}`, marker: 'listing-note' },
+  { name: 'root, brand with no fits', url: `/categoria/${ROOT}?marca=mahle`, marker: 'listing-note' },
+  { name: 'root, all left out with a brand', url: `/categoria/${ROOT}?marca=bosch`, marker: 'category-empty' },
+  { name: 'air filters, note and no-data group', url: '/categoria/filtros-de-aire', marker: 'listing-note' },
+  { name: 'air filters, all left out with a brand', url: '/categoria/filtros-de-aire?marca=bosch', marker: 'category-empty' },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the category page with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, url, marker } of FIT_PAGES) {
+      test(`${name}: no sideways scroll and no text cut`, async ({ page }) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(marker).first()).toBeVisible();
+        // The counts line is the fit line, not the single product count: the page is in the car state.
+        await expect(page.getByTestId('category-summary')).toContainText(messages.Fit.countUnknown.replace('{count}', '').trim());
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+        expect(await cutText(page)).toEqual([]);
+      });
+    }
+
+    test('the note and the all-left-out heading name the longest car and stay inside the viewport', async ({ page }) => {
+      const inside = async (url: string, pick: (page: Page) => ReturnType<Page['locator']>) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        const element = pick(page);
+        await expect(element).toContainText(LONGEST_CAR.engine);
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      };
+      await inside(`/categoria/${ROOT}`, (p) => p.getByTestId('listing-note'));
+      await inside('/categoria/filtros-de-aire?marca=bosch', (p) =>
+        p.getByTestId('category-empty').getByRole('heading', { level: 2 }),
+      );
+    });
+
+    test('the all-left-out actions are inside the viewport and at least 44px tall', async ({ page }) => {
+      await page.goto(`/categoria/filtros-de-aire?marca=bosch&coche=${LONGEST_CAR.slug}`);
+      for (const id of ['category-empty-action', 'fit-change-car']) {
+        const action = page.getByTestId(id);
+        await expect(action).toBeVisible();
+        const box = (await action.boundingBox())!;
+        expect(box.x, id).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, id).toBeLessThanOrEqual(width + 0.5);
+        expect(box.height, id).toBeGreaterThanOrEqual(44);
+      }
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(await cutText(page)).toEqual([]);
+    });
+  });
+}
