@@ -1,4 +1,7 @@
+import { useId } from 'react';
+
 import { CategoryIllustration, type IllustrationKey } from './CategoryIllustration';
+import { FitMark, type FitMarkKind } from './FitMark';
 import styles from './ProductCard.module.css';
 
 export type ProductCardProps = {
@@ -17,13 +20,24 @@ export type ProductCardProps = {
   shopCount: string;
   /** The product's own leaf category drawing. Null renders the same tile, empty. */
   illustration: IllustrationKey | null;
+  /**
+   * The fit mark under the spec line, with its finished words. Null or omitted for no mark:
+   * no car, or a card with no compatibility data.
+   */
+  fit?: { kind: FitMarkKind; label: string } | null;
+  /**
+   * The title's heading level: 3 when the card sits inside a listing group (h1, h2 group
+   * heading, h3 title), 2 otherwise, which is the default.
+   */
+  headingLevel?: 2 | 3;
 };
 
 /**
  * One product in a listing. Display strings only. The title link is stretched
  * over the whole card, so the card is a single tab stop. The price is a span,
  * never a paragraph (the .page p rule in globals.css would recolour it).
- * Reading order: drawing, brand, title, spec line, price group, shop chip.
+ * Reading order: drawing, brand, title, spec line, fit mark, price group, shop
+ * chip. The title link is described by the mark, so a screen reader hears both.
  */
 export function ProductCard({
   href,
@@ -34,7 +48,11 @@ export function ProductCard({
   price,
   shopCount,
   illustration,
+  fit = null,
+  headingLevel = 2,
 }: ProductCardProps) {
+  const markId = useId();
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   return (
     <li className={styles.card} data-testid="category-card">
       <div className={styles.head}>
@@ -47,16 +65,22 @@ export function ProductCard({
               {brand}
             </span>
           ) : null}
-          <h2 className={styles.title}>
-            <a href={href} className={styles.link} data-testid="card-title">
+          <Heading className={styles.title}>
+            <a
+              href={href}
+              className={styles.link}
+              aria-describedby={fit === null ? undefined : markId}
+              data-testid="card-title"
+            >
               {title}
             </a>
-          </h2>
+          </Heading>
           {spec !== null ? (
             <span className={styles.spec} data-testid="card-spec">
               {spec}
             </span>
           ) : null}
+          {fit === null ? null : <FitMark kind={fit.kind} label={fit.label} id={markId} />}
         </div>
       </div>
       <div className={styles.footer}>

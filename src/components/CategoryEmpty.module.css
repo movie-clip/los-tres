@@ -54,6 +54,27 @@
   outline-offset: var(--focus-offset);
 }
 
+/* Two actions: stacked below 40rem, each content wide and a half step apart; from
+   40rem on one row while they fit. Each stays in its own paragraph. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+  margin: 0;
+}
+
+.actions .text {
+  margin: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 40rem) {
+  .actions {
+    flex-flow: row wrap;
+  }
+}
+
 /* The action link is the same secondary button as the home link. */
 .action {
   composes: home;

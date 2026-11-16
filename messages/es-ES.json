@@ -47,7 +47,24 @@
     "specRef": "Ref. {partNumber}",
     "noMatchHeading": "No hay productos de esta marca en esta categoría",
     "noMatchBody": "Prueba con otra marca o quita el filtro para ver todos los productos.",
-    "noMatchAction": "Quitar el filtro"
+    "noMatchAction": "Quitar el filtro",
+    "allOutHeading": "Ningún producto es compatible con tu {car}"
+  },
+  "Fit": {
+    "fitsHeading": "Compatibles con tu {car}",
+    "unknownHeading": "Sin datos de compatibilidad",
+    "unknownHelp": "No tenemos datos de con qué coches encajan. Compruébalo antes de comprar.",
+    "exactHeading": "Coincidencia exacta de referencia o EAN",
+    "exactHelp": "{count, plural, one {No es compatible con tu {car}, pero lo mostramos porque coincide exactamente con lo que has buscado.} other {No son compatibles con tu {car}, pero los mostramos porque coinciden exactamente con lo que has buscado.}}",
+    "noFitsNote": "No hay productos compatibles con tu {car}.",
+    "markFits": "Compatible",
+    "markNoFit": "No compatible",
+    "countFits": "{count, plural, one {# compatible} other {# compatibles}}",
+    "countUnknown": "{count} sin datos",
+    "countLeftOut": "{count, plural, one {# no compatible oculto} other {# no compatibles ocultos}}",
+    "countExact": "{count, plural, one {# coincidencia exacta} other {# coincidencias exactas}}",
+    "changeCar": "Cambiar de coche",
+    "allOutBody": "{count, plural, one {Hemos ocultado # producto porque no es compatible con tu coche.} other {Hemos ocultado # productos porque no son compatibles con tu coche.}}"
   },
   "Search": {
     "metaTitle": "Buscar productos | {siteName}",

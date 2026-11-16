@@ -16,11 +16,15 @@ import { CategoryResultsPanel } from '@/components/CategoryResultsPanel';
 import { CategorySort } from '@/components/CategorySort';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { DemoNotice } from '@/components/DemoNotice';
+import { fitMarkKind } from '@/components/FitMark';
+import { ListingGroup, groupRuns, type ListingGroupKind } from '@/components/ListingGroup';
+import { ListingNote } from '@/components/ListingNote';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
 import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
+import { carLinks } from '@/server/car/return-path';
 import { selectedVehicleId } from '@/server/car/state';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import {
@@ -47,6 +51,9 @@ const SORT_OPTIONS: { sort: CategorySortValue; labelKey: 'sortPriceAsc' | 'sortP
 
 // Counts can reach four digits; es-ES drops the separator there unless asked.
 const countFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
+
+// Between the parts of the counts line, and before the page indicator: a middle dot with a space each side.
+const COUNTS_SEPARATOR = ' \u00b7 ';
 
 // One database read per request, shared by generateMetadata and the page.
 const load = cache(getPublicCategoryPage);
@@ -101,8 +108,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   );
   if (category === null) notFound();
 
-  const [t, tProduct, tNotFound, tDemo, tCar] = await Promise.all([
+  const [t, tFit, tProduct, tNotFound, tDemo, tCar] = await Promise.all([
     getTranslations('Category'),
+    getTranslations('Fit'),
     getTranslations('Product'),
     getTranslations('NotFound'),
     getTranslations('DemoNotice'),
@@ -112,6 +120,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
   // What every internal link carries: the selected car, else nothing (D11).
   const carSlug = selectedSlug(car);
+  // The fit view: only with a selected car, whose listing the loader filtered. Without one the page is as it was.
+  const carFit =
+    car.state === 'selected' && category.fit !== null
+      ? { name: car.vehicle.name, counts: category.fit }
+      : null;
 
   // The ancestors, root first, the category itself not listed: empty for a root, so no nav renders.
   const breadcrumb = (
@@ -162,6 +175,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       ? { href: pageHref(category.page + 1), label: t('nextPage') }
       : null;
 
+  // With a car a chip counts what the page lists for it, so a brand with nothing listed has no chip.
+  const listedBrands =
+    carFit === null ? category.brands : category.brands.filter((brand) => brand.productCount > 0);
   // The brand group is for a choice: two brands or more.
   const toChip = (brand: (typeof category.brands)[number]): BrandChip => {
     const selected = brand.slug === selectedBrandSlug;
@@ -179,7 +195,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       selected,
     };
   };
-  const brandChips = category.brands.map(toChip);
+  const brandChips = listedBrands.map(toChip);
   // Two lists: a short one below 40rem and the long one from 40rem (BrandChips renders both).
   const toList = (visible: number) => {
     const moreChips = brandChips.slice(visible);
@@ -190,14 +206,16 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     };
   };
   const brands =
-    category.brands.length >= 2 ? (
+    listedBrands.length >= 2 ? (
       <BrandChips
         groupLabel={t('brandGroupLabel')}
         // No chip is selected when the filter matched nothing: the way out is the action button.
         all={{
           href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
           label: t('brandAll'),
-          selected: category.state === 'results' && selectedBrandSlug === null,
+          selected:
+            (category.state === 'results' || category.state === 'all-left-out') &&
+            selectedBrandSlug === null,
         }}
         narrow={toList(NARROW_BRAND_CHIPS)}
         wide={toList(VISIBLE_BRAND_CHIPS)}
@@ -224,6 +242,109 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       />
     ) : null;
 
+  // The counts line: one product count without a car; with one, fits, no data and hidden, then the page.
+  const countsLine =
+    carFit === null
+      ? category.pageCount > 1
+        ? t('summaryPaged', counts)
+        : t('summary', counts)
+      : [
+          tFit('countFits', { count: carFit.counts.fitsCount }),
+          tFit('countUnknown', { count: countFormat.format(carFit.counts.unknownCount) }),
+          tFit('countLeftOut', { count: carFit.counts.leftOutCount }),
+          ...(category.pageCount > 1 ? [t('pageIndicator', counts)] : []),
+        ].join(COUNTS_SEPARATOR);
+
+  const removeFilter = {
+    href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
+    label: t('noMatchAction'),
+  };
+
+  // The card of one product. A card with a fit group sits in a listing group: h3 title, and the mark its group gives.
+  const toCard = (product: (typeof category.products)[number]) => {
+    const kind = fitMarkKind(product.fitGroup);
+    return {
+      key: product.slug,
+      href: withCar(productPath(product.slug), carSlug),
+      title: product.title,
+      brand: product.brand,
+      spec:
+        product.partNumber === null ? null : t('specRef', { partNumber: product.partNumber }),
+      // "Desde" only when the price is the lowest of several shops.
+      priceFrom: product.offerCount >= 2 ? t('priceFrom') : null,
+      price: formatEuroCents(product.lowestPriceCents),
+      shopCount: tProduct('shopCount', { count: product.offerCount }),
+      illustration: toIllustrationKey(product.categorySlug),
+      fit:
+        kind === null
+          ? null
+          : { kind, label: kind === 'fits' ? tFit('markFits') : tFit('markNoFit') },
+      headingLevel: product.fitGroup === null ? (2 as const) : (3 as const),
+    };
+  };
+
+  const groupCopy = (group: ListingGroupKind, name: string, cardCount: number) => {
+    switch (group) {
+      case 'fits':
+        return { heading: tFit('fitsHeading', { car: name }), help: null };
+      case 'unknown':
+        return { heading: tFit('unknownHeading'), help: tFit('unknownHelp') };
+      case 'no-fit-exact':
+        // The category listing never returns this group (search does); counted by the page's cards.
+        return {
+          heading: tFit('exactHeading'),
+          help: tFit('exactHelp', { car: name, count: cardCount }),
+        };
+    }
+  };
+
+  let listing;
+  if (category.state === 'no-match') {
+    listing = (
+      <CategoryEmpty heading={t('noMatchHeading')} body={t('noMatchBody')} action={removeFilter} />
+    );
+  } else if (category.state === 'all-left-out' && carFit !== null) {
+    // Every product of the category or brand was hidden: the way out is another car (or no brand).
+    const links = carLinks(car);
+    const changeCar = {
+      href: links.change ?? links.select,
+      label: tFit('changeCar'),
+      testId: 'fit-change-car',
+    };
+    listing = (
+      <CategoryEmpty
+        heading={t('allOutHeading', { car: carFit.name })}
+        body={tFit('allOutBody', { count: carFit.counts.leftOutCount })}
+        action={selectedBrandSlug === null ? changeCar : removeFilter}
+        secondAction={selectedBrandSlug === null ? undefined : changeCar}
+      />
+    );
+  } else if (carFit !== null) {
+    const runs = groupRuns(category.products, (product) => {
+      // The loader gives every card of a car listing a group; a card without one is a fault, never shown as a group.
+      if (product.fitGroup === null) throw new Error('category: card without a fit group');
+      return product.fitGroup;
+    });
+    listing = (
+      <>
+        {carFit.counts.fitsCount === 0 ? (
+          <ListingNote text={tFit('noFitsNote', { car: carFit.name })} />
+        ) : null}
+        {runs.map((run) => (
+          <ListingGroup
+            key={run.group}
+            group={run.group}
+            {...groupCopy(run.group, carFit.name, run.items.length)}
+          >
+            <ProductGrid cards={run.items.map(toCard)} />
+          </ListingGroup>
+        ))}
+      </>
+    );
+  } else {
+    listing = <ProductGrid cards={category.products.map(toCard)} />;
+  }
+
   return (
     <main className="page">
       {carNotice}
@@ -235,37 +356,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       </div>
       <CategoryResultsPanel
         brands={brands}
-        count={category.pageCount > 1 ? t('summaryPaged', counts) : t('summary', counts)}
+        count={countsLine}
         sort={sortControl}
       />
-      {category.state === 'no-match' ? (
-        <CategoryEmpty
-          heading={t('noMatchHeading')}
-          body={t('noMatchBody')}
-          action={{
-            href: withCar(categoryListingPath(category.slug, { sort }), carSlug),
-            label: t('noMatchAction'),
-          }}
-        />
-      ) : (
-        <ProductGrid
-          cards={category.products.map((product) => ({
-            key: product.slug,
-            href: withCar(productPath(product.slug), carSlug),
-            title: product.title,
-            brand: product.brand,
-            spec:
-              product.partNumber === null
-                ? null
-                : t('specRef', { partNumber: product.partNumber }),
-            // "Desde" only when the price is the lowest of several shops.
-            priceFrom: product.offerCount >= 2 ? t('priceFrom') : null,
-            price: formatEuroCents(product.lowestPriceCents),
-            shopCount: tProduct('shopCount', { count: product.offerCount }),
-            illustration: toIllustrationKey(product.categorySlug),
-          }))}
-        />
-      )}
+      {listing}
       {category.state === 'results' && category.pageCount > 1 ? (
         <Pagination
           navLabel={t('paginationLabel')}

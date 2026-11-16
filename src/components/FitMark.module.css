@@ -1,0 +1,48 @@
+/* A tag in the card's text column, left aligned and not stretched. Success and
+   danger are the state colours of globals; the words are always there, so the
+   colour is never the only cue. 0.75rem is this component's own glyph size. */
+.mark {
+  display: inline-flex;
+  gap: var(--space-0);
+  align-items: center;
+  align-self: flex-start;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--space-0) var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.fits {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.noFit {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The glyph is a filled shape clipped from an empty box: decorative, no text. */
+.glyph {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  background: currentColor;
+}
+
+/* The same check polygon as the selected brand chip. */
+.fits .glyph {
+  clip-path: polygon(0 55%, 15% 40%, 38% 62%, 85% 10%, 100% 25%, 38% 92%);
+}
+
+.noFit .glyph {
+  clip-path: polygon(15% 0, 50% 35%, 85% 0, 100% 15%, 65% 50%, 100% 85%, 85% 100%, 50% 65%, 15% 100%, 0 85%, 35% 50%, 0 15%);
+}
