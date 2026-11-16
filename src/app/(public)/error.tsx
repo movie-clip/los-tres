@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-
 import { usePublicFallback } from '@/components/PublicFallbackContext';
 
 import styles from './error.module.css';
@@ -15,7 +13,8 @@ import styles from './error.module.css';
  *
  * A client boundary cannot call next-intl without a provider, so the finished
  * strings come from the context PublicChrome fills on the server (the admin
- * error page works the same way).
+ * error page works the same way). The way home is a plain anchor with the finished
+ * href (it carries the selected car): a failed render must not depend on the router.
  */
 export default function PublicError() {
   const fallback = usePublicFallback();
@@ -25,9 +24,9 @@ export default function PublicError() {
       <h1 className={styles.heading}>{fallback.heading}</h1>
       <p>{fallback.body}</p>
       <p>
-        <Link href="/" className={styles.home}>
+        <a href={fallback.homeHref} className={styles.home}>
           {fallback.home}
-        </Link>
+        </a>
       </p>
     </main>
   );

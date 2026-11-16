@@ -124,7 +124,12 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
   ];
   return (
     <PublicFallbackProvider
-      value={{ heading: tError('heading'), body: tError('body'), home: tNotFound('backHome') }}
+      value={{
+        heading: tError('heading'),
+        body: tError('body'),
+        home: tNotFound('backHome'),
+        homeHref: withCar('/', slug),
+      }}
     >
       <SiteHeader
         siteName={getSiteName()}
