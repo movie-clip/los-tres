@@ -81,7 +81,10 @@
     "promptBody": "Escribe el nombre de un producto, su referencia o su EAN. Por ejemplo, «filtro de aceite» o «5W-30».",
     "noResultsHeading": "No hay resultados",
     "noResultsBody": "No hemos encontrado ningún producto para «{term}». Prueba con una palabra más corta o con la referencia o el EAN del producto. Comprueba también que esté bien escrito.",
-    "browseAction": "Explorar por categoría"
+    "browseAction": "Explorar por categoría",
+    "summaryCarPrefix": "Para «{term}»:",
+    "allOutHeading": "Ningún resultado es compatible con tu {car}",
+    "allOutBody": "{count, plural, one {Hemos encontrado # producto para «{term}», pero no es compatible con tu coche y lo hemos ocultado.} other {Hemos encontrado # productos para «{term}», pero no son compatibles con tu coche y los hemos ocultado.}}"
   },
   "Error": {
     "heading": "Ha ocurrido un error",
