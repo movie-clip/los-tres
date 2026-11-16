@@ -146,12 +146,17 @@ deploy it must be the public https origin**, or all of them point at
 - Demo-only products and categories are `noindex` and carry no canonical.
 - Canonical keeps only `?pagina=<n>` for n above 1; any other query parameter,
   including any future filter, is dropped from it; `marca` and `orden` on a
-  category page (S11.4) are dropped like any other.
-- `/robots.txt` disallows `/go/`, `/api/` and `/buscar` (the search page,
+  category page (S11.4) are dropped like any other, and so is `coche` (S5.7).
+- Every page opened with `coche` (S5.7), whether or not the car is recognised,
+  is `noindex` and carries no canonical; `coche` never appears in the sitemap.
+- `/robots.txt` disallows `/go/`, `/api/`, `/mi-coche` (the car picker page,
+  S5.7: also `noindex` with no canonical, `Referrer-Policy: same-origin`) and
+  `/buscar` (the search page,
   which exists since S5.4: disallowed here and also `noindex` with no
   canonical, and it answers `Referrer-Policy: same-origin`). The search term
   travels in the URL, which the app never logs or stores; **the S9.1 deploy
-  must keep any reverse proxy from logging the `/buscar` query string**, and a
+  must keep any reverse proxy from logging the `/buscar` or `/mi-coche` query
+  string** (`/mi-coche?volver=` can hold a search term), and a
   managed PostgreSQL must allow `CREATE EXTENSION unaccent` (0002). It does not mention the admin area,
   which sends its own noindex signals. `/go/<offer>` also answers
   `X-Robots-Tag: noindex, nofollow`.

@@ -86,18 +86,27 @@ that device until they change or remove it.
      breadcrumb, pagination, sort, chips, search form) carries `coche` while
      one is selected.
    - An unknown or retired slug is ignored: the page renders unfiltered with a
-     short notice "No reconocemos ese coche", and the browser clears the
-     stored value.
+     short notice "No reconocemos ese coche". The browser clears the stored
+     value only when it is that very slug; a different stored car stays.
+   - A `coche` in the URL never writes the stored car: only the picker writes
+     it, and "Quitar" clears it. A shared link with `coche` therefore shows
+     that car for that visit and leaves the visitor's own saved car alone.
    - SEO: canonical already drops every parameter but `pagina` (S6.2), so
-     `coche` is dropped. Pages with `coche` carry `noindex`. `coche` never
-     appears in the sitemap.
+     `coche` is dropped. Every page opened with `coche`, valid or not, carries
+     `noindex`. `coche` never appears in the sitemap.
 5. **Remembered on the device.** When a visitor selects a vehicle, the browser
-   stores its slug in `localStorage` under `lostres.coche` (no expiry). On a
-   page opened without `coche`, a small script reads it and replaces the URL
-   with the same URL plus `coche` (no new history entry). The server stores
+   stores its slug, and only the slug, in `localStorage` under `mi-coche` (no
+   expiry; the key names no site, because a visitor can read it in devtools).
+   On a page opened without `coche`, a small script reads it and replaces the
+   URL with the same URL plus `coche` (no new history entry). The server stores
    nothing about the visitor: no cookie, no session, no log of the selection
    (guardrail 5). It is a preference the visitor asked for, so no consent
-   banner is needed; the privacy page gets one sentence saying so.
+   banner is needed.
+   - Open: the privacy page was not changed in S5.7 (owner ruling D-1 of that
+     run, "ignore privacy page for now"). Its "ni tecnologías similares" line
+     still contradicts the `mi-coche` write, and the sentence this rule asked
+     for is not written. The owner decides the wording; do it before any
+     public deploy.
    - `/go/<offer>` does not log the vehicle.
 6. **Change and remove.** The header always shows the selection control:
    - none selected: a button "Selecciona tu coche";
@@ -110,9 +119,20 @@ that device until they change or remove it.
    came from (`volver` parameter, a site-internal path only) with `coche` set.
    With JavaScript it opens as a dialog on the current page with the same
    three steps, keyboard accessible, and focus returns to the trigger.
-   - Options come from server-rendered lists, or a read-only JSON route
-     `/api/vehiculos` (makes; `?marca=` models; `?modelo=` engines). The
-     `/api/` prefix is already disallowed in robots.txt.
+   - `/mi-coche` takes `marca` (make slug), `modelo` (model slug), `coche`
+     (the engine's vehicle slug) and `volver`. The step shown is the first one
+     not yet chosen: no valid `marca` is the make step, a `marca` without a
+     valid `modelo` of it is the model step, a `modelo` without a valid `coche`
+     of it is the engine step, and all three valid redirects (replace) to
+     `volver` with `coche` last. `volver` is a single `/` path of at most 512
+     characters, with no backslash or control character, never `//`, `/go/`,
+     `/api/`, `/admin` or `/mi-coche` itself; anything else lands on `/`. Its
+     other query parameters are kept, and `coche` is set once, last. The page
+     is `noindex`, has no canonical, is disallowed in robots.txt and sends
+     `Referrer-Policy: same-origin`, because `volver` can hold a search term.
+   - Options are server-rendered into the page (the dialog's tree is embedded
+     in the header, the page renders its steps from the same tree). There is
+     no options route and no `/api/vehiculos`: the path answers 404.
    - Only makes and models that have at least one vehicle are listed. A make
      with no fitment at all is still listed: "unknown" products still show.
 8. **Product page.** With a vehicle selected, the product page shows a fit

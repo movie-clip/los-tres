@@ -1,6 +1,6 @@
 # S5.7 The visitor picks their car once, the site remembers it on this device, and they can change or remove it
 
-Status: draft 2026-10-30, awaiting human approval (board status Ready follows the human's own move)
+Status: approved 2026-10-30 (the human, D-9) and built on branch `269-select-car`; the review gate passed with all 61 ACs satisfied (`agentic/runs/2026-10-30-s5-7-select-car/23-review.md`). Rulings since approval that changed what the text below says: D-21 (the storage key is `mi-coche`, not `lostres.coche`; AC 31), D-17 (no options route, the options are embedded server-side), D-18 (404 and error pages read the car like any page), D-22 (the no-car control sits in header row 1, not a second row) and D-23 (the no-script car links carry `volver` with the `/buscar` query). The privacy page is unchanged (D-1). Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: L
 Issue: #269 · Tickets: #270-#273 (T5.7.1-T5.7.4) and one new ticket (T5.7.5, issue to be created; ruling D-2)
 Depends on: S5.5 (#261), merged: the vehicle list and `findActiveVehicle`. S5.6 (#265), merged, gives the demo feeds their fitment, but this story reads no fitment. S5.8 (#274) and S5.9 (#278) depend on this story.
@@ -17,7 +17,7 @@ Nothing here blocks ticketing except the creation of the new ticket's issue (D-2
 
 ### Carried open item (D-1): the privacy page
 
-Ruling D-1, 2026-10-30: "ignore privacy page for now". **This story does not change the privacy page.** `Privacy.cookiesBody` still says the site installs no cookies "ni tecnologías similares" in the visitor's browser, which stops being true once `lostres.coche` is written to `localStorage`. Spec rule 5 and decision 0016 both say "the privacy page gets one sentence", and that is **not** done by this story: reconcile must not mark it as shipped. The wording needs more than one sentence (the "similar technologies" denial and the heading `Privacy.cookiesHeading` need review) and the owner decides it. Recommended: the owner rules on it, and it ships before any public deploy; until then it is a known false statement on a page that is only live on the demo. The human may add a Backlog item or a line in the S9.1 deploy checklist; this story creates neither.
+Ruling D-1, 2026-10-30: "ignore privacy page for now". **This story does not change the privacy page.** `Privacy.cookiesBody` still says the site installs no cookies "ni tecnologías similares" in the visitor's browser, which stops being true once `mi-coche` (named `lostres.coche` when this was written; D-21) is written to `localStorage`. Spec rule 5 and decision 0016 both say "the privacy page gets one sentence", and that is **not** done by this story: reconcile must not mark it as shipped. The wording needs more than one sentence (the "similar technologies" denial and the heading `Privacy.cookiesHeading` need review) and the owner decides it. Recommended: the owner rules on it, and it ships before any public deploy; until then it is a known false statement on a page that is only live on the demo. The human may add a Backlog item or a line in the S9.1 deploy checklist; this story creates neither.
 
 ## Story
 
@@ -32,7 +32,7 @@ In:
 - the picker, make then model then engine: as a dialog with JavaScript, and as GET steps on `/mi-coche` without it, returning to the origin page through `volver` (spec rule 7);
 - the read-only options the picker needs, from server-rendered lists or a read-only JSON route (the tech lead chooses); only makes and models with at least one active vehicle are listed;
 - `coche` carried on every internal link and on the search and sort forms while a car is selected, except `/go/<offer>` (spec rule 4; D-2, D-3);
-- the browser keeping the choice under `localStorage` key `lostres.coche`: written on selection, restored on a page opened without `coche`, cleared on "Quitar" (spec rules 5 and 6; OD-S2);
+- the browser keeping the choice under `localStorage` key `mi-coche` (D-21): written on selection, restored on a page opened without `coche`, cleared on "Quitar" (spec rules 5 and 6; OD-S2);
 - the notice for an unknown or retired car, the page rendered as without a car (spec rule 4);
 - `noindex` on pages opened with `coche`, canonical without it, `coche` never in the sitemap (spec rule 4);
 - `/mi-coche` `noindex` and disallowed in `robots.txt`, like `/buscar` (D-6);
@@ -98,10 +98,10 @@ The picker with JavaScript (dialog)
 
 The choice on the device (`localStorage`)
 
-31. Selecting a car stores its slug, and only the slug, under `lostres.coche`.
+31. Selecting a car stores its slug, and only the slug, under `mi-coche` (D-21; first written as `lostres.coche`).
 32. A page opened without `coche`, with a stored car, ends at the same URL plus `coche`, without adding a history entry; its other query parameters and fragment are kept.
 33. After that restore the page shows the car selected, in the header and in its links.
-34. "Quitar" clears `lostres.coche`, removes `coche` from the URL keeping its other parameters, and the header returns to the no-car state.
+34. "Quitar" clears `mi-coche`, removes `coche` from the URL keeping its other parameters, and the header returns to the no-car state.
 35. A stored value that is not shaped like a slug is cleared and never added to the URL.
 36. When the browser's storage is unavailable or throws, the page still works, no uncaught error is raised, and the picker still selects a car through the URL.
 37. (OD-S2.) Opening a URL that carries `coche` does not write or change the stored car.
@@ -189,7 +189,7 @@ Ordered, contracts before consumers. Each ticket has a test dispatch after it, a
 1. **T5.7.1 (#270) ux. Spec for the car control, the picker and the notice.** The header anatomy with the control in both states, the dialog within the design system's limits (no shadow, transition, transform, animation), the three steps and the no-JavaScript flow, the 404 and error behaviour, the notice and its place, and every string (spec rule 9). Runs first, edits no repo file; the docs lane writes `docs/design/system.md` at close-out. ACs 1 to 6, 23 to 30, 40, 58 to 61.
 2. **T5.7.2 (#271) backend. `/mi-coche` steps, the options and the `coche` helper.** The read of makes, models and engines, the GET steps and `volver` rule, the helper that turns `coche` into an active vehicle or an unrecognised result, and `/mi-coche` `noindex` and the `robots.txt` line. Test dispatch after it: the options integration tests, the `volver` and helper unit tests, the no-JavaScript e2e. ACs 7 to 22, 55, 57.
 3. **T5.7.5 (issue to be created, D-2) frontend, with the path builders. Carry `coche` on every internal link and form.** The path builders, the link sinks and the search and sort forms. It starts only after the human has read the design comparison in Open decisions item 1; if the mechanism changes, this ticket is re-cut. Needs the helper from T5.7.2. Test dispatch after it: the link crawl and form tests. ACs 43 to 47.
-4. **T5.7.3 (#272) frontend. Header control, dialog, saved choice and notice.** The control, the dialog, the script that writes, restores and clears `lostres.coche`, the notice for an unrecognised car, and `/go` carrying no `coche`. Needs T5.7.1, T5.7.2 and T5.7.5. Test dispatch after it: the dialog, focus, storage and notice e2e. ACs 1 to 6, 23 to 42, 48 to 50.
+4. **T5.7.3 (#272) frontend. Header control, dialog, saved choice and notice.** The control, the dialog, the script that writes, restores and clears `mi-coche`, the notice for an unrecognised car, and `/go` carrying no `coche`. Needs T5.7.1, T5.7.2 and T5.7.5. Test dispatch after it: the dialog, focus, storage and notice e2e. ACs 1 to 6, 23 to 42, 48 to 50.
 5. **T5.7.4 (#273) backend, then test. `noindex` for pages with `coche`, and the story's end-to-end checks.** Narrowed by D-1: it carries no privacy line. Two dispatches: first the code, `noindex` for pages opened with `coche`, canonical without it, and the sitemap check (the page metadata of the home, category, product, search and legal routes); then the cross-cutting tests, the 390 and 1280 px layout checks, the updated tab-order and reflow pins, and the no-cookie and no-log checks. The tech lead may move the `noindex` code into T5.7.2. ACs 51 to 54, 56, 58 to 61.
 
 ## Docs to reconcile at close-out
