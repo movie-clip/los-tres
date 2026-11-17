@@ -5,6 +5,7 @@ import { QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { getDb } from '../../db/client';
 import { feeds, fitments, products, shops, vehicles } from '../../db/schema';
+import { errorCode } from '../error-code';
 import { activeVehicleWhere, countedFitmentWhere, visibleProductWhere } from '../visibility';
 
 // The fit-state question of the car filter (S5.5, docs/product/vehicle-fitment.md).
@@ -48,13 +49,25 @@ export function fitStateSql(vehicleId: number): SQL<FitState> {
 }
 
 /**
- * Fixed error: a Drizzle error message embeds its bound params (the slug, the ids).
- * The driver error rides as `cause` (Drizzle's wrapper is unwrapped to it) so a
- * caller can log `errorCode(error.cause)`; the message stays fixed.
+ * The fixed failure of this module. `code` is the database error code (or the
+ * word UNKNOWN), the only thing taken from the driver error: it is validated by
+ * `errorCode` and holds no parameter. No `cause` is attached, because the driver
+ * error and Drizzle's wrapper embed the bound params (the slug, the ids).
  */
+export class FitStateError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super('fit-state: failed');
+    this.code = code;
+  }
+}
+
+/** Fixed error: the message never holds the slug or the ids; the code is Postgres's. */
 function failed(error?: unknown): Error {
+  // The Postgres code lives on the cause of Drizzle's wrapper.
   const driver = error instanceof Error && error.cause !== undefined ? error.cause : error;
-  return new Error('fit-state: failed', { cause: driver });
+  return new FitStateError(errorCode(driver));
 }
 
 /** The active vehicle with this slug, or null when unknown or retired. */
@@ -116,7 +129,7 @@ export async function readFitStates(
  * `getCarContext`). Counted fitments only (`fitStateSql`). Re-applies
  * `visibleProductWhere()`: a slug that is not a public product answers
  * `unknown`, so a hidden product's fitments are unreachable here. Throws the
- * fixed error, with the driver error as `cause`.
+ * `FitStateError` (fixed message, database error code in `code`, no cause).
  */
 export async function readProductFitState(
   productSlug: string,

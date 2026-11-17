@@ -21,11 +21,6 @@ export type ProductFit = {
   banner: ProductFitBanner | null;
 };
 
-/** The Postgres code on the cause of fit-state's fixed error. Never the message. */
-function codeOf(error: unknown): string {
-  return errorCode(error instanceof Error && error.cause !== undefined ? error.cause : error);
-}
-
 /**
  * The fit outcome of one public product (by slug) for the request's car. Never
  * throws: a failed read gives `unchecked` and one `product-fit: fit failed (<code>)`
@@ -38,7 +33,7 @@ export async function getProductFit(productSlug: string, car: CarContext): Promi
   try {
     return { banner: await readProductFitState(productSlug, car.vehicle.id) };
   } catch (error) {
-    console.error(`product-fit: fit failed (${codeOf(error)})`);
+    console.error(`product-fit: fit failed (${errorCode(error)})`);
     return { banner: 'unchecked' };
   }
 }
