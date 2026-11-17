@@ -4,3 +4,9 @@
   display: inline-block;
   overflow-wrap: anywhere;
 }
+
+/* The " ·" that ends every part but the last: never broken from the word before it,
+   so a wrapped line never starts with the separator (D-21). */
+.separator {
+  white-space: nowrap;
+}

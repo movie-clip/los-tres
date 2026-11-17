@@ -8,17 +8,28 @@ import { createTranslator } from 'use-intl/core';
 
 import messages from '../../messages/es-ES.json';
 
-// S5.8 follow-ups (D-14, D-17): the counts line wraps between parts, and the group copy is one shared helper.
+// S5.8 follow-ups (D-14, D-17, D-21): the counts line wraps between parts, the " ·" ends the part before it,
+// and the group copy is one shared helper.
 
 const render = (props: CountsLineProps) => renderToStaticMarkup(createElement(CountsLine, props));
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
-const spans = (html: string) => [...html.matchAll(/<span[^>]*>([\s\S]*?)<\/span>/g)].map((match) => match[1]);
+// A part span holds its text and, for every part but the last, one nested separator span.
+const PART = /<span[^>]*>([^<]*)(?:<span[^>]*>([^<]*)<\/span>)?<\/span>/g;
+const spans = (html: string) => [...html.matchAll(PART)].map((match) => match[1]);
+const separators = (html: string) => [...html.matchAll(PART)].map((match) => match[2] ?? null);
 
 describe('CountsLine', () => {
   it('renders one span per part, with " · " between parts', () => {
     const html = render({ parts: ['10 compatibles', '23 sin datos', '17 ocultos'] });
     expect(spans(html)).toEqual(['10 compatibles', '23 sin datos', '17 ocultos']);
     expect(text(html)).toBe('10 compatibles · 23 sin datos · 17 ocultos');
+  });
+
+  it('ends every part but the last with " ·" in its own span, and puts the plain space between parts', () => {
+    const html = render({ parts: ['10 compatibles', '23 sin datos', '17 ocultos'] });
+    expect(separators(html)).toEqual([' ·', ' ·', null]);
+    // Outside the part spans only the spaces remain: no line can start with the dot.
+    expect(html.replace(PART, '|')).toBe('| | |');
   });
 
   it('renders a single part with no separator', () => {
@@ -49,7 +60,7 @@ describe('CountsLine', () => {
 
   it('renders no element of its own: only the part spans', () => {
     const html = render({ prefix: 'P:', parts: ['a', 'b'] });
-    expect(html.replace(/<span[^>]*>[^<]*<\/span>/g, '')).not.toMatch(/<[a-z]/);
+    expect(html.replace(PART, '')).not.toMatch(/<[a-z]/);
   });
 
   it('keeps the text content equal to the plain joined string', () => {

@@ -361,9 +361,28 @@ const partProblems = (page: Page, testId: string) =>
     const line = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
     const style = getComputedStyle(line);
     const room = line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    const parts = [...line.querySelectorAll<HTMLElement>('span')];
+    const parts = [...line.querySelectorAll<HTMLElement>(':scope > span')];
     const problems: string[] = [];
     if (parts.length < 2) problems.push(`only ${parts.length} part spans in ${id}`);
+    // D-21: the " ·" ends the part before it, so the dot sits on the same line as that part's last character
+    // and no line starts with it or holds it alone.
+    for (const separator of line.querySelectorAll<HTMLElement>(':scope > span > span')) {
+      const text = separator.previousSibling;
+      const dot = separator.firstChild;
+      if (!text || !dot || !text.textContent || dot.textContent !== ' ·') {
+        problems.push(`separator span in ${id} is not " ·" after part text`);
+        continue;
+      }
+      const rectOf = (node: Node, start: number) => {
+        const range = document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + 1);
+        return range.getBoundingClientRect();
+      };
+      const before = rectOf(text, text.textContent.length - 1);
+      const after = rectOf(dot, 1);
+      if (Math.round(before.top) !== Math.round(after.top)) problems.push(`the dot after "${text.textContent}" starts a new line`);
+    }
     for (const part of parts) {
       const clone = part.cloneNode(true) as HTMLElement;
       clone.style.whiteSpace = 'nowrap';
