@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import messages from '../../messages/es-ES.json';
 import { DEMO_CATEGORY_COUNTS, DEMO_FOUR_OFFERS, DEMO_LONG_TITLE } from '../fixtures/demo';
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
-import { LONGEST_CAR, enginesOf, modelsOf, scriptedControl } from '../support/car';
+import { CAR, LONGEST_CAR, enginesOf, modelsOf, scriptedControl } from '../support/car';
 
 // S11.7 (03-ux checks 24 and 25): the public pages reflow at 360 and at 195 CSS px (a 390 phone at
 // 200% zoom), with no sideways scroll and no text hidden by an ancestor. The legal pages are left
@@ -418,5 +418,86 @@ for (const [width, height] of VIEWPORTS) {
         expect(await sideways(page)).toBeLessThanOrEqual(0);
       });
     }
+  });
+}
+
+// S5.9 (#279, 04-ux checks 8, 10, 12, 29 and 30; story AC 32): the fit banner in its three demo states at the
+// four widths. The longest car cannot fit any demo product, so it carries the no-fit and unknown banners (the two
+// wide ones, with the link and the help line); the fits banner uses the demo car. The could-not-check line has no
+// demo state: it shares the banner's box and wrapping, and its words are proven in product-fit.test.ts.
+const BANNER_PAGES: { name: string; slug: string; car: { slug: string }; kind: string; link: boolean }[] = [
+  { name: 'fits (demo car)', slug: 'demo-filtro-de-aceite-bosch-of-3306', car: CAR, kind: 'fits', link: false },
+  { name: 'no-fit (longest car)', slug: 'demo-filtro-de-aceite-mahle-of-1124', car: LONGEST_CAR, kind: 'no-fit', link: true },
+  { name: 'unknown (longest car)', slug: 'demo-filtro-de-aceite-oc-1234', car: LONGEST_CAR, kind: 'unknown', link: false },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the fit banner at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, slug, car, kind, link } of BANNER_PAGES) {
+      test(`${name}: no sideways scroll, no text cut, as wide as the cards above and below it`, async ({ page }) => {
+        await page.goto(`/producto/${slug}?coche=${car.slug}`);
+        const banner = page.getByTestId('fit-banner');
+        await expect(banner).toHaveAttribute('data-fit', kind);
+        await expect(banner).toBeVisible();
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+        expect(await cutText(page)).toEqual([]);
+
+        const geometry = await banner.evaluate((node) => {
+          const box = node.getBoundingClientRect();
+          const before = node.previousElementSibling!.getBoundingClientRect();
+          const after = node.nextElementSibling!.getBoundingClientRect();
+          return {
+            left: box.left,
+            right: box.right,
+            width: box.width,
+            beforeWidth: before.width,
+            afterWidth: after.width,
+            gapAbove: box.top - before.bottom,
+            gapBelow: after.top - box.bottom,
+          };
+        });
+        expect(geometry.left).toBeGreaterThanOrEqual(0);
+        expect(geometry.right).toBeLessThanOrEqual(width + 0.5);
+        // Check 12: the card's own width, with the page's grid gap above and below and no extra margin.
+        expect(Math.abs(geometry.width - geometry.beforeWidth)).toBeLessThanOrEqual(1);
+        expect(Math.abs(geometry.width - geometry.afterWidth)).toBeLessThanOrEqual(1);
+        expect(Math.abs(geometry.gapAbove - geometry.gapBelow)).toBeLessThanOrEqual(1);
+      });
+    }
+
+    test('the no-fit link is inside the banner, at least 44px tall, under the sentence when narrow and beside it at 1280', async ({
+      page,
+    }) => {
+      await page.goto(`/producto/demo-filtro-de-aceite-mahle-of-1124?coche=${LONGEST_CAR.slug}`);
+      const banner = page.getByTestId('fit-banner');
+      await expect(banner).toHaveAttribute('data-fit', 'no-fit');
+      const link = page.getByTestId('fit-banner-link');
+      await expect(link).toBeVisible();
+      const rects = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const box = document.querySelector(selector)!.getBoundingClientRect();
+          return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, height: box.height };
+        };
+        const text = [...document.querySelectorAll('[data-testid="fit-banner"] span')].find((node) => node.textContent?.trim());
+        const label = text!.getBoundingClientRect();
+        return {
+          banner: rect('[data-testid="fit-banner"]'),
+          link: rect('[data-testid="fit-banner-link"]'),
+          label: { left: label.left, right: label.right, top: label.top, bottom: label.bottom },
+        };
+      });
+      expect(rects.link.height).toBeGreaterThanOrEqual(44);
+      expect(rects.link.left).toBeGreaterThanOrEqual(rects.banner.left - 0.5);
+      expect(rects.link.right).toBeLessThanOrEqual(Math.min(rects.banner.right, width) + 0.5);
+      expect(rects.link.bottom).toBeLessThanOrEqual(rects.banner.bottom + 0.5);
+      if (width === 1280) {
+        expect(rects.link.left, 'the link sits beside the sentence').toBeGreaterThanOrEqual(rects.label.right - 0.5);
+      } else {
+        expect(rects.link.top, 'the link sits under the sentence').toBeGreaterThanOrEqual(rects.label.bottom - 0.5);
+      }
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+    });
   });
 }
