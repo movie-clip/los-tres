@@ -1,0 +1,6 @@
+/* The Page notice look is the demo notice's: composed, no copied rules. Its
+   bottom margin is the step to the first group. */
+.note {
+  composes: notice from './DemoNotice.module.css';
+  overflow-wrap: anywhere;
+}

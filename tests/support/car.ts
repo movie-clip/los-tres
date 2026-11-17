@@ -3,6 +3,7 @@ import { expect, type Page } from '@playwright/test';
 import messages from '../../messages/es-ES.json';
 import { VEHICLE_CATALOGUE, type VehicleEntry } from '../../src/db/vehicle-catalogue';
 import { loadEnv } from './env';
+import { icuPlural } from './messages';
 
 // Shared scaffolding for the S5.7 car-selection e2e (car-*.spec.ts). Vehicles come from the
 // shipped list, never retyped; copy comes from messages/es-ES.json, never a literal. The one
@@ -73,6 +74,27 @@ export function selectedText(entry: VehicleEntry): string {
 export const LONGEST_CAR: VehicleEntry = VEHICLE_CATALOGUE.reduce((longest, entry) =>
   selectedText(entry).length > selectedText(longest).length ? entry : longest,
 );
+
+/**
+ * S5.8: the counts line a listing shows with a selected car, built from the message file: fits, no
+ * data and hidden joined by a middle dot, then the page indicator when there are several pages.
+ * `paged` is `[page, pages]`; `exact` is the search-only fourth part (#277).
+ */
+export function fitCountsLine(
+  counts: { fits: number; unknown: number; leftOut: number; exact?: number },
+  paged?: [number, number],
+): string {
+  const plural = (message: string, count: number): string => icuPlural(message, count);
+  return [
+    plural(messages.Fit.countFits, counts.fits),
+    messages.Fit.countUnknown.replace('{count}', String(counts.unknown)),
+    plural(messages.Fit.countLeftOut, counts.leftOut),
+    ...(counts.exact === undefined || counts.exact === 0 ? [] : [plural(messages.Fit.countExact, counts.exact)]),
+    ...(paged === undefined
+      ? []
+      : [messages.Category.pageIndicator.replace('{page}', String(paged[0])).replace('{pages}', String(paged[1]))]),
+  ].join(' · ');
+}
 
 /** The query string of a URL without the leading `?`, as an ordered list of [name, value]. */
 export function queryOf(url: string): [string, string][] {

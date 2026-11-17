@@ -154,6 +154,17 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | car selected | `?coche=seat-leon-iii-2012-2020-1-6-tdi-115cv`, or localStorage key `mi-coche` set to that slug (an init script; not `lostres.coche`, renamed by D-21), which reloads the page once to `?coche=` |
 | car, longest label | `?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |
 | unknown car | `?coche=no-existe` (the page renders as without a car, plus the notice "No reconocemos ese coche") |
+| category, grouped, boundary (S5.8; `<car>` is `seat-leon-iii-2012-2020-1-6-tdi-115cv`) | `/categoria/mantenimiento-del-coche?coche=<car>` (10 fits, 23 no data, 17 hidden; page 1 holds 10 fits then 14 no data, page 2 holds 9 no data). Per category (fits/no data/hidden): aceite-de-motor 1/14/1, filtros-de-aceite 3/3/6, filtros-de-aire 3/2/7, filtros-de-habitaculo 3/4/3 |
+| category, no fits | `/categoria/mantenimiento-del-coche?coche=<car>&marca=mahle` (0 fits, 1 no data, 5 hidden) |
+| category, no no-data | `/categoria/mantenimiento-del-coche?coche=<car>&marca=bosch` (2 fits, 0 no data, 4 hidden) |
+| category, all left out (brand) | `/categoria/filtros-de-aire?coche=<car>&marca=bosch` (also `marca=mahle`; 2 hidden) |
+| category, zero-count chips absent | `/categoria/filtros-de-aire?coche=<car>` (Bosch and Mahle have no chip; Knecht 2, Filtron 1, Mann-Filter 1, Purflux 1) |
+| category, singular counts | `/categoria/aceite-de-motor?coche=<car>` (1 fits, 14 no data, 1 hidden) is the only demo page that shows "1 compatible" and "1 no compatible oculto" |
+| category, longest car | `/categoria/mantenimiento-del-coche?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` (0 fits, 23 no data, 27 hidden); it reaches the note, the no-data group and the all-left-out card, never the fits group |
+| search, car, text query | `/buscar?q=filtro&coche=<car>` (9 fits, 9 no data, 16 hidden, one page; `?pagina=2` is the 404); with the longest car 0/9/25 |
+| search, exact no-fit hit | `/buscar?q=OF-1124&coche=<car>` or `q=2000000100203` (a Mahle product with fitments, none the car; "0 no compatibles ocultos · 1 coincidencia exacta") |
+| search, car, all left out | `/buscar?q=bosch%20aire&coche=<car>` (2 hidden) |
+| category all left out without a brand, search left-out-only plus a fits group naming the longest car | not producible on the demo data; report not checked |
 | car picker, steps without script | a Playwright context with `javaScriptEnabled: false`, open any page, press the car link: it lands on `/mi-coche?volver=...`; the make and model steps add `marca` and `modelo` (`/mi-coche?marca=seat&modelo=seat-leon-iii`; slugs are `makeSlug` and `modelSlug` in `src/db/vehicle-catalogue.ts`) |
 | car picker, dialog | with script, click `[data-testid=car-select]` (or `car-change` with a car); wait for `aria-haspopup="dialog"` first, since before hydration it is a link |
 | car header on the 404 and error page | with a stored car, the page reloads once to `?coche=` (D-18); the error page cannot resolve a car without a database, so it is not e2e-reachable with one |

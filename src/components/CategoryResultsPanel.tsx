@@ -5,8 +5,8 @@ import styles from './CategoryResultsPanel.module.css';
 export type CategoryResultsPanelProps = {
   /** The brand filter. Null when the category has fewer than two brands: no group, no hairline. */
   brands: ReactNode | null;
-  /** Finished count text, for example "12 productos". It is the data-testid="category-summary" line. */
-  count: string;
+  /** Finished count text, for example "12 productos", or a CountsLine. It is the data-testid="category-summary" line. */
+  count: ReactNode;
   /** The sort control. Null when there is nothing to sort (no results). */
   sort: ReactNode | null;
 };

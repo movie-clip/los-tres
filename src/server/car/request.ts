@@ -28,6 +28,17 @@ export function isForwardablePath(value: string): boolean {
 }
 
 /**
+ * The car slug a URL asks for: exactly one `coche` parameter and a well-formed slug,
+ * else null (absent, empty, malformed or repeated). The one rule behind the
+ * `x-car-slug` header and the proxy's missing-page check, so the two cannot drift.
+ */
+export function carSlugFromUrl(url: URL): string | null {
+  const values = url.searchParams.getAll('coche');
+  const [only] = values;
+  return values.length === 1 && isWellFormedSlug(only) ? only : null;
+}
+
+/**
  * A copy of `incoming` for the page request: both car headers deleted first, so a
  * client cannot inject them, then set from `url`.
  *
@@ -41,10 +52,8 @@ export function carRequestHeaders(url: URL, incoming: Headers): Headers {
   headers.delete(CAR_HEADER);
   headers.delete(PATH_HEADER);
 
-  const values = url.searchParams.getAll('coche');
-  if (values.length > 0) {
-    const [only] = values;
-    headers.set(CAR_HEADER, values.length === 1 && isWellFormedSlug(only) ? only : CAR_UNRECOGNISED);
+  if (url.searchParams.has('coche')) {
+    headers.set(CAR_HEADER, carSlugFromUrl(url) ?? CAR_UNRECOGNISED);
   }
 
   const rest = new URLSearchParams(url.searchParams);

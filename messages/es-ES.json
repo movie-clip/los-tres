@@ -47,7 +47,24 @@
     "specRef": "Ref. {partNumber}",
     "noMatchHeading": "No hay productos de esta marca en esta categoría",
     "noMatchBody": "Prueba con otra marca o quita el filtro para ver todos los productos.",
-    "noMatchAction": "Quitar el filtro"
+    "noMatchAction": "Quitar el filtro",
+    "allOutHeading": "Ningún producto es compatible con tu {car}"
+  },
+  "Fit": {
+    "fitsHeading": "Compatibles con tu {car}",
+    "unknownHeading": "Sin datos de compatibilidad",
+    "unknownHelp": "No tenemos datos de con qué coches encajan. Compruébalo antes de comprar.",
+    "exactHeading": "Coincidencia exacta de referencia o EAN",
+    "exactHelp": "{count, plural, one {No es compatible con tu {car}, pero lo mostramos porque coincide exactamente con lo que has buscado.} other {No son compatibles con tu {car}, pero los mostramos porque coinciden exactamente con lo que has buscado.}}",
+    "noFitsNote": "No hay productos compatibles con tu {car}.",
+    "markFits": "Compatible",
+    "markNoFit": "No compatible",
+    "countFits": "{count, plural, one {# compatible} other {# compatibles}}",
+    "countUnknown": "{count} sin datos",
+    "countLeftOut": "{count, plural, one {# no compatible oculto} other {# no compatibles ocultos}}",
+    "countExact": "{count, plural, one {# coincidencia exacta} other {# coincidencias exactas}}",
+    "changeCar": "Cambiar de coche",
+    "allOutBody": "{count, plural, one {Hemos ocultado # producto porque no es compatible con tu coche.} other {Hemos ocultado # productos porque no son compatibles con tu coche.}}"
   },
   "Search": {
     "metaTitle": "Buscar productos | {siteName}",
@@ -64,7 +81,10 @@
     "promptBody": "Escribe el nombre de un producto, su referencia o su EAN. Por ejemplo, «filtro de aceite» o «5W-30».",
     "noResultsHeading": "No hay resultados",
     "noResultsBody": "No hemos encontrado ningún producto para «{term}». Prueba con una palabra más corta o con la referencia o el EAN del producto. Comprueba también que esté bien escrito.",
-    "browseAction": "Explorar por categoría"
+    "browseAction": "Explorar por categoría",
+    "summaryCarPrefix": "Para «{term}»:",
+    "allOutHeading": "Ningún resultado es compatible con tu {car}",
+    "allOutBody": "{count, plural, one {Hemos encontrado # producto para «{term}», pero no es compatible con tu coche y lo hemos ocultado.} other {Hemos encontrado # productos para «{term}», pero no son compatibles con tu coche y los hemos ocultado.}}"
   },
   "Error": {
     "heading": "Ha ocurrido un error",
@@ -163,8 +183,8 @@
     "heading": "Política de privacidad",
     "controllerHeading": "Responsable del tratamiento",
     "controllerBody": "{ownerName}, NIF {ownerNif}, con domicilio en {ownerAddress}. Puedes contactar en <email>{contactEmail}</email>.",
-    "cookiesHeading": "No usamos cookies",
-    "cookiesBody": "{siteName} no instala cookies ni tecnologías similares en el navegador de los visitantes. Por eso no verás ningún aviso de cookies.",
+    "cookiesHeading": "Cookies y almacenamiento local",
+    "cookiesBody": "{siteName} no instala cookies en el navegador de los visitantes, por eso no verás ningún aviso de cookies. Si eliges un coche, lo recordamos solo en tu propio navegador (almacenamiento local) para filtrar los productos; no se envía a nuestros servidores ni se guarda en ellos, y puedes quitarlo cuando quieras desde el selector de coche.",
     "dataHeading": "Qué datos registramos cuando visitas el sitio",
     "dataClicks": "<b>Clics hacia las tiendas.</b> Cuando pulsas el enlace a una tienda, registramos la oferta, la tienda, el producto, la hora y la página desde la que pulsaste. No registramos tu dirección IP, tu navegador ni ningún identificador tuyo. Lo usamos para saber qué ofertas interesan y para cuadrar las cuentas con las redes de afiliación.",
     "dataLogs": "<b>Registros del servidor.</b> Los registros técnicos del servidor no guardan direcciones IP ni datos del navegador.",

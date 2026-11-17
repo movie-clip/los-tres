@@ -1,0 +1,27 @@
+/* Sections are a full step apart, a stronger break than the card gap, so the
+   boundary between two groups reads as a boundary. */
+.group + .group {
+  margin-top: var(--space-4);
+}
+
+.heading {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* With an explanation the heading sits closer to it; the explanation carries the gap to the grid. */
+.withHelp {
+  margin-bottom: var(--space-0);
+}
+
+/* A paragraph inside .page is muted by globals.css; this line is muted on purpose. */
+.help {
+  margin: 0 0 var(--space-2);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}

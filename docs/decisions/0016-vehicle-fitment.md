@@ -21,7 +21,10 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
   log (guardrail 5). Pages render on the server from the URL.
 - **Unknown fit is shown, not hidden.** With a car selected, listings show the
   parts that fit first, then the parts with no fitment data under a heading;
-  parts whose fitment excludes the car are left out.
+  parts whose fitment excludes the car are left out, except an exact EAN or
+  exact part-number search hit, which is shown, marked as not compatible, after
+  the unknown group, and not counted as left out. *Amended by S5.8 (D-1,
+  2026-11-16, #274): drafted by the docs lane, for the owner to review.*
 
 ## Why
 

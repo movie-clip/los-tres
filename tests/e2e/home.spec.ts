@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import messages from '../../messages/es-ES.json';
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import { DEMO_CATEGORY_COUNTS, DEMO_CATEGORY_NAMES } from '../fixtures/demo';
-import { withoutCarLinks } from '../support/car';
+import { CAR, withoutCarLinks } from '../support/car';
 import { loadEnv } from '../support/env';
 import { icuPlural } from '../support/messages';
 import {
@@ -130,6 +130,30 @@ test.describe('home page (C-7, S11.3)', () => {
       icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS[ROOT as keyof typeof DEMO_CATEGORY_COUNTS]),
     );
     await expect(page.getByRole('heading', { name: DEMO_CATEGORY_NAMES[ROOT as keyof typeof DEMO_CATEGORY_NAMES] })).toHaveCount(0);
+    await close();
+  });
+
+  test('a selected car leaves every tile count and the all-products count unchanged (S5.8, AC 40)', async ({
+    request,
+    browser,
+  }) => {
+    const response = await request.get('/', { params: { coche: CAR.slug } });
+    expect(response.status()).toBe(200);
+    const { page, close } = await openRawHtml(browser, await response.text());
+
+    const tiles = page.getByTestId('category-tile');
+    await expect(tiles).toHaveCount(populated.length);
+    for (const [index, child] of populated.entries()) {
+      await expect(tiles.nth(index).getByTestId('category-tile-count')).toHaveText(
+        icuPlural(
+          messages.Home.productCount,
+          DEMO_CATEGORY_COUNTS[child.slug as keyof typeof DEMO_CATEGORY_COUNTS],
+        ),
+      );
+    }
+    await expect(page.getByTestId('home-all-count')).toHaveText(
+      icuPlural(messages.Home.productCount, DEMO_CATEGORY_COUNTS[ROOT as keyof typeof DEMO_CATEGORY_COUNTS]),
+    );
     await close();
   });
 

@@ -3,13 +3,17 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
 import { categories, feeds, offers, products } from '@/db/schema';
+import { selectedVehicleId, type CarContext } from '@/server/car/state';
 import { CATEGORY_PAGE_SIZE, getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 
 import {
   insertCategory,
   insertFeed,
+  insertFitment,
   insertListedProduct,
+  insertOffer,
+  insertProduct,
   insertShop,
   insertVehicle,
 } from '../support/catalogue';
@@ -47,6 +51,7 @@ describe('getPublicCategoryPage shape (C-3)', () => {
       productCount: 1,
       categoryProductCount: 1,
       state: 'results',
+      fit: null,
       products: [
         {
           slug: 'filtro-a',
@@ -56,6 +61,7 @@ describe('getPublicCategoryPage shape (C-3)', () => {
           offerCount: 2,
           categorySlug: 'filtros',
           partNumber: null,
+          fitGroup: null,
         },
       ],
       // The fixture sets no brand_normalised, so the product has no chip.
@@ -345,6 +351,7 @@ describe('empty category (AC 14)', () => {
       productCount: 0,
       categoryProductCount: 0,
       state: 'empty-category',
+      fit: null,
       products: [],
       brands: [],
       ancestors: [],
@@ -1133,5 +1140,545 @@ describe('canonical and robots on a filtered or sorted URL (D-7, S11.4)', () => 
     };
     expect(filtered.title).toEqual(plain.title);
     expect(filtered.description).toEqual(plain.description);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S5.8 (#275): the category listing with a selected car. Under a car the page
+// lists the products that fit first, then the ones with no data, leaves the
+// no-fit ones out and counts all three; no car, an unrecognised car and an
+// unavailable car list as before.
+// ---------------------------------------------------------------------------
+
+type CarPage = NonNullable<Awaited<ReturnType<typeof getPublicCategoryPage>>>;
+
+/** One selected car, one other vehicle and one approved feed that says the fitments. */
+async function carWorld() {
+  const car = await insertVehicle();
+  const other = await insertVehicle();
+  const fitFeed = await insertFeed((await insertShop()).id);
+  const category = await insertCategory({ slug: 'filtros' });
+  return { carId: car.id, otherId: other.id, fitFeed, category };
+}
+
+type World = Awaited<ReturnType<typeof carWorld>>;
+
+/** A listed, branded product in the world's category with the fit state asked for. */
+async function carProduct(
+  world: World,
+  o: {
+    slug: string;
+    fit: 'fits' | 'no-fit' | 'unknown';
+    prices?: number[];
+    brand?: string | null;
+    title?: string;
+    categoryId?: number;
+    isHidden?: boolean;
+  },
+) {
+  const product = await listBranded({
+    slug: o.slug,
+    categoryId: o.categoryId ?? world.category.id,
+    brand: o.brand === undefined ? null : o.brand,
+    prices: o.prices,
+    title: o.title,
+  });
+  if (o.isHidden) await getDb().update(products).set({ isHidden: true }).where(eq(products.id, product.id));
+  if (o.fit === 'fits') await insertFitment(product.id, world.carId, world.fitFeed);
+  if (o.fit === 'no-fit') await insertFitment(product.id, world.otherId, world.fitFeed);
+  return product;
+}
+
+const sumOf = (page: CarPage) => (page.fit ? page.fit.fitsCount + page.fit.unknownCount + page.fit.leftOutCount : NaN);
+
+describe('with a selected car: the two groups, in order (S5.8, AC 1, AC 13)', () => {
+  it('lists the fits group, then the no-data group, and leaves the no-fit one out', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'no-data', fit: 'unknown', prices: [100] });
+    await carProduct(world, { slug: 'compatible', fit: 'fits', prices: [500] });
+    await carProduct(world, { slug: 'no-compatible', fit: 'no-fit', prices: [50] });
+
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+
+    expect(slugsOf(page)).toEqual(['compatible', 'no-data']);
+    expect(page?.products.map((card) => card.fitGroup)).toEqual(['fits', 'unknown']);
+    expect(page?.fit).toEqual({ fitsCount: 1, unknownCount: 1, leftOutCount: 1 });
+    expect(page).toMatchObject({ productCount: 2, pageCount: 1, categoryProductCount: 3, state: 'results' });
+  });
+
+  it('puts every fitting product before every no-data one whatever the sort, and keeps the sort inside a group', async () => {
+    const world = await carWorld();
+    // The no-data ones are the cheapest and the first by name, so only the group can put them last.
+    await carProduct(world, { slug: 'u-1', fit: 'unknown', prices: [100], title: 'Aaa' });
+    await carProduct(world, { slug: 'u-2', fit: 'unknown', prices: [200], title: 'Aab' });
+    await carProduct(world, { slug: 'f-1', fit: 'fits', prices: [900], title: 'Zzb' });
+    await carProduct(world, { slug: 'f-2', fit: 'fits', prices: [800], title: 'Zza' });
+
+    const bySort = {
+      'price-asc': ['f-2', 'f-1', 'u-1', 'u-2'],
+      'price-desc': ['f-1', 'f-2', 'u-2', 'u-1'],
+      name: ['f-2', 'f-1', 'u-1', 'u-2'],
+    } as const;
+    for (const [sort, expected] of Object.entries(bySort)) {
+      const page = await getPublicCategoryPage('filtros', 1, null, sort as keyof typeof bySort, world.carId);
+      expect(slugsOf(page), sort).toEqual(expected);
+    }
+  });
+
+  it('breaks a tie inside a group by id, as without a car', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'a', fit: 'fits', prices: [700] });
+    await carProduct(world, { slug: 'b', fit: 'fits', prices: [700] });
+    await carProduct(world, { slug: 'c', fit: 'unknown', prices: [700] });
+    expect(slugsOf(await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('counts the fits of the whole subtree and lists a child category product under its parent', async () => {
+    const world = await carWorld();
+    const child = await insertCategory({ slug: 'hija', parentId: world.category.id });
+    await carProduct(world, { slug: 'en-raiz', fit: 'unknown', prices: [100] });
+    await carProduct(world, { slug: 'en-hija', fit: 'fits', prices: [900], categoryId: child.id });
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    expect(slugsOf(page)).toEqual(['en-hija', 'en-raiz']);
+    expect(page?.fit).toEqual({ fitsCount: 1, unknownCount: 1, leftOutCount: 0 });
+  });
+});
+
+describe('with a selected car: what makes a product fit, unknown or left out (S5.8, AC 2, AC 3)', () => {
+  it('leaves a product out only when its counted fitments name other vehicles', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'solo-otro', fit: 'no-fit' });
+    const both = await carProduct(world, { slug: 'ambos', fit: 'fits' });
+    await insertFitment(both.id, world.otherId, world.fitFeed);
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    expect(slugsOf(page)).toEqual(['ambos']);
+    expect(page?.fit).toEqual({ fitsCount: 1, unknownCount: 0, leftOutCount: 1 });
+  });
+
+  it('lists a product whose only fitments do not count as no-data, not as left out (feed, shop, retired vehicle)', async () => {
+    const world = await carWorld();
+    const unapprovedFeed = await insertFeed((await insertShop()).id, { isApproved: false });
+    const unapprovedShopFeed = await insertFeed((await insertShop({ isApproved: false })).id);
+    const retired = await insertVehicle({ isRetired: true });
+
+    const fromUnapprovedFeed = await carProduct(world, { slug: 'feed-sin-aprobar', fit: 'unknown' });
+    await insertFitment(fromUnapprovedFeed.id, world.carId, unapprovedFeed);
+    const noFitUnapprovedFeed = await carProduct(world, { slug: 'feed-sin-aprobar-otro', fit: 'unknown' });
+    await insertFitment(noFitUnapprovedFeed.id, world.otherId, unapprovedFeed);
+    const fromUnapprovedShop = await carProduct(world, { slug: 'tienda-sin-aprobar', fit: 'unknown' });
+    await insertFitment(fromUnapprovedShop.id, world.carId, unapprovedShopFeed);
+    const toRetired = await carProduct(world, { slug: 'vehiculo-retirado', fit: 'unknown' });
+    await insertFitment(toRetired.id, retired.id, world.fitFeed);
+
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+
+    expect(new Set(slugsOf(page))).toEqual(
+      new Set(['feed-sin-aprobar', 'feed-sin-aprobar-otro', 'tienda-sin-aprobar', 'vehiculo-retirado']),
+    );
+    expect(page?.products.every((card) => card.fitGroup === 'unknown')).toBe(true);
+    expect(page?.fit).toEqual({ fitsCount: 0, unknownCount: 4, leftOutCount: 0 });
+  });
+
+  it('keeps a fitment to the car from an approved feed counting when another feed that says the same is not approved', async () => {
+    const world = await carWorld();
+    const unapprovedFeed = await insertFeed((await insertShop()).id, { isApproved: false });
+    const product = await carProduct(world, { slug: 'doble', fit: 'fits' });
+    await insertFitment(product.id, world.carId, unapprovedFeed);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.products[0]).toMatchObject({
+      slug: 'doble',
+      fitGroup: 'fits',
+    });
+  });
+});
+
+describe('with a selected car: hidden and unapproved never listed or counted (guardrail 1, S5.8, AC 4)', () => {
+  it('lists and counts no hidden product, whatever its fit', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'visible', fit: 'unknown' });
+    for (const fit of ['fits', 'unknown', 'no-fit'] as const) {
+      await carProduct(world, { slug: `oculto-${fit}`, fit, isHidden: true });
+    }
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    expect(slugsOf(page)).toEqual(['visible']);
+    expect(page?.fit).toEqual({ fitsCount: 0, unknownCount: 1, leftOutCount: 0 });
+    expect(page).toMatchObject({ productCount: 1, categoryProductCount: 1 });
+  });
+
+  it('lists and counts no product without a public offer: hidden offer, unapproved feed, in review, no offer at all', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'visible', fit: 'fits' });
+    const unapproved = await insertFeed((await insertShop()).id, { isApproved: false });
+
+    const noPublicOffer: { slug: string; make: (productId: number) => Promise<unknown> }[] = [
+      { slug: 'oferta-oculta', make: (productId) => insertOffer({ productId, feedId: world.fitFeed, isHidden: true }) },
+      { slug: 'oferta-en-revision', make: (productId) => insertOffer({ productId, feedId: world.fitFeed, inReview: true }) },
+      { slug: 'feed-sin-aprobar-oferta', make: (productId) => insertOffer({ productId, feedId: unapproved }) },
+      { slug: 'sin-ofertas', make: async () => undefined },
+    ];
+    for (const { slug, make } of noPublicOffer) {
+      for (const fit of ['fits', 'unknown', 'no-fit'] as const) {
+        const product = await insertProduct({ slug: `${slug}-${fit}`, categoryId: world.category.id });
+        await make(product.id);
+        if (fit === 'fits') await insertFitment(product.id, world.carId, world.fitFeed);
+        if (fit === 'no-fit') await insertFitment(product.id, world.otherId, world.fitFeed);
+      }
+    }
+
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    expect(slugsOf(page)).toEqual(['visible']);
+    expect(page?.fit).toEqual({ fitsCount: 1, unknownCount: 0, leftOutCount: 0 });
+    expect(page?.categoryProductCount).toBe(1);
+  });
+
+  it('lists and counts no product that is unmapped to a category', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'visible', fit: 'fits' });
+    const unmapped = await insertListedProduct({ slug: 'sin-categoria', prices: [100], categoryId: null });
+    await insertFitment(unmapped.id, world.carId, world.fitFeed);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.fit).toEqual({
+      fitsCount: 1,
+      unknownCount: 0,
+      leftOutCount: 0,
+    });
+  });
+
+  it('shows a card the offers it has publicly: a hidden cheaper offer changes neither price nor count under a car', async () => {
+    const world = await carWorld();
+    const product = await carProduct(world, { slug: 'con-oculta', fit: 'fits', prices: [100, 300] });
+    await getDb().update(offers).set({ isHidden: true }).where(eq(offers.id, product.offerIds[0]));
+    const [card] = (await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.products ?? [];
+    expect(card).toMatchObject({ slug: 'con-oculta', lowestPriceCents: 300, offerCount: 1 });
+  });
+});
+
+describe('with a selected car: each number counts a product once (S5.8, AC 10)', () => {
+  it('counts a product with several offers, shops, feeds and fitments once', async () => {
+    const world = await carWorld();
+    const secondFitFeed = await insertFeed((await insertShop()).id);
+    const rich = await carProduct(world, { slug: 'rico', fit: 'fits', prices: [100, 200, 300] });
+    await insertFitment(rich.id, world.carId, secondFitFeed);
+    await insertFitment(rich.id, world.otherId, world.fitFeed);
+    const lost = await carProduct(world, { slug: 'perdido', fit: 'no-fit', prices: [100, 200, 300] });
+    await insertFitment(lost.id, world.otherId, secondFitFeed);
+    await carProduct(world, { slug: 'sin-datos', fit: 'unknown', prices: [100, 200] });
+
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+
+    expect(page?.fit).toEqual({ fitsCount: 1, unknownCount: 1, leftOutCount: 1 });
+    expect(page?.products.filter((card) => card.slug === 'rico')).toHaveLength(1);
+    expect(page?.products.find((card) => card.slug === 'rico')).toMatchObject({ offerCount: 3, lowestPriceCents: 100 });
+  });
+});
+
+describe('with a selected car: the three numbers add up to the no-car count (S5.8, AC 11, AC 12)', () => {
+  async function mixed() {
+    const world = await carWorld();
+    const child = await insertCategory({ slug: 'hija', parentId: world.category.id });
+    let n = 0;
+    for (const brand of ['Bosch', 'Mahle', null]) {
+      for (const fit of ['fits', 'unknown', 'no-fit'] as const) {
+        for (let k = 0; k <= n % 3; k += 1) {
+          n += 1;
+          await carProduct(world, {
+            slug: `p-${n}`,
+            fit,
+            brand,
+            prices: [100 + n, 200 + n],
+            categoryId: n % 2 === 0 ? child.id : world.category.id,
+          });
+        }
+      }
+    }
+    return world;
+  }
+
+  it('holds without a brand, in the category and in its child', async () => {
+    const world = await mixed();
+    for (const slug of ['filtros', 'hija']) {
+      const noCar = await getPublicCategoryPage(slug, 1, null, 'price-asc');
+      const withCar = await getPublicCategoryPage(slug, 1, null, 'price-asc', world.carId);
+      expect(sumOf(withCar as CarPage), slug).toBe(noCar?.productCount);
+      expect((withCar?.fit?.fitsCount ?? 0) + (withCar?.fit?.unknownCount ?? 0), slug).toBe(withCar?.productCount);
+    }
+  });
+
+  it('holds with each brand selected, and the numbers count that brand only', async () => {
+    const world = await mixed();
+    for (const brand of ['bosch', 'mahle']) {
+      const noCar = await getPublicCategoryPage('filtros', 1, brand, 'price-asc');
+      const withCar = await getPublicCategoryPage('filtros', 1, brand, 'price-asc', world.carId);
+      expect(sumOf(withCar as CarPage), brand).toBe(noCar?.productCount);
+      expect(withCar?.fit?.fitsCount, brand).toBeGreaterThan(0);
+      expect(withCar?.products.every((card) => card.brand?.toLowerCase() === brand), brand).toBe(true);
+    }
+  });
+
+  it('is the same under every sort and page, so the numbers are of the listing and not of the page', async () => {
+    const world = await mixed();
+    const first = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    for (const sort of ['price-desc', 'name'] as const) {
+      expect((await getPublicCategoryPage('filtros', 1, null, sort, world.carId))?.fit, sort).toEqual(first?.fit);
+    }
+  });
+});
+
+describe('with a selected car: the brand filter and the chip counts (S5.8, AC 14, AC 15)', () => {
+  it('counts a chip as fits plus no-data, never the left out, whatever the brand selected and the sort', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'b-f', fit: 'fits', brand: 'Bosch' });
+    await carProduct(world, { slug: 'b-u', fit: 'unknown', brand: 'Bosch' });
+    await carProduct(world, { slug: 'b-n', fit: 'no-fit', brand: 'Bosch' });
+    await carProduct(world, { slug: 'm-f', fit: 'fits', brand: 'Mahle' });
+    await carProduct(world, { slug: 'm-n1', fit: 'no-fit', brand: 'Mahle' });
+    await carProduct(world, { slug: 'm-n2', fit: 'no-fit', brand: 'Mahle' });
+
+    const expected = [
+      { slug: 'bosch', label: 'Bosch', productCount: 2 },
+      { slug: 'mahle', label: 'Mahle', productCount: 1 },
+    ];
+    for (const brand of [null, 'bosch', 'mahle', 'no-existe']) {
+      for (const sort of ['price-asc', 'name'] as const) {
+        const page = await getPublicCategoryPage('filtros', 1, brand, sort, world.carId);
+        expect(page?.brands, `${brand} ${sort}`).toEqual(expected);
+      }
+    }
+  });
+
+  it('shows a brand with products in one group only that group', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'b-f', fit: 'fits', brand: 'Bosch' });
+    await carProduct(world, { slug: 'm-u', fit: 'unknown', brand: 'Mahle' });
+    const bosch = await getPublicCategoryPage('filtros', 1, 'bosch', 'price-asc', world.carId);
+    expect(bosch?.products.map((card) => card.fitGroup)).toEqual(['fits']);
+    expect(bosch?.fit).toEqual({ fitsCount: 1, unknownCount: 0, leftOutCount: 0 });
+    const mahle = await getPublicCategoryPage('filtros', 1, 'mahle', 'price-asc', world.carId);
+    expect(mahle?.products.map((card) => card.fitGroup)).toEqual(['unknown']);
+  });
+
+  it('keeps a brand whose products are all left out in the list at 0, and answers it all-left-out, not no-match', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'b-f', fit: 'fits', brand: 'Bosch' });
+    await carProduct(world, { slug: 'm-n1', fit: 'no-fit', brand: 'Mahle' });
+    await carProduct(world, { slug: 'm-n2', fit: 'no-fit', brand: 'Mahle' });
+
+    const page = await getPublicCategoryPage('filtros', 1, 'mahle', 'price-asc', world.carId);
+
+    expect(page?.brands).toEqual([
+      { slug: 'bosch', label: 'Bosch', productCount: 1 },
+      { slug: 'mahle', label: 'Mahle', productCount: 0 },
+    ]);
+    expect(page?.selectedBrand).toEqual({ slug: 'mahle', label: 'Mahle', productCount: 0 });
+    expect(page).toMatchObject({
+      state: 'all-left-out',
+      products: [],
+      productCount: 0,
+      pageCount: 1,
+      categoryProductCount: 3,
+      fit: { fitsCount: 0, unknownCount: 0, leftOutCount: 2 },
+    });
+  });
+
+  it('answers a brand with no products at all no-match, with a car as without one', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'b-f', fit: 'fits', brand: 'Bosch' });
+    const page = await getPublicCategoryPage('filtros', 1, 'no-existe', 'price-asc', world.carId);
+    expect(page).toMatchObject({ state: 'no-match', products: [], selectedBrand: null });
+    expect(page?.fit).toEqual({ fitsCount: 0, unknownCount: 0, leftOutCount: 0 });
+  });
+
+  it('orders the chips by the listed count, then label', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'a-1', fit: 'fits', brand: 'Aaa' });
+    await carProduct(world, { slug: 'z-1', fit: 'fits', brand: 'Zzz' });
+    await carProduct(world, { slug: 'z-2', fit: 'unknown', brand: 'Zzz' });
+    await carProduct(world, { slug: 'a-2', fit: 'no-fit', brand: 'Aaa' });
+    await carProduct(world, { slug: 'a-3', fit: 'no-fit', brand: 'Aaa' });
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.brands.map((b) => b.label)).toEqual([
+      'Zzz',
+      'Aaa',
+    ]);
+  });
+});
+
+describe('with a selected car: pagination over the combined list (S5.8, AC 16, AC 18)', () => {
+  it('runs a page across the group boundary and does not count the left out in the page count', async () => {
+    const world = await carWorld();
+    for (let n = 0; n < 20; n += 1) await carProduct(world, { slug: `f-${n}`, fit: 'fits', prices: [1000 + n] });
+    for (let n = 0; n < 10; n += 1) await carProduct(world, { slug: `u-${n}`, fit: 'unknown', prices: [100 + n] });
+    for (let n = 0; n < 40; n += 1) await carProduct(world, { slug: `n-${n}`, fit: 'no-fit', prices: [10 + n] });
+
+    const first = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+    const second = await getPublicCategoryPage('filtros', 2, null, 'price-asc', world.carId);
+
+    expect(first).toMatchObject({ page: 1, pageCount: 2, productCount: 30, categoryProductCount: 70 });
+    expect(first?.products).toHaveLength(CATEGORY_PAGE_SIZE);
+    expect(first?.products.map((card) => card.fitGroup)).toEqual([
+      ...Array<string>(20).fill('fits'),
+      ...Array<string>(4).fill('unknown'),
+    ]);
+    expect(second?.products.map((card) => card.fitGroup)).toEqual(Array<string>(6).fill('unknown'));
+    expect(second?.fit).toEqual({ fitsCount: 20, unknownCount: 10, leftOutCount: 40 });
+
+    const seen = [...(slugsOf(first) ?? []), ...(slugsOf(second) ?? [])];
+    expect(new Set(seen).size).toBe(30);
+    expect(seen.some((slug) => slug.startsWith('n-'))).toBe(false);
+  });
+
+  it('returns null for a page past the last of the combined list, though the no-car list has one more page', async () => {
+    const world = await carWorld();
+    for (let n = 0; n < CATEGORY_PAGE_SIZE; n += 1) await carProduct(world, { slug: `f-${n}`, fit: 'fits' });
+    for (let n = 0; n < 5; n += 1) await carProduct(world, { slug: `n-${n}`, fit: 'no-fit' });
+
+    expect(await getPublicCategoryPage('filtros', 2, null, 'price-asc')).not.toBeNull();
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.pageCount).toBe(1);
+    expect(await getPublicCategoryPage('filtros', 2, null, 'price-asc', world.carId)).toBeNull();
+  });
+
+  it('never returns null for page 1 of an existing category, even when every product is left out', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n-1', fit: 'no-fit' });
+    await carProduct(world, { slug: 'n-2', fit: 'no-fit' });
+
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+
+    expect(page).toMatchObject({
+      state: 'all-left-out',
+      page: 1,
+      pageCount: 1,
+      productCount: 0,
+      categoryProductCount: 2,
+      products: [],
+      fit: { fitsCount: 0, unknownCount: 0, leftOutCount: 2 },
+    });
+    expect(await getPublicCategoryPage('filtros', 2, null, 'price-asc', world.carId)).toBeNull();
+  });
+
+  it('keeps an empty category empty-category with a car, with zero counts and no fit wording to derive', async () => {
+    const world = await carWorld();
+    await insertCategory({ slug: 'vacia' });
+    const page = await getPublicCategoryPage('vacia', 1, null, 'price-asc', world.carId);
+    expect(page).toMatchObject({
+      state: 'empty-category',
+      productCount: 0,
+      categoryProductCount: 0,
+      pageCount: 1,
+      products: [],
+      fit: { fitsCount: 0, unknownCount: 0, leftOutCount: 0 },
+    });
+    expect(await getPublicCategoryPage('vacia', 2, null, 'price-asc', world.carId)).toBeNull();
+  });
+
+  it('is the empty-category state, not all-left-out, when the only products are hidden ones with no fit', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'oculto', fit: 'no-fit', isHidden: true });
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId))?.state).toBe('empty-category');
+  });
+
+  it('still answers an unknown or malformed category null with a car', async () => {
+    const world = await carWorld();
+    for (const slug of ['no-existe', 'Bad_Slug', 'a--b']) {
+      expect(await getPublicCategoryPage(slug, 1, null, 'price-asc', world.carId), slug).toBeNull();
+    }
+  });
+});
+
+describe('with a selected car: the rest of the page is as without one (S5.8)', () => {
+  it('keeps indexable, ancestors, sort and demoOnly independent of the car', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n-1', fit: 'no-fit' });
+    const noCar = await getPublicCategoryPage('filtros', 1, null, 'name');
+    const withCar = await getPublicCategoryPage('filtros', 1, null, 'name', world.carId);
+    expect(withCar).toMatchObject({
+      indexable: noCar?.indexable,
+      ancestors: noCar?.ancestors,
+      sort: 'name',
+      name: noCar?.name,
+      categoryProductCount: noCar?.categoryProductCount,
+    });
+  });
+});
+
+describe('no car, an unrecognised car and an unavailable car list as before (S5.8, AC 24, AC 25)', () => {
+  async function filled() {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'f', fit: 'fits', brand: 'Bosch', prices: [900] });
+    await carProduct(world, { slug: 'u', fit: 'unknown', brand: 'Mahle', prices: [100] });
+    await carProduct(world, { slug: 'n', fit: 'no-fit', brand: 'Bosch', prices: [50] });
+    return world;
+  }
+
+  it('lists a no-fit product and the cheapest first, with no group and no fit counts, when no car is passed', async () => {
+    await filled();
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc');
+    expect(slugsOf(page)).toEqual(['n', 'u', 'f']);
+    expect(page?.fit).toBeNull();
+    expect(page?.products.map((card) => card.fitGroup)).toEqual([null, null, null]);
+    expect(page).toMatchObject({ productCount: 3, categoryProductCount: 3 });
+  });
+
+  it('is the same page for a null vehicle id as for none, which is what an unrecognised or unavailable car resolves to', async () => {
+    await filled();
+    const plain = await getPublicCategoryPage('filtros', 1, 'bosch', 'price-desc');
+    for (const state of ['none', 'unrecognised', 'unavailable'] as const) {
+      const car: CarContext =
+        state === 'unrecognised' ? { state, raw: 'coche-que-no-existe', path: null } : { state, path: null };
+      expect(selectedVehicleId(car), state).toBeNull();
+      expect(await getPublicCategoryPage('filtros', 1, 'bosch', 'price-desc', selectedVehicleId(car)), state).toEqual(plain);
+    }
+  });
+
+  it('leaves the brand chips as the public counts, with a car that is not a vehicle of the list', async () => {
+    await filled();
+    const page = await getPublicCategoryPage('filtros', 1, null, 'price-asc', null);
+    expect(page?.brands).toEqual([
+      { slug: 'bosch', label: 'Bosch', productCount: 2 },
+      { slug: 'mahle', label: 'Mahle', productCount: 1 },
+    ]);
+  });
+});
+
+describe('a failed fit read fails the listing and logs no car (S5.8, AC 26, AC 38)', () => {
+  // 2^40 is outside the integer range of vehicle_id: Postgres rejects the bound parameter, the same way
+  // an unreadable fit table would fail the one statement that carries the fit.
+  const BAD_VEHICLE_ID = 2 ** 40;
+
+  it('throws the fixed error and never returns the listing unfiltered', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n', fit: 'no-fit' });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(getPublicCategoryPage('filtros', 1, null, 'price-asc', BAD_VEHICLE_ID)).rejects.toThrow(/^category: failed$/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('logs one fixed-code line that names neither the vehicle nor the slug nor the brand', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'n', fit: 'no-fit', brand: 'Bosch' });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await getPublicCategoryPage('filtros', 1, 'bosch', 'price-asc', BAD_VEHICLE_ID).catch(() => undefined);
+      expect(spy).toHaveBeenCalledTimes(1);
+      const line = spy.mock.calls.map((call) => call.map(String).join(' ')).join('\n');
+      expect(line).toMatch(/^category: failed \([A-Za-z0-9_]+\)$/);
+      for (const secret of [String(BAD_VEHICLE_ID), 'filtros', 'bosch']) expect(line).not.toContain(secret);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('logs nothing at all when the listing succeeds with a car', async () => {
+    const world = await carWorld();
+    await carProduct(world, { slug: 'f', fit: 'fits' });
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => undefined),
+    );
+    try {
+      await getPublicCategoryPage('filtros', 1, null, 'price-asc', world.carId);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });

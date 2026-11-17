@@ -222,3 +222,201 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// S5.8 (#276, ACs 41, 42; 04-ux checks 30 and 33): the category page with a selected car, with the longest
+// car label, at the four widths. Group headings, the counts line, the fits-empty note, the marks and the
+// all-left-out card wrap and are not cut. The cases are the ones the demo data reaches with the longest car's
+// own fit. The demo's longest car fits no product, so it reaches the fits-empty note, the no-data group and
+// the all-left-out card, but never the fits group (its heading naming the longest car, and the marks): that
+// state is not faked here and is named in the run report.
+const FIT_PAGES: { name: string; url: string; marker: string }[] = [
+  { name: 'root, note and no-data group', url: `/categoria/${ROOT}`, marker: 'listing-note' },
+  { name: 'root, brand with no fits', url: `/categoria/${ROOT}?marca=mahle`, marker: 'listing-note' },
+  { name: 'root, all left out with a brand', url: `/categoria/${ROOT}?marca=bosch`, marker: 'category-empty' },
+  { name: 'air filters, note and no-data group', url: '/categoria/filtros-de-aire', marker: 'listing-note' },
+  { name: 'air filters, all left out with a brand', url: '/categoria/filtros-de-aire?marca=bosch', marker: 'category-empty' },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the category page with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, url, marker } of FIT_PAGES) {
+      test(`${name}: no sideways scroll and no text cut`, async ({ page }) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(marker).first()).toBeVisible();
+        // The counts line is the fit line, not the single product count: the page is in the car state.
+        await expect(page.getByTestId('category-summary')).toContainText(messages.Fit.countUnknown.replace('{count}', '').trim());
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+        expect(await cutText(page)).toEqual([]);
+      });
+    }
+
+    test('the note and the all-left-out heading name the longest car and stay inside the viewport', async ({ page }) => {
+      const inside = async (url: string, pick: (page: Page) => ReturnType<Page['locator']>) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        const element = pick(page);
+        await expect(element).toContainText(LONGEST_CAR.engine);
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      };
+      await inside(`/categoria/${ROOT}`, (p) => p.getByTestId('listing-note'));
+      await inside('/categoria/filtros-de-aire?marca=bosch', (p) =>
+        p.getByTestId('category-empty').getByRole('heading', { level: 2 }),
+      );
+    });
+
+    test('the all-left-out actions are inside the viewport and at least 44px tall', async ({ page }) => {
+      await page.goto(`/categoria/filtros-de-aire?marca=bosch&coche=${LONGEST_CAR.slug}`);
+      for (const id of ['category-empty-action', 'fit-change-car']) {
+        const action = page.getByTestId(id);
+        await expect(action).toBeVisible();
+        const box = (await action.boundingBox())!;
+        expect(box.x, id).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, id).toBeLessThanOrEqual(width + 0.5);
+        expect(box.height, id).toBeGreaterThanOrEqual(44);
+      }
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(await cutText(page)).toEqual([]);
+    });
+  });
+}
+
+// S5.8 (#277, 04-ux checks 30 and 33): the search page with the longest car, at the four widths. The
+// counts line (term, four parts), the fits-empty note, the exact-hit group heading and explanation and the
+// all-left-out card wrap and are not cut. The demo's longest car fits no product, so the fits group is not
+// reached (same limit as the category block above); the exact-hit group and the all-left-out card are.
+const SEARCH_FIT_PAGES: { name: string; url: string; marker: string }[] = [
+  { name: 'text term, note and no-data group', url: '/buscar?q=filtro', marker: 'listing-note' },
+  { name: 'exact part number, note and exact-hit group', url: '/buscar?q=OF-1124', marker: 'listing-group' },
+  { name: 'exact EAN, exact-hit group', url: '/buscar?q=2000000100203', marker: 'listing-group' },
+  { name: 'all left out', url: '/buscar?q=bosch+aire', marker: 'category-empty' },
+  { name: 'no results, 100-character term', url: `/buscar?q=${'w'.repeat(100)}`, marker: 'category-empty' },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the search page with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, url, marker } of SEARCH_FIT_PAGES) {
+      test(`${name}: no sideways scroll and no text cut`, async ({ page }) => {
+        await page.goto(`${url}&coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(marker).first()).toBeVisible();
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+        expect(await cutText(page)).toEqual([]);
+      });
+    }
+
+    test('the counts line carries the term and the fit parts, inside the viewport', async ({ page }) => {
+      await page.goto(`/buscar?q=OF-1124&coche=${LONGEST_CAR.slug}`);
+      const line = page.getByTestId('search-summary');
+      await expect(line).toContainText(messages.Search.summaryCarPrefix.replace('{term}', 'OF-1124'));
+      await expect(line).toContainText(messages.Fit.countUnknown.replace('{count}', '0'));
+      const box = (await line.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+    });
+
+    test('the note, the exact-hit explanation and the all-left-out heading name the longest car and stay inside the viewport', async ({
+      page,
+    }) => {
+      const inside = async (url: string, pick: (page: Page) => ReturnType<Page['locator']>) => {
+        await page.goto(`${url}&coche=${LONGEST_CAR.slug}`);
+        const element = pick(page);
+        await expect(element).toContainText(LONGEST_CAR.engine);
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      };
+      await inside('/buscar?q=filtro', (p) => p.getByTestId('listing-note'));
+      await inside('/buscar?q=OF-1124', (p) => p.getByTestId('listing-group-help'));
+      await inside('/buscar?q=bosch+aire', (p) => p.getByTestId('category-empty').getByRole('heading', { level: 2 }));
+    });
+
+    test('the all-left-out action is inside the viewport and at least 44px tall', async ({ page }) => {
+      await page.goto(`/buscar?q=bosch+aire&coche=${LONGEST_CAR.slug}`);
+      const action = page.getByTestId('fit-change-car');
+      await expect(action).toBeVisible();
+      const box = (await action.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(await cutText(page)).toEqual([]);
+    });
+  });
+}
+
+// S5.8 follow-up (D-14): the counts line wraps between its parts. For each part of the line with the longest
+// car: when the part fits a line on its own, it must sit on one line (no break inside it); and the page never
+// scrolls sideways. A part wider than the line may break (overflow-wrap anywhere), which is not asserted away.
+const partProblems = (page: Page, testId: string) =>
+  page.evaluate((id) => {
+    const line = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+    const style = getComputedStyle(line);
+    const room = line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const parts = [...line.querySelectorAll<HTMLElement>(':scope > span')];
+    const problems: string[] = [];
+    if (parts.length < 2) problems.push(`only ${parts.length} part spans in ${id}`);
+    // D-21: the " ·" ends the part before it, so the dot sits on the same line as that part's last character
+    // and no line starts with it or holds it alone.
+    for (const separator of line.querySelectorAll<HTMLElement>(':scope > span > span')) {
+      const text = separator.previousSibling;
+      const dot = separator.firstChild;
+      if (!text || !dot || !text.textContent || dot.textContent !== ' ·') {
+        problems.push(`separator span in ${id} is not " ·" after part text`);
+        continue;
+      }
+      const rectOf = (node: Node, start: number) => {
+        const range = document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + 1);
+        return range.getBoundingClientRect();
+      };
+      const before = rectOf(text, text.textContent.length - 1);
+      const after = rectOf(dot, 1);
+      if (Math.round(before.top) !== Math.round(after.top)) problems.push(`the dot after "${text.textContent}" starts a new line`);
+    }
+    for (const part of parts) {
+      const clone = part.cloneNode(true) as HTMLElement;
+      clone.style.whiteSpace = 'nowrap';
+      clone.style.position = 'absolute';
+      clone.style.visibility = 'hidden';
+      line.appendChild(clone);
+      const natural = clone.getBoundingClientRect().width;
+      clone.remove();
+      const range = document.createRange();
+      range.selectNodeContents(part);
+      const tops = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
+      if (natural <= room && tops.size > 1) problems.push(`"${part.textContent}" fits a line (${natural.toFixed(0)} <= ${room.toFixed(0)}) but breaks into ${tops.size} lines`);
+    }
+    return problems;
+  }, testId);
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the counts line with the longest car at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    const LINES: { name: string; url: string; testId: string }[] = [
+      { name: 'category counts line', url: `/categoria/${ROOT}`, testId: 'category-summary' },
+      { name: 'air filters counts line', url: '/categoria/filtros-de-aire', testId: 'category-summary' },
+      { name: 'search counts line', url: '/buscar?q=OF-1124', testId: 'search-summary' },
+    ];
+
+    for (const { name, url, testId } of LINES) {
+      test(`${name}: no break inside a part that fits a line, no sideways scroll`, async ({ page }) => {
+        await page.goto(`${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`);
+        await expect(page.getByTestId('car-label')).toContainText(LONGEST_CAR.engine);
+        await expect(page.getByTestId(testId)).toBeVisible();
+        expect(await partProblems(page, testId)).toEqual([]);
+        expect(await sideways(page)).toBeLessThanOrEqual(0);
+      });
+    }
+  });
+}

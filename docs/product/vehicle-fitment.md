@@ -74,8 +74,23 @@ that device until they change or remove it.
    - first the `fits` products, under the heading "Compatibles con tu
      <coche>", then the `unknown` products under "Sin datos de
      compatibilidad", with a one-line explanation;
-   - never the `no-fit` products. The result count says how many fit and how
-     many are unknown, and how many were hidden as not compatible.
+   - never the `no-fit` products, with one exception on search (below). The
+     result count says how many fit and how many are unknown, and how many were
+     hidden as not compatible.
+   - **Exact-code exception (amended by S5.8, D-1; for the owner to review).**
+     On the search page only, a `no-fit` product reached by an exact EAN (8 or
+     13 digits) or an exact normalised part number is shown, marked "No
+     compatible", after the unknown group, under its own heading. It is never
+     counted as hidden: the counts line gives it its own "coincidencia exacta"
+     part. A hit that fits the car or has no data stays in its own group. A
+     category page never lists a `no-fit` product. Text-only matches that are
+     `no-fit` stay hidden.
+   - **Unavailable car (S5.8, D-4).** If the selected car cannot be read (the
+     vehicle read failed), the listing renders as without a car: unfiltered, no
+     headings, marks or fit counts, with the status the page would have had
+     without a car. If the car is known and the read of fit fails, the listing
+     fails as it does when its data cannot be read; it is never shown
+     unfiltered under a selected car.
    - Sort and brand chips apply inside each group. Brand chip counts reflect
      the filtered set. Pagination runs over the combined list (`fits` first).
    - With no vehicle selected, listings behave exactly as today.
