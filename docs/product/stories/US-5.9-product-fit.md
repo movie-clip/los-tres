@@ -1,10 +1,10 @@
 # S5.9 With a car selected, the product page tells me whether the part fits it, and any visitor can see which cars it fits
 
-Status: draft for human review, not approved. Board status follows the human's own move
+Status: approved 2026-11-17 (the human, D-8) and built on branch `278-product-fit`; the review gate passed with every AC met or met with a note. Rulings that shaped the text below: D-1 (a failed fit read degrades the page), D-2 (the demo extension), D-6 and D-7 (the list for every visitor; an unavailable car renders as without a car), now written into `docs/product/vehicle-fitment.md` rule 8, marked for the owner to review. Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: set on the board
 Issue: #278 · Tickets: #279-#280 (T5.9.1-T5.9.2)
 Depends on: S5.5 (#261), S5.6 (#265), S5.7 (#269) and S5.8 (#274), all merged: the fit state, the fitment data, the selected car in the URL, and the listings that use it. S5.9 is the last story of the car feature.
-Source: `docs/product/vehicle-fitment.md` rule 8 (and rules 2, 3, 4 and 9); decision 0016; `docs/product/stories/US-5.5-vehicle-fitment-model.md` and `US-5.7-select-car.md` (both hand S5.9 its slice); `docs/product/stories/US-5.8-filter-by-car.md` (shape precedent); the approved delivery brief `agentic/runs/2026-11-17-s5-9-product-fit/02-product.md` and rulings D-1 to D-4, D-6 and D-7 in the same run's `decisions.md` (D-5 is superseded by D-6 and D-7); recon `01-recon.md`; issue #278 acceptance outline (not read by the drafting lane: see Notes for the human); guardrails 1 and 5.
+Source: `docs/product/vehicle-fitment.md` rule 8 (and rules 2, 3, 4 and 9); decision 0016; `docs/product/stories/US-5.5-vehicle-fitment-model.md` and `US-5.7-select-car.md` (both hand S5.9 its slice); `docs/product/stories/US-5.8-filter-by-car.md` (shape precedent); the approved delivery brief and the human's rulings D-1 to D-4, D-6 and D-7 of the run that built it (D-5 is superseded by D-6 and D-7); issue #278 acceptance outline (not read by the drafting lane: see Notes for the human); guardrails 1 and 5.
 
 ## Open decisions
 

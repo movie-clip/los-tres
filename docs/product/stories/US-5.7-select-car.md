@@ -43,7 +43,7 @@ In:
 Out, for this story (listed so a lane does not do them here):
 - **the privacy page change, including the "one sentence" of spec rule 5 and decision 0016: out of scope, ruling D-1.** The "ni tecnologías similares" text stays as it is, carried as an open item above;
 - filtering, grouping, ordering and counting listings by fit state, brand-chip counts, and search results filtering (S5.8, #274 and #277);
-- the fit banner and the "vehicles it fits" list on the product page (S5.9, #278);
+- the fit banner and the "vehicles it fits" list on the product page (S5.9, #278, which has since shipped both);
 - any change to the vehicle list, to how a fitment counts, or any fitment write (S5.5 owns the list and the rule; the import is the only writer);
 - changing the `coche`-in-URL mechanism or reopening decision 0016: D-2 sends the doubt to design as a proposal only;
 - more than one saved car, a garage, accounts, plate or VIN lookup, TecDoc, admin screens for vehicles, analytics of selections (spec out-of-scope list);
