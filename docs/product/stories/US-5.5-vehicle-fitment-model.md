@@ -32,7 +32,7 @@ Out, for this story (listed so a lane does not do them here):
 - reading the fitment field from feed rows, replacing a feed's fitments on import, the `fitment: unknown vehicle <slug>` import output and the demo feeds' fitment column (S5.6);
 - the `?coche=` parameter, the `localStorage` choice, links carrying `coche`, the selection control, the picker and the `/mi-coche` and `/api/vehiculos` routes (S5.7);
 - filtering, grouping and ordering the category page and search results by fit state, and their counts (S5.8);
-- the fit banner and the vehicles-it-fits list on the product page (S5.9);
+- the fit banner and the vehicles-it-fits list on the product page (S5.9, which has since shipped both);
 - any admin screen to edit vehicles or fitments, TecDoc or any licensed catalogue, plate or VIN lookup, and any scraping of a vehicle database (spec § Out of scope; guardrail 2);
 - the `/privacidad` sentence about the stored car choice (it belongs with the story that stores the choice).
 

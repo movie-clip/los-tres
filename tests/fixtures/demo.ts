@@ -104,6 +104,41 @@ export const DEMO_ILLUSTRATED = {
   'filtros-de-habitaculo': 'demo-filtro-de-habitaculo-mahle-ca-1118-antipolen',
 } as const;
 
+/**
+ * S5.9 (#280, D-2, AC 29): the demo Bosch oil filter fits 12 distinct vehicles of 6 makes after one import,
+ * in vehicle-list (position) order: UNO-216 gives 11 of them and DOS-212 the Clio IV 1.5 dCi. Sandero III
+ * straddles the tenth row (TCe is the 10th, Eco-G the 11th). The slugs are typed here on purpose: this is
+ * the shipped feed's expectation, and unit demo-feeds.test.ts proves the files and this list agree.
+ */
+export const DEMO_BOSCH = {
+  slug: 'demo-filtro-de-aceite-bosch-of-3306',
+  partNumber: 'OF-3306',
+  vehicles: [
+    'seat-leon-iii-2012-2020-1-6-tdi-115cv',
+    'seat-leon-iii-2012-2020-1-4-tsi-125cv',
+    'volkswagen-golf-vii-2012-2020-1-6-tdi-110cv',
+    'volkswagen-golf-vii-2012-2020-1-4-tsi-125cv',
+    'volkswagen-polo-vi-2017-1-0-tsi-95cv',
+    'renault-clio-iv-2012-2019-0-9-tce-90cv',
+    'renault-clio-iv-2012-2019-1-5-dci-90cv',
+    'renault-megane-iv-2015-1-5-dci-110cv',
+    'peugeot-308-ii-2013-2021-1-6-bluehdi-120cv',
+    'dacia-sandero-iii-2020-1-0-tce-90cv',
+    'dacia-sandero-iii-2020-1-0-tce-eco-g-100cv',
+    'ford-puma-i-2019-1-0-ecoboost-hybrid-125cv',
+  ],
+  makes: 6,
+  /** The six demo cars it fits (true) or does not (false): the same as before the extension (AC 29). */
+  demoCars: {
+    'seat-leon-iii-2012-2020-1-6-tdi-115cv': true,
+    'volkswagen-golf-vii-2012-2020-1-6-tdi-110cv': true,
+    'renault-clio-iv-2012-2019-1-5-dci-90cv': true,
+    'toyota-corolla-e210-2019-1-8-hybrid-122cv': false,
+    'peugeot-208-ii-2019-1-2-puretech-100cv': false,
+    'seat-ibiza-v-2017-1-0-tsi-95cv': false,
+  },
+} as const;
+
 /** Public products per category subtree after one import (AC 9, 23). Keys are the fixed tree slugs. */
 export const DEMO_CATEGORY_COUNTS = {
   'mantenimiento-del-coche': 50,

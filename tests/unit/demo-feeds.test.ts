@@ -9,7 +9,7 @@ import { parseCsv } from '@/server/importer/csv';
 import { readHeader, validateRow, type ValidRow } from '@/server/importer/validate';
 import { demoCategoryMappings, demoShops } from '@/server/seed/demo-data';
 
-import { DEMO_CATEGORY_COUNTS, DEMO_COUNTS, DEMO_FEED_ROWS } from '../fixtures/demo';
+import { DEMO_BOSCH, DEMO_CATEGORY_COUNTS, DEMO_COUNTS, DEMO_FEED_ROWS } from '../fixtures/demo';
 
 // The shipped demo feeds (demo/feeds/*.csv) are data, not code: this reads them
 // with the importer's own header and row validators and pins the invariants the
@@ -217,6 +217,32 @@ describe('fitment in the shipped demo feeds (S5.6)', () => {
     expect(complete.length).toBeGreaterThan(0);
     // The screen vehicle of the later fitment stories is one of them.
     expect(states('seat-leon-iii-2012-2020-1-6-tdi-115cv').size).toBe(3);
+  });
+
+  // S5.9 #280, D-2 and AC 29: the demo product that makes the vehicle list collapse.
+  it('gives the Bosch oil filter 12 distinct vehicles of 6 makes, in vehicle-list order, over the 10 boundary (AC 29)', () => {
+    const bosch = [...groupProducts().values()].find((rows) => rows[0].partNumber === DEMO_BOSCH.partNumber);
+    if (bosch === undefined) throw new Error('no Bosch OF-3306 in the demo feeds');
+    const list = listOf(bosch);
+    expect(list.size).toBeGreaterThanOrEqual(11);
+    const makes = new Set([...list].map((slug) => VEHICLE_CATALOGUE.find((vehicle) => vehicle.slug === slug)?.makeSlug));
+    expect(makes.size).toBeGreaterThanOrEqual(3);
+    // The pinned list is the files' list, in the catalogue's position order.
+    const inOrder = VEHICLE_CATALOGUE.filter((vehicle) => list.has(vehicle.slug)).map((vehicle) => vehicle.slug);
+    expect(inOrder).toEqual([...DEMO_BOSCH.vehicles]);
+    expect(list.size).toBe(DEMO_BOSCH.vehicles.length);
+    expect(makes.size).toBe(DEMO_BOSCH.makes);
+  });
+
+  it('keeps the six demo cars fit states of the Bosch filter, and gives no other product the extra vehicles (AC 29)', () => {
+    const bosch = [...groupProducts().values()].find((rows) => rows[0].partNumber === DEMO_BOSCH.partNumber)!;
+    for (const [slug, fits] of Object.entries(DEMO_BOSCH.demoCars)) {
+      expect(stateOf(bosch, slug), slug).toBe(fits ? 'fits' : 'no-fit');
+    }
+    const extras = DEMO_BOSCH.vehicles.filter((slug) => !(slug in DEMO_BOSCH.demoCars));
+    expect(extras.length).toBeGreaterThanOrEqual(8);
+    const others = [...groupProducts().values()].filter((rows) => rows[0].partNumber !== DEMO_BOSCH.partNumber);
+    for (const rows of others) for (const slug of extras) expect(listOf(rows).has(slug), `${rows[0].partNumber} ${slug}`).toBe(false);
   });
 
   it('has a product two feeds sell, with a list from each feed that share a vehicle (AC 32)', () => {

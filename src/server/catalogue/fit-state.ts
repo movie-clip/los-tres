@@ -1,11 +1,13 @@
 import 'server-only';
 
-import { and, eq, exists, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, exists, inArray, sql, type SQL } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { getDb } from '../../db/client';
 import { feeds, fitments, products, shops, vehicles } from '../../db/schema';
-import { activeVehicleWhere, countedFitmentWhere } from '../visibility';
+import type { ActiveVehicle } from '../car/vehicles';
+import { errorCode } from '../error-code';
+import { activeVehicleWhere, countedFitmentWhere, visibleProductWhere } from '../visibility';
 
 // The fit-state question of the car filter (S5.5, docs/product/vehicle-fitment.md).
 // Which fitments count is decided in visibility.ts (countedFitmentWhere); this
@@ -47,9 +49,26 @@ export function fitStateSql(vehicleId: number): SQL<FitState> {
   return sql<FitState>`case when ${exists(countedFitmentOf(vehicleId))} then 'fits' when ${exists(countedFitmentOf())} then 'no-fit' else 'unknown' end`;
 }
 
-/** Fixed error: a Drizzle error message embeds its bound params (the slug, the ids). */
-function failed(): Error {
-  return new Error('fit-state: failed');
+/**
+ * The fixed failure of this module. `code` is the database error code (or the
+ * word UNKNOWN), the only thing taken from the driver error: it is validated by
+ * `errorCode` and holds no parameter. No `cause` is attached, because the driver
+ * error and Drizzle's wrapper embed the bound params (the slug, the ids).
+ */
+export class FitStateError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super('fit-state: failed');
+    this.code = code;
+  }
+}
+
+/** Fixed error: the message never holds the slug or the ids; the code is Postgres's. */
+function failed(error?: unknown): Error {
+  // The Postgres code lives on the cause of Drizzle's wrapper.
+  const driver = error instanceof Error && error.cause !== undefined ? error.cause : error;
+  return new FitStateError(errorCode(driver));
 }
 
 /** The active vehicle with this slug, or null when unknown or retired. */
@@ -63,8 +82,8 @@ export async function findActiveVehicle(
       .where(and(eq(vehicles.slug, slug), activeVehicleWhere()))
       .limit(1);
     return rows[0] ?? null;
-  } catch {
-    throw failed();
+  } catch (error) {
+    throw failed(error);
   }
 }
 
@@ -101,7 +120,73 @@ export async function readFitStates(
       .from(products)
       .where(inArray(products.id, ids));
     return { status: 'ok', vehicle, states: new Map(rows.map((row) => [row.id, row.state])) };
-  } catch {
-    throw failed();
+  } catch (error) {
+    throw failed(error);
+  }
+}
+
+/**
+ * Fit state of the public product with this slug for one vehicle id (from
+ * `getCarContext`). Counted fitments only (`fitStateSql`). Re-applies
+ * `visibleProductWhere()`: a slug that is not a public product answers
+ * `unknown`, so a hidden product's fitments are unreachable here. Throws the
+ * `FitStateError` (fixed message, database error code in `code`, no cause).
+ */
+export async function readProductFitState(
+  productSlug: string,
+  vehicleId: number,
+): Promise<FitState> {
+  try {
+    const rows = await getDb()
+      .select({ state: fitStateSql(vehicleId) })
+      .from(products)
+      .where(and(eq(products.slug, productSlug), visibleProductWhere()))
+      .limit(1);
+    return rows[0]?.state ?? 'unknown';
+  } catch (error) {
+    throw failed(error);
+  }
+}
+
+/** A vehicle a product fits, as the page shows it: the active vehicle without its id. */
+export type FittedVehicle = Omit<ActiveVehicle, 'id'>;
+
+/**
+ * Each distinct active vehicle of the public product's counted fitments, once
+ * however many feeds give it, in vehicle-list order (`vehicles.position`, then
+ * `vehicles.id`, the picker's order). Counted fitments only
+ * (`countedFitmentWhere`). Re-applies `visibleProductWhere()`: a slug that is not
+ * a public product answers `[]`, so a hidden product's fitments are unreachable
+ * here. No vehicle id leaves this function. Throws the `FitStateError` (fixed
+ * message, database error code in `code`, no cause).
+ */
+export async function readProductVehicles(productSlug: string): Promise<FittedVehicle[]> {
+  try {
+    return await getDb()
+      .select({
+        slug: vehicles.slug,
+        make: vehicles.make,
+        makeSlug: vehicles.makeSlug,
+        model: vehicles.model,
+        modelSlug: vehicles.modelSlug,
+        generation: vehicles.generation,
+        yearFrom: vehicles.yearFrom,
+        yearTo: vehicles.yearTo,
+        engine: vehicles.engine,
+        fuel: vehicles.fuel,
+        powerCv: vehicles.powerCv,
+      })
+      .from(fitments)
+      .innerJoin(products, eq(fitments.productId, products.id))
+      .innerJoin(feeds, eq(fitments.feedId, feeds.id))
+      .innerJoin(shops, eq(feeds.shopId, shops.id))
+      .innerJoin(vehicles, eq(fitments.vehicleId, vehicles.id))
+      .where(
+        and(eq(products.slug, productSlug), visibleProductWhere(), countedFitmentWhere()),
+      )
+      .groupBy(vehicles.id)
+      .orderBy(asc(vehicles.position), asc(vehicles.id));
+  } catch (error) {
+    throw failed(error);
   }
 }

@@ -170,6 +170,16 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | car header on the 404 and error page | with a stored car, the page reloads once to `?coche=` (D-18); the error page cannot resolve a car without a database, so it is not e2e-reachable with one |
 | car header heights | no car: one 64 px row with the control at its right edge (glyph only from 352 to 639 px); below 352 px the control wraps to its own row (112 px at 320 and 351); a selected car adds a 44 px row 2 (112 to 112.8 px at 375 to 1280) |
 | retired car | not producible on the demo database (no retired vehicle in the shipped list); report not checked |
+| product, banner fits (S5.9; `<car>` is `seat-leon-iii-2012-2020-1-6-tdi-115cv`, `<bosch>` is `demo-filtro-de-aceite-bosch-of-3306`) | `/producto/<bosch>?coche=<car>` |
+| product, banner no fit (link) | `/producto/demo-filtro-de-aceite-mahle-of-1124?coche=<car>`; with the longest car, `/producto/<bosch>?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |
+| product, banner no data | `/producto/demo-filtro-de-aceite-oc-1234?coche=<car>` |
+| product, banner absent | any product with no `coche`, with `?coche=no-existe`, or with a stored car and the script blocked |
+| product, could not check, unavailable car, a list of exactly 10, fits with the longest car | not producible on the demo; report not checked (the first two are integration only) |
+| product, list, 1 vehicle | `/producto/demo-filtro-de-aceite-mahle-of-1124` (Corolla only) |
+| product, list, 3 vehicles | `/producto/demo-filtro-de-aire-mann-filter-af-1318-275-200-mm` (3 tiles in 3 groups: Seat León III, Seat Ibiza V, Volkswagen Golf VII) |
+| product, list, 12 vehicles, collapsed and open | `/producto/<bosch>` (12 vehicles, 6 makes; 10 shown, the control is the `summary` under the tenth tile, 2 behind it; the group that straddles the tenth tile is Dacia Sandero III); the collapsed card is 1167 px tall at 390 |
+| product, no list | `/producto/demo-filtro-de-aceite-oc-1234` |
+| product, selected car marked in the list | `/producto/<bosch>?coche=<car>` (one tile carries "Tu coche") |
 | demo notice | shown on the demo product, `/categoria/mantenimiento-del-coche`, `?pagina=2`, `/categoria/aceite-de-motor`; absent on home, the empty category, 404 and the legal pages |
 
 Every demo category is demo-only, so a rendered page never carries a canonical (noindex, no canonical): the canonical half of any check on `?marca=` is not observable in a screenshot or curl; the integration test carries it.

@@ -155,10 +155,30 @@ that device until they change or remove it.
    compatible con tu <coche>" plus a link to the category filtered for that
    car (`no-fit`), or "Sin datos de compatibilidad para tu coche"
    (`unknown`). The page always lists the vehicles the product fits, grouped by
-   make and model, collapsed beyond 10 rows. A product page is never hidden
+   make, model and generation, collapsed beyond 10 rows. A product page is never hidden
    by the filter, only marked.
-9. **Copy.** All new copy is es-ES in the message files. The designer's UX spec
-   (S5.7) fixes the exact wording; the strings above are the intent.
+   - **List for every visitor, banner only with a car (S5.9, D-6).** The list "Vehículos compatibles" shows to every visitor: with
+     no car, an unrecognised car, an unavailable car or a selected car, whatever
+     that car's fit state. It is omitted, with no heading and no empty text,
+     when the product has no counted fitment (rule 2). The fit banner shows
+     only with a selected car. Every product stays visible and searchable
+     whatever the car.
+   - **Unavailable car (S5.9, D-7).** If the selected
+     car cannot be read (the vehicle read failed), the product page renders as
+     without a car: every offer, no banner, nothing hidden, and still `noindex`
+     under `coche`. This mirrors the listings (rule 3).
+   - **Failed fit read (S5.9, D-1).** If the car is
+     known and the read that decides the fit state fails, the page still
+     answers as it would without a car and still shows every offer. In the
+     banner's place one line says compatibility could not be checked, and it
+     says neither that the part fits nor that it does not. If the read that
+     lists the vehicles fails, the list is omitted and nothing else changes.
+     The two reads fail independently, and each failure writes one fixed log
+     line that names neither the car nor the product. This differs on purpose
+     from the listings, where a failed fit read fails the page: the product
+     page carries the offers and the shop links.
+9. **Copy.** All new copy is es-ES in the message files. Each story's UX
+   spec (S5.7, S5.9) fixes the exact wording; the strings above are the intent.
 
 ## Out of scope (this feature)
 

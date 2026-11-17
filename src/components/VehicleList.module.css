@@ -1,0 +1,201 @@
+/* The Vehicle list card (S5.9): the Offer panel look, a white card under the offers.
+   Groups are one heading and one grid of tiles each; below 40rem the tiles are one
+   column, from 40rem they fill the width with a 16rem minimum, the Card grid's
+   own minimum. Every text element wraps, every flex and grid child has a zero
+   minimum width, so nothing scrolls sideways. 0.875rem by 0.5rem is the chevron
+   box of the brand chips. */
+.card {
+  min-width: 0;
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.heading {
+  margin: 0 0 var(--space-0);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.help {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.groups,
+.rest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.group {
+  min-width: 0;
+}
+
+.groupHeading {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+@media (min-width: 40rem) {
+  .tiles {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  }
+}
+
+/* The whole tile is the link. Hover and pressed change the edge, the fill and the
+   underline only, so nothing moves. */
+.tile {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.tile:hover {
+  border-color: var(--color-ink);
+}
+
+.tile:hover .engine,
+.tile:active .engine {
+  text-decoration: underline;
+}
+
+.tile:active {
+  border-color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.tile:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Visually hidden, not removed: the group name starts the link's accessible name. */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.engineLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0) var(--space-1);
+  align-items: center;
+  min-width: 0;
+}
+
+.engine {
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+}
+
+.detail {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+/* The static chip look: a tag, not a control and not a verdict. */
+.tag {
+  padding: var(--space-0) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-chip-bg);
+  color: var(--color-chip-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+}
+
+.more {
+  min-width: 0;
+}
+
+/* The control is the Secondary button look, composed. The summary stays content
+   wide and left aligned; the two-class selector below wins over the composed
+   padding whatever the sheet order. The default marker is removed. */
+.summary {
+  composes: home from './CategoryEmpty.module.css';
+  gap: var(--space-1);
+  box-sizing: border-box;
+  max-width: 100%;
+  margin-top: var(--space-2);
+  cursor: pointer;
+  line-height: var(--leading-snug);
+  list-style: none;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.more .summary {
+  padding: var(--space-1) var(--space-2);
+}
+
+/* Both labels are in the HTML; the one that does not match the state is not drawn,
+   so it is not read either. */
+.more[open] .moreLabel,
+.more:not([open]) .fewerLabel {
+  display: none;
+}
+
+.rest {
+  margin-top: var(--space-3);
+}
+
+/* Two shapes, down when closed and up when open; nothing rotates. The fill follows
+   the text colour, so hover and pressed need no rule of their own. */
+.chevron {
+  flex: none;
+  width: 0.875rem;
+  height: 0.5rem;
+  background: currentColor;
+  clip-path: polygon(0 0, 0 35%, 50% 100%, 100% 35%, 100% 0, 50% 65%);
+}
+
+.more[open] .chevron {
+  clip-path: polygon(0 100%, 0 65%, 50% 0, 100% 65%, 100% 100%, 50% 35%);
+}

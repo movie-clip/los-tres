@@ -1,0 +1,116 @@
+/* The Fit banner is the Page notice anatomy: a 1px edge, a 0.25rem left rule, one
+   text block. The kind sets the tint, the rule and the glyph; the meaning is
+   always in the words. It has no margin of its own: the layout grid spaces it.
+   0.75rem is the glyph box of the Fit mark, this component's own size. */
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: flex-start;
+  justify-content: space-between;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-left: 0.25rem solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-chip-bg);
+  color: var(--color-text);
+}
+
+.fits {
+  border-left-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.noFit {
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.unknown {
+  border-left-color: var(--color-border-strong);
+  background: var(--color-chip-bg);
+}
+
+/* The could-not-check line is the Page notice look: no glyph, regular weight. */
+.unchecked {
+  border-left-color: var(--color-accent);
+  background: var(--color-warning-bg);
+}
+
+/* The lead and the link share a wrapping row: on a phone the link wraps under the lead. */
+.lead {
+  display: flex;
+  flex: 1 1 16rem;
+  gap: var(--space-1);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* The glyph is a filled shape clipped from an empty box: decorative, no text. It is
+   centred on the first line of the text, not on the whole block. */
+.glyph {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: calc((var(--text-md) * var(--leading-snug) - 0.75rem) / 2);
+  background: currentColor;
+}
+
+.fits .glyph {
+  color: var(--color-success);
+  clip-path: polygon(0 55%, 15% 40%, 38% 62%, 85% 10%, 100% 25%, 38% 92%);
+}
+
+.noFit .glyph {
+  color: var(--color-danger);
+  clip-path: polygon(15% 0, 50% 35%, 85% 0, 100% 15%, 65% 50%, 100% 85%, 85% 100%, 50% 65%, 15% 100%, 0 85%, 35% 50%, 0 15%);
+}
+
+.unknown .glyph {
+  color: var(--color-chip-text);
+  clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%);
+}
+
+.text {
+  min-width: 0;
+}
+
+/* A span, not a p: `.page p` in globals is muted grey and the lead takes the full text colour. */
+.label {
+  display: block;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.unchecked .label {
+  font-weight: var(--weight-regular);
+}
+
+/* The help line of the unknown kind sits under the lead, indented by the glyph
+   because it is inside the same text column. */
+.banner .help {
+  margin: var(--space-0) 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* The link is the Secondary button of the system, composed, no copied rules. The
+   two-class selector below wins over the composed padding, whatever the sheet order. */
+.link {
+  composes: home from './CategoryEmpty.module.css';
+  flex: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.banner .link {
+  padding: var(--space-1) var(--space-2);
+}
