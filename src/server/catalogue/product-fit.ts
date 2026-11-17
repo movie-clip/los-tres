@@ -2,7 +2,12 @@ import 'server-only';
 
 import type { CarContext } from '../car/state';
 import { errorCode } from '../error-code';
-import { readProductFitState, type FitState } from './fit-state';
+import {
+  readProductFitState,
+  readProductVehicles,
+  type FitState,
+  type FittedVehicle,
+} from './fit-state';
 
 // What the product page says about the selected car (S5.9). A supplementary read:
 // it degrades instead of failing the page, and it names no visibility flag (the
@@ -19,21 +24,48 @@ export type ProductFit = {
    * `unchecked` when the fit read failed.
    */
   banner: ProductFitBanner | null;
+  /**
+   * The product's distinct counted vehicles in vehicle-list order, for every
+   * visitor. `[]` = no counted fitment; null = the read failed.
+   */
+  vehicles: FittedVehicle[] | null;
 };
+
+/** The banner read, caught on its own: `null` without a selected car, `unchecked` on a failure. */
+async function readBanner(productSlug: string, car: CarContext): Promise<ProductFitBanner | null> {
+  if (car.state !== 'selected') {
+    return null;
+  }
+  try {
+    return await readProductFitState(productSlug, car.vehicle.id);
+  } catch (error) {
+    console.error(`product-fit: fit failed (${errorCode(error)})`);
+    return 'unchecked';
+  }
+}
+
+/** The vehicles read, caught on its own: null on a failure. */
+async function readVehicles(productSlug: string): Promise<FittedVehicle[] | null> {
+  try {
+    return await readProductVehicles(productSlug);
+  } catch (error) {
+    console.error(`product-fit: vehicles failed (${errorCode(error)})`);
+    return null;
+  }
+}
 
 /**
  * The fit outcome of one public product (by slug) for the request's car. Never
- * throws: a failed read gives `unchecked` and one `product-fit: fit failed (<code>)`
- * line. Call it only after the product loader returned a product.
+ * throws: the banner read and the vehicles read run concurrently and are caught
+ * separately, so a failure of one never changes the other's field. A failed banner
+ * read gives `unchecked` and one `product-fit: fit failed (<code>)` line; a failed
+ * vehicles read gives null and one `product-fit: vehicles failed (<code>)` line.
+ * Call it only after the product loader returned a product.
  */
 export async function getProductFit(productSlug: string, car: CarContext): Promise<ProductFit> {
-  if (car.state !== 'selected') {
-    return { banner: null };
-  }
-  try {
-    return { banner: await readProductFitState(productSlug, car.vehicle.id) };
-  } catch (error) {
-    console.error(`product-fit: fit failed (${errorCode(error)})`);
-    return { banner: 'unchecked' };
-  }
+  const [banner, vehicles] = await Promise.all([
+    readBanner(productSlug, car),
+    readVehicles(productSlug),
+  ]);
+  return { banner, vehicles };
 }
