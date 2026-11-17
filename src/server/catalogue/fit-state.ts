@@ -5,7 +5,7 @@ import { QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { getDb } from '../../db/client';
 import { feeds, fitments, products, shops, vehicles } from '../../db/schema';
-import { activeVehicleWhere, countedFitmentWhere } from '../visibility';
+import { activeVehicleWhere, countedFitmentWhere, visibleProductWhere } from '../visibility';
 
 // The fit-state question of the car filter (S5.5, docs/product/vehicle-fitment.md).
 // Which fitments count is decided in visibility.ts (countedFitmentWhere); this
@@ -47,9 +47,14 @@ export function fitStateSql(vehicleId: number): SQL<FitState> {
   return sql<FitState>`case when ${exists(countedFitmentOf(vehicleId))} then 'fits' when ${exists(countedFitmentOf())} then 'no-fit' else 'unknown' end`;
 }
 
-/** Fixed error: a Drizzle error message embeds its bound params (the slug, the ids). */
-function failed(): Error {
-  return new Error('fit-state: failed');
+/**
+ * Fixed error: a Drizzle error message embeds its bound params (the slug, the ids).
+ * The driver error rides as `cause` (Drizzle's wrapper is unwrapped to it) so a
+ * caller can log `errorCode(error.cause)`; the message stays fixed.
+ */
+function failed(error?: unknown): Error {
+  const driver = error instanceof Error && error.cause !== undefined ? error.cause : error;
+  return new Error('fit-state: failed', { cause: driver });
 }
 
 /** The active vehicle with this slug, or null when unknown or retired. */
@@ -63,8 +68,8 @@ export async function findActiveVehicle(
       .where(and(eq(vehicles.slug, slug), activeVehicleWhere()))
       .limit(1);
     return rows[0] ?? null;
-  } catch {
-    throw failed();
+  } catch (error) {
+    throw failed(error);
   }
 }
 
@@ -101,7 +106,30 @@ export async function readFitStates(
       .from(products)
       .where(inArray(products.id, ids));
     return { status: 'ok', vehicle, states: new Map(rows.map((row) => [row.id, row.state])) };
-  } catch {
-    throw failed();
+  } catch (error) {
+    throw failed(error);
+  }
+}
+
+/**
+ * Fit state of the public product with this slug for one vehicle id (from
+ * `getCarContext`). Counted fitments only (`fitStateSql`). Re-applies
+ * `visibleProductWhere()`: a slug that is not a public product answers
+ * `unknown`, so a hidden product's fitments are unreachable here. Throws the
+ * fixed error, with the driver error as `cause`.
+ */
+export async function readProductFitState(
+  productSlug: string,
+  vehicleId: number,
+): Promise<FitState> {
+  try {
+    const rows = await getDb()
+      .select({ state: fitStateSql(vehicleId) })
+      .from(products)
+      .where(and(eq(products.slug, productSlug), visibleProductWhere()))
+      .limit(1);
+    return rows[0]?.state ?? 'unknown';
+  } catch (error) {
+    throw failed(error);
   }
 }
