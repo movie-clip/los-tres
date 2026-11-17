@@ -7,6 +7,7 @@ import { Breadcrumb } from '@/components/Breadcrumb';
 import { toIllustrationKey } from '@/components/CategoryIllustration';
 import { CarNotice } from '@/components/CarNotice';
 import { DemoNotice } from '@/components/DemoNotice';
+import { FitBanner } from '@/components/FitBanner';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
 import { ProductDescription } from '@/components/ProductDescription';
@@ -14,6 +15,7 @@ import { ProductHero, type ProductDetail } from '@/components/ProductHero';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
 import { categoryPath, productPath, withCar } from '@/server/catalogue/paths';
+import { getProductFit, type ProductFitBanner } from '@/server/catalogue/product-fit';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { pageSeo } from '@/server/catalogue/seo';
@@ -50,13 +52,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await load(slug);
   if (product === null) notFound();
 
-  const [t, tCategory, tDemo, tCar, car] = await Promise.all([
+  const [t, tCategory, tDemo, tCar, tFit, tProductFit, car] = await Promise.all([
     getTranslations('Product'),
     getTranslations('Category'),
     getTranslations('DemoNotice'),
     getTranslations('Car'),
+    getTranslations('Fit'),
+    getTranslations('ProductFit'),
     getCarContext(),
   ]);
+
+  // The product is public here, so the fit read may run. It never throws: a failed
+  // read comes back as 'unchecked'. Null (no banner) unless a car is selected.
+  const fit = await getProductFit(product.slug, car);
+  const carName = car.state === 'selected' ? car.vehicle.name : '';
+  const bannerText: Record<ProductFitBanner, string> = {
+    fits: tProductFit('bannerFits', { car: carName }),
+    'no-fit': tProductFit('bannerNoFit', { car: carName }),
+    unknown: tProductFit('bannerUnknown'),
+    unchecked: tProductFit('bannerUnchecked'),
+  };
 
   // A null detail is left out entirely, never shown as empty.
   const details: ProductDetail[] = [];
@@ -99,6 +114,21 @@ export default async function ProductPage({ params }: ProductPageProps) {
             shopCount={t('shopCount', { count: product.offers.length })}
             vatNote={t('vatIncluded')}
           />
+          {fit.banner !== null && (
+            <FitBanner
+              kind={fit.banner}
+              text={bannerText[fit.banner]}
+              help={fit.banner === 'unknown' ? tFit('unknownHelp') : null}
+              link={
+                fit.banner === 'no-fit' && car.state === 'selected'
+                  ? {
+                      href: withCar(categoryPath(product.categorySlug), car.vehicle.slug),
+                      label: tProductFit('bannerNoFitLink'),
+                    }
+                  : null
+              }
+            />
+          )}
           <OfferList
             heading={t('offersHeading')}
             bestPriceLabel={t('bestPrice')}

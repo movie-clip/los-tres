@@ -113,6 +113,13 @@
       "filtros-de-habitaculo": "Ilustración de un filtro de habitáculo. No es una foto del producto."
     }
   },
+  "ProductFit": {
+    "bannerFits": "Compatible con tu {car}",
+    "bannerNoFit": "No es compatible con tu {car}",
+    "bannerNoFitLink": "Ver productos compatibles",
+    "bannerUnknown": "Sin datos de compatibilidad para tu coche",
+    "bannerUnchecked": "No hemos podido comprobar la compatibilidad con tu coche. Inténtalo de nuevo en unos minutos."
+  },
   "Footer": {
     "legalNotice": "Aviso legal",
     "privacy": "Privacidad",
