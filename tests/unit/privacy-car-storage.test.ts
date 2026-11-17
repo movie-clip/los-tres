@@ -8,7 +8,8 @@ import type { OwnerIdentity } from '@/config/owner';
 
 import messages from '../../messages/es-ES.json';
 
-// S5.8 follow-up (D-18): the privacy page says the selected car is kept in the visitor's own browser.
+// S5.8 follow-ups (D-18, D-22): the privacy page says the selected car is kept in the visitor's own browser,
+// under a heading that names local storage too.
 
 const SITE = 'Sitio de Prueba';
 const OWNER: OwnerIdentity = {
@@ -25,6 +26,9 @@ const D18 =
   'Si eliges un coche, lo recordamos solo en tu propio navegador (almacenamiento local) para filtrar los productos; ' +
   'no se envía a nuestros servidores ni se guarda en ellos, y puedes quitarlo cuando quieras desde el selector de coche.';
 
+// D-22: the heading names both topics, so on its own it does not read as "nothing is stored".
+const HEADING = 'Cookies y almacenamiento local';
+
 const html = renderToStaticMarkup(
   createElement(PrivacyContent, {
     t: createTranslator({ locale: 'es-ES', messages, namespace: 'Privacy' }) as never,
@@ -40,5 +44,17 @@ describe('the privacy page and the selected car', () => {
 
   it('keeps the message file on the ruled wording, with the site name placeholder', () => {
     expect(messages.Privacy.cookiesBody).toBe(D18.replace(SITE, '{siteName}'));
+  });
+
+  it('puts the D-22 heading directly above the D-18 sentence', () => {
+    expect(messages.Privacy.cookiesHeading).toBe(HEADING);
+    const heading = html.indexOf(`>${HEADING}</h2>`);
+    expect(heading).toBeGreaterThan(-1);
+    // The next heading comes after the sentence, so the sentence sits under this one.
+    const sentence = html.indexOf(D18.slice(0, 40));
+    expect(sentence).toBeGreaterThan(heading);
+    const next = html.indexOf('<h2', heading + 1);
+    expect(next === -1 || next > sentence).toBe(true);
+    expect(html).not.toContain('No usamos cookies');
   });
 });
