@@ -118,7 +118,14 @@
     "bannerNoFit": "No es compatible con tu {car}",
     "bannerNoFitLink": "Ver productos compatibles",
     "bannerUnknown": "Sin datos de compatibilidad para tu coche",
-    "bannerUnchecked": "No hemos podido comprobar la compatibilidad con tu coche. Inténtalo de nuevo en unos minutos."
+    "bannerUnchecked": "No hemos podido comprobar la compatibilidad con tu coche. Inténtalo de nuevo en unos minutos.",
+    "listHeading": "Vehículos compatibles",
+    "listHelp": "Elige un coche para ver los productos de esta categoría compatibles con él.",
+    "groupName": "{make} {model} {generation}",
+    "yourCar": "Tu coche",
+    "moreVehicles": "{count, plural, one {Mostrar # vehículo más} other {Mostrar # vehículos más}}",
+    "fewerVehicles": "Mostrar menos",
+    "rowDetail": "{fuelPower} · {years}"
   },
   "Footer": {
     "legalNotice": "Aviso legal",
