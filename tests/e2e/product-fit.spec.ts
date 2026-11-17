@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_ILLUSTRATED, DEMO_SHARED } from '../fixtures/demo';
+import { DEMO_BOSCH, DEMO_ILLUSTRATED, DEMO_SHARED } from '../fixtures/demo';
 import {
   CAR,
   CAR_STORAGE_KEY,
@@ -12,6 +12,7 @@ import {
   seedStorage,
   storageOf,
 } from '../support/car';
+import { VEHICLE_CATALOGUE } from '../../src/db/vehicle-catalogue';
 import { normaliseSpaces } from '../support/messages';
 import { expectNoSetCookie, openRawHtml } from '../support/page-checks';
 
@@ -37,6 +38,8 @@ type State = {
   text: string;
   help: string | null;
   link: boolean;
+  /** How many vehicle-list tiles the demo product shows (S5.9 #280): bosch 12 after D-2, Mahle 1, OC 1234 none. */
+  tiles: number;
 };
 
 const STATES: State[] = [
@@ -47,6 +50,7 @@ const STATES: State[] = [
     text: messages.ProductFit.bannerFits.replace('{car}', CAR_NAME),
     help: null,
     link: false,
+    tiles: DEMO_BOSCH.vehicles.length,
   },
   {
     name: 'no-fit',
@@ -55,6 +59,7 @@ const STATES: State[] = [
     text: messages.ProductFit.bannerNoFit.replace('{car}', CAR_NAME),
     help: null,
     link: true,
+    tiles: 1,
   },
   {
     name: 'unknown',
@@ -63,6 +68,7 @@ const STATES: State[] = [
     text: messages.ProductFit.bannerUnknown,
     help: messages.Fit.unknownHelp,
     link: false,
+    tiles: 0,
   },
 ];
 
@@ -301,6 +307,17 @@ test.describe('links (ACs 22, 23)', () => {
       nodes.map((node) => ({ href: node.getAttribute('href') ?? '', testid: node.getAttribute('data-testid') })),
     );
   const CONTROL_ACTIONS = new Set(['car-select', 'car-change', 'car-remove']);
+  // S5.9 #280 AC 18: a vehicle-list tile is the one link whose coche is its own vehicle, not the selected car.
+  // The sweeps below take the tiles out and assert them on their own, so every other link is still held to the rule.
+  const TILE = 'vehicle-list-row';
+  const isTile = (anchor: Anchor) => anchor.testid === TILE;
+  /** The tile rule: the product's category, the tile's own vehicle in coche, once, as the only parameter. */
+  const expectOwnVehicle = (anchor: Anchor, where: string) => {
+    const own = cocheValues(anchor.href);
+    expect(own, `${where}: ${anchor.href}`).toHaveLength(1);
+    expect(anchor.href, where).toBe(`${CATEGORY}?coche=${own[0]}`);
+    expect(VEHICLE_CATALOGUE.some((vehicle) => vehicle.slug === own[0]), `${where}: ${own[0]} is a vehicle`).toBe(true);
+  };
 
   for (const state of STATES) {
     test(`${state.name}: every internal link but /go and the car control carries coche once and last; /go carries nothing`, async ({
@@ -309,12 +326,16 @@ test.describe('links (ACs 22, 23)', () => {
       await page.goto(urlOf(state.slug, CAR.slug));
       await expect(banner(page)).toHaveCount(1);
       const anchors = (await anchorsOf(page)).filter((anchor) => anchor.href.startsWith('/') && !anchor.href.startsWith('//'));
-      const carried = anchors.filter((anchor) => !anchor.href.startsWith('/go/') && !CONTROL_ACTIONS.has(anchor.testid ?? ''));
+      const tiles = anchors.filter(isTile);
+      const carried = anchors.filter((anchor) => !anchor.href.startsWith('/go/') && !CONTROL_ACTIONS.has(anchor.testid ?? '') && !isTile(anchor));
       expect(carried.length).toBeGreaterThanOrEqual(4);
       for (const anchor of carried) {
         expect(cocheValues(anchor.href), anchor.href).toEqual([CAR.slug]);
         expect(queryOf(anchor.href).at(-1), anchor.href).toEqual(['coche', CAR.slug]);
       }
+      // Tiles: bosch lists its twelve, the Mahle oil filter its one, OC 1234 none; each carries its own vehicle (AC 18).
+      expect(tiles.length, state.name).toBe(state.tiles);
+      for (const tile of tiles) expectOwnVehicle(tile, state.name);
       const go = anchors.filter((anchor) => anchor.href.startsWith('/go/'));
       expect(go.length).toBeGreaterThan(0);
       for (const anchor of go) {
@@ -325,11 +346,16 @@ test.describe('links (ACs 22, 23)', () => {
   }
 
   test('with no car and with an unrecognised one no link carries coche (AC 22)', async ({ page }) => {
-    for (const url of [urlOf(MAHLE_OIL), urlOf(MAHLE_OIL, UNKNOWN_SLUG)]) {
+    for (const url of [urlOf(MAHLE_OIL), urlOf(MAHLE_OIL, UNKNOWN_SLUG), urlOf(BOSCH), urlOf(BOSCH, UNKNOWN_SLUG)]) {
       await page.goto(url);
-      for (const anchor of await anchorsOf(page)) {
+      const anchors = await anchorsOf(page);
+      // The list tiles are the only exception (AC 18, AC 22): their own vehicle, whether or not a car is selected.
+      for (const anchor of anchors.filter((item) => !isTile(item))) {
         expect(cocheValues(anchor.href), `${url}: ${anchor.href}`).toEqual([]);
       }
+      const tiles = anchors.filter(isTile);
+      expect(tiles.length, url).toBeGreaterThan(0);
+      for (const tile of tiles) expectOwnVehicle(tile, url);
     }
   });
 

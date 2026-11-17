@@ -4,11 +4,12 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { closeDb, getDb } from '@/db/client';
 import { feeds, fitments, offers, products } from '@/db/schema';
 import { formatImportReport, importExitCode, importFeeds } from '@/server/importer';
-import { readFitStates } from '@/server/catalogue/fit-state';
+import { readFitStates, readProductVehicles } from '@/server/catalogue/fit-state';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { seedDemoData } from '@/server/seed';
 
 import {
+  DEMO_BOSCH,
   DEMO_COUNTS,
   DEMO_DRILL,
   DEMO_FEED_ROWS,
@@ -223,6 +224,46 @@ describe('fitments of the shipped demo data (S5.6)', () => {
     if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
     expect(result.states.get(product)).toBe('fits');
     expect(result.states.size).toBe(1);
+  });
+
+  // S5.9 #280, D-2 and AC 29: the demo Bosch filter fits 12 vehicles, enough to collapse the list.
+  it('lists 12 distinct vehicles of 6 makes for the Bosch filter, in list order, León once though three feeds name it (AC 29)', async () => {
+    await seedDemoData(getDb());
+    await importFeeds(getDb());
+    const list = await readProductVehicles(DEMO_BOSCH.slug);
+    expect(list.map((vehicle) => vehicle.slug)).toEqual([...DEMO_BOSCH.vehicles]);
+    expect(new Set(list.map((vehicle) => vehicle.makeSlug)).size).toBe(DEMO_BOSCH.makes);
+    expect(list.length).toBeGreaterThan(10);
+
+    const product = await productIdOf(DEMO_BOSCH.partNumber);
+    const leon = await vehicleIdBySlug(SCREEN_VEHICLE);
+    const rows = (await fitmentRows()).filter((row) => row.productId === product);
+    expect(new Set(rows.filter((row) => row.vehicleId === leon).map((row) => row.feedId)).size).toBe(3);
+    // One fitment row per (vehicle, feed): 12 vehicles, León three times, Golf twice, Clio dCi once, the rest once.
+    expect(rows.length).toBeGreaterThan(list.length);
+  });
+
+  it('keeps the six demo cars fit states of the Bosch filter after the extension (AC 29)', async () => {
+    await seedDemoData(getDb());
+    await importFeeds(getDb());
+    const product = await productIdOf(DEMO_BOSCH.partNumber);
+    for (const [slug, fits] of Object.entries(DEMO_BOSCH.demoCars)) {
+      const result = await readFitStates(slug, [product]);
+      if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
+      expect(result.states.get(product), slug).toBe(fits ? 'fits' : 'no-fit');
+    }
+  });
+
+  it('gives the extra vehicles to no other demo product (AC 29)', async () => {
+    await seedDemoData(getDb());
+    await importFeeds(getDb());
+    const bosch = await productIdOf(DEMO_BOSCH.partNumber);
+    const extras = DEMO_BOSCH.vehicles.filter((slug) => !(slug in DEMO_BOSCH.demoCars));
+    const extraIds = await Promise.all(extras.map(vehicleIdBySlug));
+    const rows = await fitmentRows();
+    const others = rows.filter((row) => extraIds.includes(row.vehicleId) && row.productId !== bosch);
+    expect(others).toEqual([]);
+    expect(rows.filter((row) => extraIds.includes(row.vehicleId)).length).toBe(extras.length);
   });
 
   it('changes no fitment row on the second import: same ids, same creation times (AC 18, AC 34)', async () => {

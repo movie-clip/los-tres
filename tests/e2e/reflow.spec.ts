@@ -501,3 +501,124 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// S5.9 (#280, 04-ux checks 30 to 32; story AC 32): the vehicle list on the 12-vehicle demo Bosch filter, closed and open,
+// at the four widths, with no car, the demo car (tag in the first group) and the longest car (no-fit banner above it).
+const LIST_SLUG = 'demo-filtro-de-aceite-bosch-of-3306';
+const LIST_PAGES: { name: string; car: { slug: string } | null }[] = [
+  { name: 'no car', car: null },
+  { name: 'the demo car (tag on a tile)', car: CAR },
+  { name: 'the longest car', car: LONGEST_CAR },
+];
+
+for (const [width, height] of VIEWPORTS) {
+  test.describe(`the vehicle list at ${width}x${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    for (const { name, car } of LIST_PAGES) {
+      for (const state of ['closed', 'open'] as const) {
+        test(`${name}, ${state}: no sideways scroll, no text cut, tiles inside the card and at least 44px tall`, async ({ page }) => {
+          await page.goto(`/producto/${LIST_SLUG}${car === null ? '' : `?coche=${car.slug}`}`);
+          const card = page.getByTestId('vehicle-list');
+          await expect(card).toBeVisible();
+          const toggle = page.getByTestId('vehicle-list-toggle');
+          await expect(toggle).toBeVisible();
+          if (state === 'open') {
+            await toggle.click();
+            await expect(page.getByTestId('vehicle-list-more')).toHaveAttribute('open', /.*/);
+          }
+          const expectedTiles = state === 'open' ? 12 : 10;
+          await expect(page.getByTestId('vehicle-list-row').filter({ visible: true })).toHaveCount(expectedTiles);
+
+          expect(await sideways(page)).toBeLessThanOrEqual(0);
+          expect(await cutText(page)).toEqual([]);
+
+          const geometry = await page.evaluate(() => {
+            const rect = (node: Element) => {
+              const box = node.getBoundingClientRect();
+              return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width, height: box.height };
+            };
+            // A closed details keeps boxes for its content: checkVisibility() is what says it is not shown.
+            const shown = (node: Element) => node.checkVisibility();
+            const card = document.querySelector('[data-testid="vehicle-list"]')!;
+            const before = card.previousElementSibling!;
+            const after = card.nextElementSibling!;
+            return {
+              card: rect(card),
+              before: rect(before),
+              after: rect(after),
+              tiles: [...card.querySelectorAll('[data-testid="vehicle-list-row"]')].filter(shown).map(rect),
+              tags: [...card.querySelectorAll('[data-testid="vehicle-list-your-car"]')].filter(shown).map(rect),
+              headings: [...card.querySelectorAll('h2, h3')].filter(shown).map(rect),
+              toggle: rect(card.querySelector('[data-testid="vehicle-list-toggle"]')!),
+            };
+          });
+          const { card: box } = geometry;
+          expect(box.left).toBeGreaterThanOrEqual(0);
+          expect(box.right).toBeLessThanOrEqual(width + 0.5);
+          // The card is as wide as the offers card above it and the description below it (check 12 of the banner, same rule).
+          expect(Math.abs(box.width - geometry.before.width)).toBeLessThanOrEqual(1);
+          expect(Math.abs(box.width - geometry.after.width)).toBeLessThanOrEqual(1);
+          expect(geometry.tiles).toHaveLength(expectedTiles);
+          for (const tile of geometry.tiles) {
+            expect(tile.left).toBeGreaterThanOrEqual(box.left - 0.5);
+            expect(tile.right).toBeLessThanOrEqual(box.right + 0.5);
+            expect(tile.height).toBeGreaterThanOrEqual(44);
+          }
+          for (const heading of geometry.headings) {
+            expect(heading.left).toBeGreaterThanOrEqual(box.left - 0.5);
+            expect(heading.right).toBeLessThanOrEqual(box.right + 0.5);
+          }
+          // The tag sits inside its own tile (it wraps under the engine at 195 but never leaves the tile).
+          for (const tag of geometry.tags) {
+            const home = geometry.tiles.find((tile) => tag.left >= tile.left - 0.5 && tag.right <= tile.right + 0.5 && tag.top >= tile.top - 0.5 && tag.bottom <= tile.bottom + 0.5);
+            expect(home, 'the tag is inside a tile').toBeDefined();
+          }
+          expect(geometry.toggle.height).toBeGreaterThanOrEqual(44);
+          expect(geometry.toggle.left).toBeGreaterThanOrEqual(box.left - 0.5);
+          expect(geometry.toggle.right).toBeLessThanOrEqual(box.right + 0.5);
+          // Tiles never overlap: sorted by position, no two share area.
+          for (const [index, a] of geometry.tiles.entries()) {
+            for (const b of geometry.tiles.slice(index + 1)) {
+              const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+              const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+              expect(overlapX > 1 && overlapY > 1, 'two tiles overlap').toBe(false);
+            }
+          }
+        });
+      }
+    }
+
+    test('the grid: one tile per row below 40rem, several columns at 1280 (check 31)', async ({ page }) => {
+      await page.goto(`/producto/${LIST_SLUG}`);
+      const tiles = await page.getByTestId('vehicle-list-row').filter({ visible: true }).evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const box = node.getBoundingClientRect();
+          return { left: box.left, width: box.width, top: box.top };
+        }),
+      );
+      const card = await page.getByTestId('vehicle-list').evaluate((node) => node.getBoundingClientRect().width);
+      const lefts = new Set(tiles.map((tile) => Math.round(tile.left)));
+      if (width >= 640) {
+        // Two tiles of the first group sit side by side, and each is a fraction of the card, not a full row.
+        expect(lefts.size).toBeGreaterThanOrEqual(2);
+        for (const tile of tiles) expect(tile.width).toBeLessThan(card / 2);
+      } else {
+        expect(lefts.size, 'one column').toBe(1);
+        // Full width of the card's content box: nothing narrower than the widest tile.
+        const widest = Math.max(...tiles.map((tile) => tile.width));
+        for (const tile of tiles) expect(Math.abs(tile.width - widest)).toBeLessThanOrEqual(1);
+      }
+    });
+
+    test('the list with a selected car and the banner above it do not push the page sideways, closed or open', async ({ page }) => {
+      await page.goto(`/producto/${LIST_SLUG}?coche=${LONGEST_CAR.slug}`);
+      await expect(page.getByTestId('fit-banner')).toHaveAttribute('data-fit', 'no-fit');
+      await expect(page.getByTestId('vehicle-list')).toBeVisible();
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      await page.getByTestId('vehicle-list-toggle').click();
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(await cutText(page)).toEqual([]);
+    });
+  });
+}
