@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import messages from '../../messages/es-ES.json';
+
 // AC 27, D-8: the admin screens hold no user-facing string of their own. Visible
 // text comes from the Admin namespace of messages/es-ES.json. A text scan, so it
 // needs neither a build nor a browser; the e2e checks the rendered copy.
@@ -96,6 +98,97 @@ describe('the page language (AC 27)', () => {
     expect(layout).not.toMatch(/SiteHeader|SiteFooter|PublicChrome/);
     for (const { file, code } of adminSources()) {
       expect(code, file).not.toMatch(/SiteHeader|SiteFooter|PublicChrome/);
+    }
+  });
+});
+
+// S3.1, AC 40 and 39 (D-6): no text on the page says or implies that approving a registered
+// feed makes its offers appear. S3.1 alone does not publish a real feed (the importer reads
+// canonical columns only, S3.5; categories are mapped by the seed only, S4.2), so a line that
+// promised it would be false. The scan covers the whole Admin.Sources block, which is where the
+// S2.3 result lines live, and Admin.Form, where the S3.1 forms add copy.
+
+function leaves(node: unknown, prefix = ''): [string, string][] {
+  if (typeof node === 'string') return [[prefix, node]];
+  if (node && typeof node === 'object') {
+    return Object.entries(node).flatMap(([key, value]) => leaves(value, prefix ? `${prefix}.${key}` : key));
+  }
+  return [];
+}
+
+/** A phrase that says offers are, or will be, shown: "se muestran", "aparecen", "ya están en el sitio", "visibles". */
+const SHOWS_OFFERS =
+  /\b(?:se\s+muestra(?:n)?|se\s+mostrar[aá]n?|aparece(?:n)?|aparecer[aá]n?|se\s+ve(?:n)?|se\s+ver[aá]n?|ya\s+est[aá]n?\s+en\s+el\s+sitio|visibles?|publicad[oa]s?|se\s+publica(?:n)?)\b/i;
+/** The same phrases in a negative or lapsing sentence ("ya no se muestran", "dejarán de mostrarse"), which are true. */
+const NEGATED =
+  /\b(?:no|nunca|ya\s+no)\s+(?:se\s+)?(?:muestra(?:n)?|mostrar[aá]n?|aparece(?:n)?|ve(?:n)?)\b|\bdejar[aá]n?\s+de\s+(?:mostrarse|aparecer|verse)\b/gi;
+/** A condition: the sentence says when an offer is shown, not that approval shows it. */
+const CONDITIONAL = /\b(?:solo|únicamente|si|aunque|sin)\b/i;
+
+/** Sentences of `text` that claim, or imply, that offers appear and are not negated or conditional. */
+function offerPromises(text: string): string[] {
+  return text
+    .split(/(?<=[.:;!?])\s+/)
+    .map((sentence) => sentence.replace(NEGATED, ''))
+    .filter((sentence) => SHOWS_OFFERS.test(sentence) && !CONDITIONAL.test(sentence));
+}
+
+describe('no copy promises that approval publishes offers (AC 40, D-6)', () => {
+  const block = [...leaves(messages.Admin.Sources, 'Sources'), ...leaves(messages.Admin.Form, 'Form')];
+
+  it('scans the whole Admin.Sources and Admin.Form blocks, so the rule is not vacuous', () => {
+    expect(block.length).toBeGreaterThan(80);
+    expect(block.map(([key]) => key)).toEqual(
+      expect.arrayContaining(['Sources.doneFeedApproved', 'Sources.intro', 'Sources.noticeFeedCreated', 'Form.Feed.warningBody']),
+    );
+  });
+
+  it('finds no sentence that says approval shows offers, in any key', () => {
+    const found = block.flatMap(([key, value]) => offerPromises(value).map((sentence) => `${key}: ${sentence}`));
+    expect(found).toEqual([]);
+  });
+
+  it('is shown to fail on the line the S2.3 page used to say, and on other promises', () => {
+    for (const promise of [
+      'Feed aprobado: sus ofertas ya se muestran.',
+      'Feed aprobado. Sus ofertas aparecen en el sitio.',
+      'Al aprobarlo, las ofertas serán visibles.',
+      'Tienda aprobada: ya están en el sitio.',
+    ]) {
+      expect(offerPromises(promise), promise).not.toEqual([]);
+    }
+  });
+
+  it('lets the true lines through: negated, lapsing and conditional ones', () => {
+    for (const fine of [
+      'Tienda desactivada: sus ofertas ya no se muestran.',
+      'Sus ofertas dejarán de mostrarse en el sitio al instante.',
+      'Una oferta solo se muestra en el sitio si su tienda y su feed están aprobados.',
+      'La tienda no está aprobada: sus ofertas no se muestran en el sitio, aunque tenga feeds aprobados.',
+    ]) {
+      expect(offerPromises(fine), fine).toEqual([]);
+    }
+  });
+
+  it('says what the S2.3 approval line now says, and keeps the intro sentence that a new feed starts unapproved', () => {
+    const copy = messages.Admin.Sources;
+    expect(copy.doneFeedApproved).toBe('Feed aprobado. Las próximas importaciones lo tendrán en cuenta.');
+    expect(copy.doneFeedApproved).not.toMatch(/oferta/i);
+    expect(copy.intro).toContain('Un feed nuevo empieza sin aprobar');
+    expect(copy.doneFeedApprovedPaused).not.toMatch(/ofertas ya se muestran/);
+  });
+
+  it('keeps the S3.1 notices free of any value: no name, slug or address placeholder', () => {
+    for (const key of [
+      'noticeNetworkCreated',
+      'noticeNetworkSaved',
+      'noticeShopCreated',
+      'noticeShopSaved',
+      'noticeFeedCreated',
+      'noticeFeedSaved',
+      'noticeFeedUnapproved',
+    ] as const) {
+      expect(messages.Admin.Sources[key], key).not.toMatch(/[{}]|https?:/);
     }
   });
 });

@@ -474,7 +474,8 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
 
   it('uses no ICU placeholder the pages do not pass', () => {
     // Admin.Sources (US-2.3) passes the counts, the shop name and the feed id and network its page formats.
-    const allowed = new Set(['siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText']);
+    // S3.1 adds `count` (Sources.networksCount) and `max` (the three Form.Errors length messages).
+    const allowed = new Set(['siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText', 'count', 'max']);
     for (const [key, value] of leaves(admin)) {
       for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {
         expect(allowed.has(match[1]), `Admin.${key} names {${match[1]}}`).toBe(true);
@@ -483,7 +484,9 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
   });
 
   it('puts no recovery, sign-up or remember-me wording in the sign-in copy (AC 1)', () => {
-    const text = leaves(admin).map(([, value]) => value).join(' | ');
+    // Scoped to the sign-in screen: the S2.1 rule is about what the sign-in page offers. The S3.1 copy
+    // legitimately says "registrar" (a feed is registered), so scanning all of Admin was a mis-scope.
+    const text = leaves(admin.SignIn).map(([, value]) => value).join(' | ');
     expect(text).not.toMatch(/olvid|registr|recuérd|recuerd|restablec/i);
   });
 });

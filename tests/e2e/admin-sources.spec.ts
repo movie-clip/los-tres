@@ -107,7 +107,7 @@ test.describe('the signed-in page', () => {
       await expect(group.getByTestId(/^source-shop-/).getByTestId('source-tag').first(), name).toHaveText(copy.shopApproved);
       const feed = group.getByTestId(/^source-feed-/).first();
       await expect(feed.getByTestId('source-tag'), name).toHaveText(copy.feedApproved);
-      await expect(feed, name).toContainText(copy.feedMetaDemo);
+      await expect(feed, name).toContainText(copy.demoMark);
       await expect(feed.getByTestId('source-disable'), name).toBeVisible();
       await expect(feed.getByTestId('source-approve'), name).toHaveCount(0);
     }
@@ -127,9 +127,12 @@ test.describe('the signed-in page', () => {
     // markup loads. A feed URL may embed a network API key (guardrail 5).
     const html = await response?.text();
     expect(html).toBeTruthy();
+    // S3.1 (AC 23, 25, 45): a host is shown now, so the check is "no feed URL beyond the host and
+    // no secret-looking value": no stored demo value, no key, and no address of any scheme.
     for (const url of ['demo-feed:', 'apikey', 'api_key', 'token=']) {
       expect(html, url).not.toContain(url);
     }
+    expect(html).not.toMatch(/https?:\/\/[a-z0-9.-]+\.(?:example|test|com)/i);
     expect(await page.content()).not.toContain('demo-feed:');
     // Nothing else is needed from the network: an anonymous client gets nothing of it.
     expect((await request.get('/admin/tiendas', { maxRedirects: 0 })).status()).toBeGreaterThanOrEqual(300);

@@ -12,6 +12,7 @@ import {
   products,
   shops,
 } from '@/db/schema';
+import { createFeed, createNetwork, createShop, listNetworksForAdmin, listSourcesForAdmin } from '@/server/admin/sources';
 import { seedDemoData } from '@/server/seed';
 
 import { DEMO_COUNTS, DEMO_FEED_URLS, DEMO_SHOPS } from '../fixtures/demo';
@@ -186,5 +187,91 @@ describe('seed scope (guardrail 1)', () => {
     await seedDemoData(getDb());
     const [shop] = await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno'));
     expect(shop).toMatchObject({ name: 'Renombrada por el admin', isApproved: false });
+  });
+});
+
+function form(fields: Record<string, string>): FormData {
+  const data = new FormData();
+  for (const [name, value] of Object.entries(fields)) data.set(name, value);
+  return data;
+}
+
+describe('the derived demo marker (S3.1, AC 35)', () => {
+  it('marks the seeded network, shops and feeds demo, and a row an admin creates never', async () => {
+    await seedDemoData(getDb());
+    const created = await createShop(form({ name: 'Tienda del admin', slug: 'tienda-del-admin' }));
+    const network = await createNetwork(form({ name: 'Red del admin', slug: 'red-del-admin' }));
+    expect(created.status).toBe('written');
+    expect(network.status).toBe('written');
+
+    const list = await listSourcesForAdmin();
+    const seeded = list.filter((shop) => DEMO_SHOPS.some((demo) => demo.slug === shop.slug));
+    expect(seeded).toHaveLength(DEMO_COUNTS.shops);
+    for (const shop of seeded) {
+      expect(shop.demo, shop.name).toBe(true);
+      expect(shop.feeds.every((feed) => feed.demo)).toBe(true);
+      // The seeded address reads as no host: a demo-feed: value is never shown (AC 24).
+      expect(shop.feeds.every((feed) => feed.host === null)).toBe(true);
+    }
+    expect(list.find((shop) => shop.slug === 'tienda-del-admin')).toMatchObject({ demo: false, feeds: [] });
+
+    const networkList = await listNetworksForAdmin();
+    expect(networkList.find((row) => row.slug === 'demo')?.demo).toBe(true);
+    expect(networkList.find((row) => row.slug === 'red-del-admin')?.demo).toBe(false);
+  });
+
+  it('a feed an admin creates is never demo, even under a demo shop and a demo network', async () => {
+    await seedDemoData(getDb());
+    const [demoShop] = await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno'));
+    const [demoNetwork] = await getDb().select().from(networks).where(eq(networks.slug, 'demo'));
+    const result = await createFeed(
+      form({ shopId: String(demoShop.id), networkId: String(demoNetwork.id), url: 'https://feeds.example/real.csv' }),
+    );
+    expect(result.status).toBe('written');
+    const created = (await getDb().select().from(feeds).where(eq(feeds.url, 'https://feeds.example/real.csv')))[0];
+    expect(created).toMatchObject({ isDemo: false, isApproved: false, sourceType: 'affiliate_network' });
+  });
+
+  it('a demo shop and a demo network lose the marker once a non-demo feed is added to them, and only them (D-16)', async () => {
+    await seedDemoData(getDb());
+    const [one] = await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno'));
+    const [demoNetwork] = await getDb().select().from(networks).where(eq(networks.slug, 'demo'));
+    expect((await createFeed(form({ shopId: String(one.id), networkId: String(demoNetwork.id), url: 'https://feeds.example/real.csv' }))).status).toBe('written');
+
+    const list = await listSourcesForAdmin();
+    expect(list.find((shop) => shop.id === one.id)?.demo).toBe(false);
+    for (const shop of list.filter((row) => row.id !== one.id)) expect(shop.demo, shop.name).toBe(true);
+    expect((await listNetworksForAdmin()).find((row) => row.slug === 'demo')?.demo).toBe(false);
+    // The feeds keep their own marker: the seeded one is still demo.
+    expect(list.find((shop) => shop.id === one.id)?.feeds.map((feed) => feed.demo)).toEqual([true, false]);
+  });
+
+  it('a shop or network with no feed is not demo', async () => {
+    await createShop(form({ name: 'Sin feeds', slug: 'sin-feeds' }));
+    await createNetwork(form({ name: 'Sin feeds', slug: 'red-sin-feeds' }));
+    expect((await listSourcesForAdmin())[0].demo).toBe(false);
+    expect((await listNetworksForAdmin())[0].demo).toBe(false);
+  });
+});
+
+describe('a restart after an admin edited the demo rows (S3.1, AC 36)', () => {
+  it('does not rename them back, adds no second row, and keeps a disable', async () => {
+    await seedDemoData(getDb());
+    await getDb().update(shops).set({ name: 'Renombrada por el admin', isApproved: false }).where(eq(shops.slug, 'tienda-demo-uno'));
+    await getDb().update(networks).set({ name: 'Red renombrada' }).where(eq(networks.slug, 'demo'));
+    await getDb().update(feeds).set({ isApproved: false }).where(eq(feeds.url, DEMO_FEED_URLS[0]));
+    const before = await counts();
+
+    const second = await seedDemoData(getDb());
+
+    expect(second).toMatchObject({ networks: 0, shops: 0, feeds: 0 });
+    expect(await counts()).toEqual(before);
+    const [shop] = await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno'));
+    const [network] = await getDb().select().from(networks).where(eq(networks.slug, 'demo'));
+    const [feed] = await getDb().select().from(feeds).where(eq(feeds.url, DEMO_FEED_URLS[0]));
+    expect(shop).toMatchObject({ name: 'Renombrada por el admin', isApproved: false });
+    expect(network.name).toBe('Red renombrada');
+    expect(feed.isApproved).toBe(false);
+    expect((await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno')))).toHaveLength(1);
   });
 });
