@@ -1,0 +1,13 @@
+/* One column; the screen caps its width at 24rem. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* A value the admin cannot change, with the reason under it. */
+.fixed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

@@ -1,0 +1,18 @@
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  color: var(--color-link);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.link:hover {
+  text-decoration-thickness: 3px;
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}

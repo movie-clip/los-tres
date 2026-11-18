@@ -37,7 +37,20 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
   const adminRoutes = listRouteFiles(appDir).filter((file) => classifyRoute(file) === 'admin');
 
   it('finds the admin routes that exist, so the check below is not vacuous', () => {
-    expect(adminRoutes).toEqual(expect.arrayContaining(['admin/acceso/page.tsx', 'admin/(shell)/page.tsx', 'admin/(shell)/tiendas/page.tsx']));
+    expect(adminRoutes).toEqual(
+      expect.arrayContaining([
+        'admin/acceso/page.tsx',
+        'admin/(shell)/page.tsx',
+        'admin/(shell)/tiendas/page.tsx',
+        // S3.1: the six form routes, each guarded like the page above.
+        'admin/(shell)/tiendas/red/nueva/page.tsx',
+        'admin/(shell)/tiendas/red/[id]/editar/page.tsx',
+        'admin/(shell)/tiendas/tienda/nueva/page.tsx',
+        'admin/(shell)/tiendas/tienda/[id]/editar/page.tsx',
+        'admin/(shell)/tiendas/feed/nuevo/page.tsx',
+        'admin/(shell)/tiendas/feed/[id]/editar/page.tsx',
+      ]),
+    );
   });
 
   it('allow-lists exactly the sign-in page', () => {
@@ -146,13 +159,22 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(unguarded).toEqual([]);
   });
 
-  it('scans the shops and feeds actions (S2.3) and finds both, guarded and only these two exports', () => {
+  it('scans the shops and feeds actions (S2.3, S3.1) and finds them, guarded and only these eight exports', () => {
     const entry = filesWithServerActions(root, 'src').find(
       ({ file }) => file === 'src/app/admin/(shell)/tiendas/actions.ts',
     );
     expect(entry).toBeDefined();
     const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
-    expect(exported).toEqual(['setShopApprovalAction', 'setFeedApprovalAction']);
+    expect(exported).toEqual([
+      'setShopApprovalAction',
+      'setFeedApprovalAction',
+      'createNetworkAction',
+      'updateNetworkAction',
+      'createShopAction',
+      'updateShopAction',
+      'createFeedAction',
+      'updateFeedAction',
+    ]);
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 

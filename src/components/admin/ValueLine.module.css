@@ -1,0 +1,15 @@
+.line {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.label {
+  color: var(--color-muted);
+}
+
+/* A 253-character host wraps anywhere instead of scrolling the page sideways. */
+.value {
+  color: var(--color-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

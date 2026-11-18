@@ -16,3 +16,8 @@
   margin: 0;
   font-size: var(--text-sm);
 }
+
+.notice {
+  max-width: 48rem;
+  margin: 0 0 var(--space-2);
+}

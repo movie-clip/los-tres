@@ -6,10 +6,24 @@ import type { SourceActionState } from '@/app/admin/(shell)/tiendas/actions';
 
 import { ActionButton } from './ActionButton';
 import { ConfirmPanel } from './ConfirmPanel';
+import { DemoMark } from './DemoMark';
 import { ErrorBlock } from './ErrorBlock';
 import { PendingButton } from './PendingButton';
 import { StatusTag } from './StatusTag';
+import { TextLink } from './TextLink';
+import { ValueLine } from './ValueLine';
 import styles from './SourceRow.module.css';
+
+/** What a row adds to the approval controls (S3.1): the Demo mark, one value line and the links to its forms. */
+export type SourceRowExtras = {
+  /** Draws the Demo mark beside the title. */
+  demo: boolean;
+  demoLabel: string;
+  /** "Identificador: tienda-demo-uno" or "Dominio: ofertas.example.com". The value is never a feed address. */
+  valueLine: { label: string; value: string };
+  /** Text links under the meta, in order. Their names begin with the visible text. */
+  links: { href: string; label: string; ariaLabel: string }[];
+};
 
 /** Every string one row shows, already translated by the page, for both of its states. */
 export type SourceRowLabels = {
@@ -49,6 +63,7 @@ export type SourceRowProps = {
   /** Feed only: approved while its shop is not. */
   paused: boolean;
   labels: SourceRowLabels;
+  extras: SourceRowExtras;
   /** The server action for this kind, passed down by the page. */
   action: (previous: SourceActionState, form: FormData) => Promise<SourceActionState>;
 };
@@ -74,7 +89,7 @@ function doneLine(state: Extract<SourceActionState, { status: 'done' }>, labels:
  * The tag and button always follow the stored flag the server last rendered, so
  * the row never claims a state the server has not stored.
  */
-export function SourceRow({ kind, id, title, meta, note, approved, paused, labels, action }: SourceRowProps) {
+export function SourceRow({ kind, id, title, meta, note, approved, paused, labels, extras, action }: SourceRowProps) {
   // A transport failure (a 500, a dropped connection) rejects the action's promise,
   // which would reach the error boundary and replace the page. It becomes a failed
   // result for this row instead. Next's own redirect (a session that has ended) is
@@ -118,13 +133,22 @@ export function SourceRow({ kind, id, title, meta, note, approved, paused, label
     <div data-testid={`source-${kind}-${id}`}>
       <div className={styles.grid}>
         <div className={styles.info}>
-          <Heading className={kind === 'shop' ? styles.shopTitle : styles.feedTitle}>{title}</Heading>
+          <div className={styles.titleRow}>
+            <Heading className={kind === 'shop' ? styles.shopTitle : styles.feedTitle}>{title}</Heading>
+            {extras.demo ? <DemoMark label={extras.demoLabel} /> : null}
+          </div>
+          <ValueLine label={extras.valueLine.label} value={extras.valueLine.value} testId="source-value" />
           <span className={styles.meta}>{meta}</span>
           {note ? (
             <span className={styles.note} data-testid="source-note">
               {note}
             </span>
           ) : null}
+          <div className={styles.links}>
+            {extras.links.map((link) => (
+              <TextLink key={link.href} href={link.href} label={link.label} ariaLabel={link.ariaLabel} />
+            ))}
+          </div>
         </div>
         {confirming ? (
           <div className={styles.panel} ref={slotRef}>

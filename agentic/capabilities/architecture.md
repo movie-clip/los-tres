@@ -51,7 +51,8 @@ one lives in code:
   - `src/server/clicks/offer-target.ts`: the only reader of `offers.url`.
   - `src/server/clicks/handle-go.ts`: the handler.
   - `src/app/(public)/go/[offer]/route.ts`: the route.
-- **Admin approval writes** (`src/server/admin/sources.ts`). The only writer of `shops.is_approved` and `feeds.is_approved` outside the seed; the actions in `src/app/admin/(shell)/tiendas/actions.ts` call it and never name the flags; `seams.test.ts` enforces it (guardrail 1).
+- **Admin source writes** (`src/server/admin/sources.ts`): the only writer of networks, shops and feeds outside the seed (insert and update; no file deletes them), approval flags included; the actions in `src/app/admin/(shell)/tiendas/actions.ts` call it and never name the flags; `seams.test.ts` enforces it (guardrail 1).
+- **Feed URL masking** (`src/server/admin/feed-host.ts` `feedHost`): the only function that turns a stored feed URL into display text, the host or null, and the only path from `feeds.url` to admin text; `sources.ts` is the only other admin file that names the URL (guardrails 3 and 5; `seams.test.ts` enforces it).
 - **Owner identity** (`src/config/owner.ts`). The only reader of `OWNER_*` and `CONTACT_EMAIL`; only the `aviso-legal` and `privacidad` `page.tsx` call it.
 - **Selected car** (`src/server/car/context.ts` `getCarContext()`): the only reader of the `x-car-slug` and `x-car-path` request headers, which only `src/proxy.ts` sets; no page reads `searchParams.coche`.
 - **Demo flag.** `demoOnly` is computed only in `src/server/catalogue` from `feeds.is_demo`, inside the `visibleOfferWhere()` query; no file under `src/app` or `src/components` names `isDemo` (`seams.test.ts` enforces).

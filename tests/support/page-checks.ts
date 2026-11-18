@@ -164,3 +164,34 @@ export async function whilePressed<T>(page: Page, target: Locator, read: () => P
     await page.mouse.up();
   }
 }
+
+/**
+ * Sideways scroll and cut-off text on the page as it is now, for a reflow pass at a given viewport.
+ * Returns readable problems, empty when the page fits: the document is not wider than the window,
+ * no element in `body` leaves the window, and no element that clips its overflow holds more than it
+ * shows. A visually hidden 1px label is left out, as is a native select, which may clip with an ellipsis and an input scrolls its own value, so both are
+ * left out.
+ */
+export async function reflowProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    const root = document.documentElement;
+    const width = root.clientWidth;
+    if (root.scrollWidth > width) problems.push(`the page scrolls sideways by ${root.scrollWidth - width}px`);
+    for (const node of document.body.querySelectorAll<HTMLElement>('*')) {
+      if (['SELECT', 'OPTION', 'INPUT', 'SCRIPT', 'STYLE', 'NOSCRIPT'].includes(node.tagName)) continue;
+      const box = node.getBoundingClientRect();
+      // A visually hidden label is a 1px box that clips its text on purpose.
+      if (box.width <= 1 || box.height <= 1) continue;
+      const name = `${node.tagName.toLowerCase()}${node.dataset.testid ? `[${node.dataset.testid}]` : ''}`;
+      if (box.right > width + 1 || box.left < -1) {
+        problems.push(`${name} leaves the window: ${Math.round(box.left)} to ${Math.round(box.right)} of ${width}`);
+      }
+      const clips = getComputedStyle(node).overflowX !== 'visible';
+      if (clips && node.scrollWidth > node.clientWidth + 1) {
+        problems.push(`${name} cuts its content: ${node.scrollWidth}px in ${node.clientWidth}px`);
+      }
+    }
+    return problems.slice(0, 12);
+  });
+}

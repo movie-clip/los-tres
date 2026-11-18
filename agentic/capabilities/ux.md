@@ -67,7 +67,7 @@ Two adaptations for this site:
   pack and `mvp.md` win.
 
 If the skill is not available in your session, say so in `risks` and work from
-this pack. If the session lists no such skill, say so in `skill_calls` and `risks` and work from this pack.
+this pack. If the session lists no such skill, work from this pack and say so in `skill_calls`.
 
 Do not call any `mattpocock-skills:*` skill from this lane. `prototype` writes
 throwaway app code and needs a human flipping variants in the browser, which
@@ -150,7 +150,12 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, failed (transport) | `page.route` fulfils the action POST (header `next-action`) with a 500; the page stays and the row shows the error block "No se ha podido guardar el cambio" |
 | admin shops and feeds, failed (returned) | `page.route` fulfils the action POST with a `text/x-component` body `0:{a:$@1,f:'',b:<buildId>}` then `1:{status:failed,kind:feed,id:1}` |
 | admin shops and feeds, session expired | clear cookies in the context, then press a button; expect `/admin/acceso?aviso=sesion` with the notice |
-| admin shops and feeds, shop with no feeds, empty page, longest content | not producible with the demo seed; report not checked |
+| admin form routes (S3.1) | signed in, six routes under `/admin/tiendas`: `red/nueva`, `tienda/nueva`, `feed/nuevo`, `red/<id>/editar`, `tienda/<id>/editar`, `feed/<id>/editar`; each is also reached from a link on the list page |
+| admin shops and feeds, shop with no feeds | create a shop through the new-shop form (it starts unapproved with no feed); it lists with the empty-feeds state |
+| admin shops and feeds, empty lists, missing prerequisite | not producible on the shared dev database (demo rows always exist); empty states are proved in integration (`admin-source-pages.test.ts`); report not checked |
+| admin shops and feeds, longest content | create rows through the forms with a 120-character name, a 64-character slug and a feed URL with a 253-character host; open `/admin/tiendas` and the forms at 390 and 1280 |
+| admin form, refused and failed | submit a form with a blank name, a bad slug, or an `http` URL (refused, field message); for failed use the `page.route` 500 as for the shop rows |
+| admin feed edit, confirm | edit an approved non-demo feed and press submit with an address typed: the inline confirm opens |
 | car selected | `?coche=seat-leon-iii-2012-2020-1-6-tdi-115cv`, or localStorage key `mi-coche` set to that slug (an init script; not `lostres.coche`, renamed by D-21), which reloads the page once to `?coche=` |
 | car, longest label | `?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |
 | unknown car | `?coche=no-existe` (the page renders as without a car, plus the notice "No reconocemos ese coche") |

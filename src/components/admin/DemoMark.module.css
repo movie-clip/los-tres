@@ -1,0 +1,10 @@
+.mark {
+  display: inline-block;
+  padding: 0.125rem var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-chip-bg);
+  color: var(--color-chip-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}

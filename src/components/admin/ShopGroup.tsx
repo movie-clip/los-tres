@@ -1,4 +1,4 @@
-import { SourceRow, type SourceRowLabels, type SourceRowProps } from './SourceRow';
+import { SourceRow, type SourceRowExtras, type SourceRowLabels, type SourceRowProps } from './SourceRow';
 import styles from './ShopGroup.module.css';
 
 /** One feed, with every string already translated. */
@@ -12,6 +12,7 @@ export type FeedRowView = {
   /** Approved while its shop is not. */
   paused: boolean;
   labels: SourceRowLabels;
+  extras: SourceRowExtras;
 };
 
 /** One shop and its feeds, with every string already translated. */
@@ -23,6 +24,9 @@ export type ShopGroupView = {
   note: string | null;
   approved: boolean;
   labels: SourceRowLabels;
+  extras: SourceRowExtras;
+  /** "Esta tienda aún no tiene feeds.", shown in the feed position when the shop has none. */
+  noFeeds: string;
   feeds: FeedRowView[];
 };
 
@@ -46,6 +50,7 @@ export function ShopGroup({ shop, shopAction, feedAction }: ShopGroupProps) {
           approved={shop.approved}
           paused={false}
           labels={shop.labels}
+          extras={shop.extras}
           action={shopAction}
         />
       </div>
@@ -62,12 +67,17 @@ export function ShopGroup({ shop, shopAction, feedAction }: ShopGroupProps) {
                 approved={feed.approved}
                 paused={feed.paused}
                 labels={feed.labels}
+                extras={feed.extras}
                 action={feedAction}
               />
             </li>
           ))}
         </ul>
-      ) : null}
+      ) : (
+        <div className={styles.feed} data-testid="shop-no-feeds">
+          <p className={styles.none}>{shop.noFeeds}</p>
+        </div>
+      )}
     </li>
   );
 }

@@ -1,0 +1,29 @@
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 24rem;
+}
+
+.heading {
+  composes: heading from './SourcesPage.module.css';
+}
+
+.intro {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+}
+
+/* The form, or the stack of blocks, fills the column; the back link keeps its own width. */
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  gap: var(--space-3);
+}
+
+.body > form,
+.body > div {
+  align-self: stretch;
+}
