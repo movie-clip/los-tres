@@ -31,7 +31,7 @@ copies it into the run ledger at intake and records a verdict beside every row.
 | design | 2 | design | the change crosses the frontend/backend contract (a new or changed API response, a schema change), or more than one build lane touches it, or the request needs a choice no recorded decision covers (`project.md` § Building before the stack exists) | — |
 | build | 1..n | backend, frontend, test, docs | anything that edits repo code, tests or `docs/**` — and only once the stack it needs is recorded | **yes** — the human's go on the build plan, before the branch is created |
 | verify | 1 | integration | any build lane was dispatched | — |
-| verify | 2 | ux-review | `ux` was satisfied, or a build lane changed what a public or admin screen renders | — |
+| verify | 2 | ux-review | `ux` was satisfied, or a build lane changed what a public screen renders, or what an admin screen does or says (function or copy, never layout at phone widths or looks) | — |
 | verify | 3 | review | the run carries a story whose acceptance criteria someone must accept | — |
 | close | 1 | docs | always — `docs/**` against what shipped, and `pack-corrections.md` against `capabilities/` **when a lane emitted one** | — |
 
@@ -53,7 +53,7 @@ row as `not triggered (the delivery brief in <nn> is the specification)`, and
 `integration` runs the lint and test commands `CLAUDE.md` § Commands lists. If
 it lists none, that is a `BLOCKING` finding on any build, not a pass by default.
 `architecture.md` carries the rule. `ux-review` screenshots the running app at
-phone and desktop widths and checks the UX spec (`ux.md`); it runs after
+phone and desktop widths and checks the UX spec (`ux.md`), except admin screens, which get no phone width and no visual review; it runs after
 `integration` passes, because a screen that fails the gate is not worth
 looking at. `review` verifies the story's acceptance criteria one by one.
 

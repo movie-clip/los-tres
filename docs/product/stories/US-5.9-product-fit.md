@@ -44,7 +44,7 @@ In:
 Out, for this story (listed so a lane does not do them here):
 - any change to the picker, the header car control, `localStorage`, `/mi-coche`, the unrecognised-car notice, the category page or search (S5.7 and S5.8 own them);
 - any change to how a fitment counts or to what a fit state is (spec rule 2, S5.5);
-- any fitment write outside the import, any admin screen, any real feed's fitment mapping (S3.5);
+- any fitment write outside the import, any admin screen, any real feed's fitment mapping, which S3.5 writes in code, chosen by the network, with no admin screen;
 - a "compatible products" cross-sell, a fit mark on the product's offers, or fit data in the structured data;
 - the exact es-ES copy of the banner, the could-not-check line, the list heading and the collapse control, and the look and placement of all of them, which belong to the UX pass (spec rule 9) and reach the page through the message file;
 - the server read, the loader shape, component names, the ticket split between lanes and `rel` attributes on the list links, which belong to the tech lead;

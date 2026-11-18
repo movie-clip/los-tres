@@ -129,8 +129,8 @@ returns that feed to unapproved in the same write. A shop or network is marked
 demo only when it has at least one feed and every feed is a demo feed; the
 marker is derived, and no form sets it. The admin sees a feed URL as its host
 only: never prefilled in a form, never in a log. Registering and approving a
-feed does not by itself make real offers appear on the site. Each network's feed field mapping lives in code or
-config in the prototype, with no mapping editor; offers use the tracking URL the
+feed does not by itself make real offers appear on the site. S3.5 maps each network's feed columns in code, chosen
+by the network, with no admin screen and no mapping editor; offers use the tracking URL the
 feed carries (a per-shop link pattern is deferred). A product's offer list is built
 only from imported data.
 

@@ -37,7 +37,7 @@ In:
 
 Out, for this story (listed so a lane does not do them here):
 - any change to what the visitor sees: `?coche=`, the picker, filtering, grouping and the fit banner (S5.7 to S5.9);
-- a real network's own fitment field and the field mapping screen (S3.5); until it exists real offers have no fitment and their products are `unknown` (spec rule 2);
+- a real network's own fitment field and its column mapping, which S3.5 writes in code, chosen by the network, with no admin screen; until it exists real offers have no fitment and their products are `unknown` (spec rule 2);
 - removing fitments for products a feed no longer lists (OD-3);
 - an admin button to run the import, an admin screen for vehicles or fitments, and the matching queue (CLAUDE.md § Stack);
 - a new vehicle, a change to the vehicle list or to how a fitment counts (S5.5 owns both);
