@@ -121,7 +121,15 @@ Decision 0008 holds the detail.
 
 Networks, shops, feeds and affiliate link patterns are **rows the admin
 manages**, never code. Adding a shop means entering its name, network and feed
-URL in the admin area. Each network's feed field mapping lives in code or
+URL in the admin area. Since S3.1 the admin creates and edits networks,
+shops and feeds on the admin shops page, with no code change and no delete
+(disable is the only removal). A new shop and a new feed start unapproved, and
+a feed's approval is separate from its shop's. Replacing an approved feed's URL
+returns that feed to unapproved in the same write. A shop or network is marked
+demo only when it has at least one feed and every feed is a demo feed; the
+marker is derived, and no form sets it. The admin sees a feed URL as its host
+only: never prefilled in a form, never in a log. Registering and approving a
+feed does not by itself make real offers appear on the site. Each network's feed field mapping lives in code or
 config in the prototype, with no mapping editor; offers use the tracking URL the
 feed carries (a per-shop link pattern is deferred). A product's offer list is built
 only from imported data.
@@ -154,7 +162,8 @@ and the backup passphrase are kept in a password manager plus an offline copy
   lands (decision 0012). Every admin route and action checks the role on the
   server.
 - The admin:
-  - manages networks, shops and feeds, and approves or disables them;
+  - manages networks, shops and feeds (creates and edits them, S3.1), and
+    approves or disables them;
   - maps feed categories onto the five fixed categories;
   - hides any product or offer.
 
