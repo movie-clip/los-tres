@@ -146,13 +146,22 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(unguarded).toEqual([]);
   });
 
-  it('scans the shops and feeds actions (S2.3) and finds both, guarded and only these two exports', () => {
+  it('scans the shops and feeds actions (S2.3, S3.1) and finds them, guarded and only these eight exports', () => {
     const entry = filesWithServerActions(root, 'src').find(
       ({ file }) => file === 'src/app/admin/(shell)/tiendas/actions.ts',
     );
     expect(entry).toBeDefined();
     const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
-    expect(exported).toEqual(['setShopApprovalAction', 'setFeedApprovalAction']);
+    expect(exported).toEqual([
+      'setShopApprovalAction',
+      'setFeedApprovalAction',
+      'createNetworkAction',
+      'updateNetworkAction',
+      'createShopAction',
+      'updateShopAction',
+      'createFeedAction',
+      'updateFeedAction',
+    ]);
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 

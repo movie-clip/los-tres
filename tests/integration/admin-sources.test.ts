@@ -256,32 +256,46 @@ describe('listSourcesForAdmin', () => {
       {
         id: alfa.id,
         name: 'Alfa',
+        slug: alfa.slug,
         approved: false,
+        demo: false,
         offerCount: 3,
         feeds: [
-          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkName: null, offerCount: 0 },
-          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkName: 'Red Prueba', offerCount: 3 },
+          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: 'feeds.example' },
+          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkId: network.id, networkName: 'Red Prueba', offerCount: 3, host: 'api.example' },
         ],
       },
-      { id: empty.id, name: 'Beta', approved: true, offerCount: 0, feeds: [] },
+      { id: empty.id, name: 'Beta', slug: empty.slug, approved: true, demo: false, offerCount: 0, feeds: [] },
       {
         id: zeta.id,
         name: 'Zeta',
+        slug: zeta.slug,
         approved: true,
+        demo: false,
         offerCount: 0,
-        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkName: null, offerCount: 0 }],
+        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: null }],
       },
     ]);
     for (const shop of result) {
-      expect(Object.keys(shop).sort()).toEqual(['approved', 'feeds', 'id', 'name', 'offerCount']);
+      expect(Object.keys(shop).sort()).toEqual(['approved', 'demo', 'feeds', 'id', 'name', 'offerCount', 'slug']);
       expect(typeof shop.offerCount).toBe('number');
       for (const feed of shop.feeds) {
-        expect(Object.keys(feed).sort()).toEqual(['approved', 'demo', 'id', 'networkName', 'offerCount', 'source']);
+        expect(Object.keys(feed).sort()).toEqual([
+          'approved',
+          'demo',
+          'host',
+          'id',
+          'networkId',
+          'networkName',
+          'offerCount',
+          'source',
+        ]);
         expect(typeof feed.offerCount).toBe('number');
       }
     }
     const text = JSON.stringify(result);
-    for (const secret of ['KEY-SENTINEL', 'TOKEN-SENTINEL', 'feeds.example', 'api.example', '"url"']) {
+    // The host is shown now (S3.1, AC 23): the rest of the address, and the word, never.
+    for (const secret of ['KEY-SENTINEL', 'TOKEN-SENTINEL', 'apikey', 'token=', 'https:', '"url"']) {
       expect(text).not.toContain(secret);
     }
   });

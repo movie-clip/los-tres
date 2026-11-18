@@ -424,28 +424,145 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([]);
   });
 
-  // Deliberate (issue #24, S2.3): the approval writer is one file, and it never
-  // reads the feed URL, which may embed a network API key (guardrail 5).
-  it('updates shops and feeds only in src/server/admin/sources.ts, which is found (not vacuous)', () => {
-    const found = offenders(
-      /\.update\(\s*(shops|feeds)\s*\)/,
-      (file) => file === 'src/server/admin/sources.ts',
-    );
-    expect(found).toEqual([]);
-    const code = sources().find(({ file }) => file === 'src/server/admin/sources.ts')?.code ?? '';
-    expect(code).toMatch(/\.update\(\s*shops\s*\)/);
-    expect(code).toMatch(/\.update\(\s*feeds\s*\)/);
+  // Deliberate (issue #26, S3.1): the writer of networks, shops and feeds is one
+  // admin file next to the seed, the feed address is named in that writer and in
+  // one masking function, and nothing deletes the three tables (D-7). Each rule
+  // is a named predicate, proved below on inline offenders, so it can fail.
+  const WRITER = 'src/server/admin/sources.ts';
+  const MASK = 'src/server/admin/feed-host.ts';
+  const SEED = 'src/server/seed/index.ts';
+
+  const writesSourceTable = (code: string): boolean =>
+    /\.(insert|update)\(\s*(shops|feeds|networks)\s*\)/.test(code) ||
+    /\b(insert\s+into|update)\s+"?(shops|feeds|networks)"?\s/i.test(code);
+  const deletesSourceTable = (code: string): boolean =>
+    /\.delete\(\s*(shops|feeds|networks)\s*\)/.test(code) ||
+    /\bdelete\s+from\s+"?(shops|feeds|networks)\b/i.test(code);
+  const namesFeedUrl = (code: string): boolean => /(feeds|offers)\.url|\burl\s*:/.test(code);
+  const namesFeedColumn = (code: string): boolean => /\bfeeds\.url\b/.test(code);
+  const isClientFile = (code: string): boolean => /^\s*['"]use client['"]/.test(code);
+  const clientNamesUrl = (code: string): boolean =>
+    isClientFile(code) && /(feeds|offers)\.url|\burl\s*:|\.url\b/.test(code);
+
+  const inAdminUrlScope = (file: string): boolean =>
+    file.startsWith('src/server/admin/') || file.startsWith('src/app/admin/(shell)/tiendas/');
+
+  it('writes networks, shops and feeds only in the admin writer and the seed, and the writer writes all three (S3.1, AC 30)', () => {
+    const found = sources()
+      .filter(({ code }) => writesSourceTable(code))
+      .map(({ file }) => file)
+      .sort();
+    expect(found).toEqual([WRITER, SEED]);
+    const code = sources().find(({ file }) => file === WRITER)?.code ?? '';
+    for (const table of ['networks', 'shops', 'feeds']) {
+      expect(code).toMatch(new RegExp(`\\.insert\\(\\s*${table}\\s*\\)`));
+      expect(code).toMatch(new RegExp(`\\.update\\(\\s*${table}\\s*\\)`));
+    }
   });
 
-  it('never names a feed or offer url under src/server/admin or src/app/admin/(shell)/tiendas', () => {
-    const files = sources().filter(
-      ({ file }) => file.startsWith('src/server/admin/') || file.startsWith('src/app/admin/(shell)/tiendas/'),
-    );
+  it('keeps the source-table write rule able to fail (S3.1, AC 30)', () => {
+    expect(writesSourceTable('await db.insert(shops).values(row)')).toBe(true);
+    expect(writesSourceTable('await tx.update( feeds ).set({})')).toBe(true);
+    expect(writesSourceTable('await db.insert(networks).values(row)')).toBe(true);
+    expect(writesSourceTable('INSERT INTO "shops" (a) values (1)')).toBe(true);
+    expect(writesSourceTable('update feeds set is_approved = true')).toBe(true);
+    expect(writesSourceTable('await db.update(products).set({})')).toBe(false);
+    const found = [
+      { file: 'src/app/admin/(shell)/tiendas/x.ts', code: 'db.insert(feeds).values(r)' },
+      { file: WRITER, code: 'db.insert(feeds).values(r)' },
+    ]
+      .filter(({ code }) => writesSourceTable(code))
+      .map(({ file }) => file)
+      .filter((file) => ![WRITER, SEED].includes(file));
+    expect(found).toEqual(['src/app/admin/(shell)/tiendas/x.ts']);
+  });
+
+  it('names a feed or offer address only in the admin writer and the masking function under the admin code (S3.1, AC 31)', () => {
+    const files = sources().filter(({ file }) => inAdminUrlScope(file));
     expect(files.map(({ file }) => file)).toEqual(
-      expect.arrayContaining(['src/server/admin/sources.ts', 'src/app/admin/(shell)/tiendas/actions.ts']),
+      expect.arrayContaining([WRITER, MASK, 'src/app/admin/(shell)/tiendas/actions.ts']),
     );
-    const found = files.filter(({ code }) => /(feeds|offers)\.url|url\s*:/.test(code)).map(({ file }) => file);
+    const found = files
+      .filter(({ code }) => namesFeedUrl(code))
+      .map(({ file }) => file)
+      .sort();
+    expect(found).toEqual([MASK, WRITER].sort());
+  });
+
+  it('makes the masking function the one export of its file (S3.1, AC 31)', () => {
+    const code = sources().find(({ file }) => file === MASK)?.code ?? '';
+    expect(code).toMatch(/export\s+function\s+feedHost\s*\(/);
+    const exported = [
+      ...code.matchAll(/\bexport\s+(?:async\s+)?(?:function|const|let|var|class|type|interface|enum)\s+(\w+)/g),
+    ].map((match) => match[1]);
+    expect(exported).toEqual(['feedHost']);
+    expect(code).not.toMatch(/\bexport\s*(\{|default\b|\*)/);
+  });
+
+  it('reads feeds.url only in the schema, the importer, the seed and the admin writer (S3.1)', () => {
+    const found = offenders(
+      /\bfeeds\.url\b/,
+      (file) =>
+        file.startsWith('src/db/schema/') ||
+        file.startsWith('src/server/importer/') ||
+        file.startsWith('src/server/seed/') ||
+        file === WRITER,
+    );
     expect(found).toEqual([]);
+    const code = sources().find(({ file }) => file === WRITER)?.code ?? '';
+    expect(code).toMatch(/\bfeeds\.url\b/);
+  });
+
+  it('names no feed address in a client component (S3.1, AC 25, 31)', () => {
+    const found = sources()
+      .filter(({ code }) => clientNamesUrl(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('keeps the feed address rules able to fail (S3.1, AC 31)', () => {
+    // A third admin file naming the address is reported by the name predicate.
+    expect(namesFeedUrl('const row = { url: stored };')).toBe(true);
+    expect(namesFeedUrl('const column = feeds.url;')).toBe(true);
+    expect(namesFeedUrl('const column = offers.url;')).toBe(true);
+    expect(namesFeedUrl('const host = feedHost(row.stored);')).toBe(false);
+    const adminOffender = [
+      { file: 'src/app/admin/(shell)/tiendas/page.tsx', code: 'const view = { url: feed.url };' },
+      { file: WRITER, code: 'select({ stored: feeds.url })' },
+    ]
+      .filter(({ code }) => namesFeedUrl(code))
+      .map(({ file }) => file)
+      .filter((file) => ![WRITER, MASK].includes(file));
+    expect(adminOffender).toEqual(['src/app/admin/(shell)/tiendas/page.tsx']);
+    // The column rule reports a file outside its list.
+    expect(namesFeedColumn('db.select({ u: feeds.url })')).toBe(true);
+    expect(namesFeedColumn('db.select({ u: offers.url })')).toBe(false);
+    // A client file that names the address in any form is reported; a server file is not.
+    expect(clientNamesUrl("'use client';\nconst p = { url: props.url };")).toBe(true);
+    expect(clientNamesUrl("'use client';\nconst u = feed.url;")).toBe(true);
+    expect(clientNamesUrl('"use client"\nconst p = { url: x };')).toBe(true);
+    expect(clientNamesUrl("'use client';\nconst p = { host: props.host };")).toBe(false);
+    expect(clientNamesUrl('const p = { url: x };')).toBe(false);
+  });
+
+  it('deletes from the shops, feeds and networks tables nowhere in src, with no allow-list (S3.1, AC 32, D-7)', () => {
+    const found = sources()
+      .filter(({ code }) => deletesSourceTable(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it('keeps the delete rule able to fail (S3.1, AC 32)', () => {
+    expect(deletesSourceTable('await db.delete(shops).where(x)')).toBe(true);
+    expect(deletesSourceTable('await tx.delete( feeds )')).toBe(true);
+    expect(deletesSourceTable('await db.delete(networks)')).toBe(true);
+    expect(deletesSourceTable('DELETE FROM "feeds" where 1=1')).toBe(true);
+    expect(deletesSourceTable('delete from networks')).toBe(true);
+    expect(deletesSourceTable('await db.delete(fitments).where(x)')).toBe(false);
+    const found = [{ file: WRITER, code: 'await db.delete(shops).where(x)' }]
+      .filter(({ code }) => deletesSourceTable(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([WRITER]);
   });
 
   it('writes admin accounts only in src/server/auth/accounts.ts', () => {
