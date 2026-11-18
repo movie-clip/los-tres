@@ -1,0 +1,12 @@
+.box {
+  composes: box from './ShopGroup.module.css';
+  max-width: 48rem;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2);
+}
+
+/* Two classes under the page, so the muted paragraph colour is kept and only the margin and size are set. */
+.box .text {
+  margin: 0;
+  font-size: var(--text-md);
+}

@@ -1,0 +1,7 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  max-width: 48rem;
+  margin: var(--space-2) 0 0;
+}

@@ -1,0 +1,26 @@
+/* The text field look, composed from its module so the two never drift apart. */
+.field {
+  composes: field from './TextField.module.css';
+}
+
+.label {
+  composes: label from './TextField.module.css';
+}
+
+.select {
+  composes: input from './TextField.module.css';
+  text-overflow: ellipsis;
+}
+
+.invalid {
+  composes: invalid from './TextField.module.css';
+}
+
+.message {
+  composes: message from './TextField.module.css';
+}
+
+/* A native select has no read-only state: the pointer is ignored while a submit is in flight. */
+.readOnly {
+  pointer-events: none;
+}

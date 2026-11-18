@@ -1,13 +1,23 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
-import { AdminMessage } from '@/components/admin/AdminMessage';
+import { CreateToolbar } from '@/components/admin/CreateToolbar';
+import { EmptyList } from '@/components/admin/EmptyList';
+import { NetworkList, type NetworkView } from '@/components/admin/NetworkList';
+import { NetworksSection } from '@/components/admin/NetworksSection';
 import type { FeedRowView, ShopGroupView } from '@/components/admin/ShopGroup';
 import { SourcesList } from '@/components/admin/SourcesList';
 import { SourcesPage } from '@/components/admin/SourcesPage';
 import { getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
-import { listSourcesForAdmin, type AdminFeed, type AdminShop } from '@/server/admin/sources';
+import { isSourceNotice, type SourceNotice } from '@/server/admin/source-rules';
+import {
+  listNetworksForAdmin,
+  listSourcesForAdmin,
+  type AdminFeed,
+  type AdminNetwork,
+  type AdminShop,
+} from '@/server/admin/sources';
 import { requireAdminPage } from '@/server/auth/guard';
 
 import { setFeedApprovalAction, setShopApprovalAction } from './actions';
@@ -23,6 +33,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type Translate = Awaited<ReturnType<typeof getTranslations<'Admin.Sources'>>>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const SOURCES_PATH = '/admin/tiendas';
+
+/** The message key of each notice the redirect after a save may carry (05-ux section 6). */
+const NOTICE_KEYS = {
+  'red-creada': 'noticeNetworkCreated',
+  'red-guardada': 'noticeNetworkSaved',
+  'tienda-creada': 'noticeShopCreated',
+  'tienda-guardada': 'noticeShopSaved',
+  'feed-creado': 'noticeFeedCreated',
+  'feed-guardado': 'noticeFeedSaved',
+  'feed-sin-aprobar': 'noticeFeedUnapproved',
+} as const satisfies Record<SourceNotice, string>;
 
 // CLDR drops the separator on four digits; the design wants 1.234 ofertas.
 const countFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
@@ -37,9 +61,10 @@ function feedView(feed: AdminFeed, shop: AdminShop, t: Translate): FeedRowView {
         ? t('feedMetaNetwork', { network: feed.networkName })
         : null,
     t('feedMetaOffers', { offers: feed.offerCount, offersText }),
-    feed.demo ? t('feedMetaDemo') : null,
   ].filter((part): part is string => part !== null);
   const values = { id: feed.id, shop: shop.name };
+  // The host or a fixed phrase: the stored value is never a fallback (AC 24).
+  const domain = feed.host ?? (feed.demo ? t('domainNone') : t('domainUnavailable'));
   return {
     id: feed.id,
     title: t('feedTitle', { id: feed.id }),
@@ -47,6 +72,16 @@ function feedView(feed: AdminFeed, shop: AdminShop, t: Translate): FeedRowView {
     note: paused ? t('feedNotePaused') : null,
     approved: feed.approved,
     paused,
+    extras: {
+      demo: feed.demo,
+      demoLabel: t('demoMark'),
+      valueLine: { label: t('domainLabel'), value: domain },
+      // A shop upload has no form (D-T12): no edit link.
+      links:
+        feed.source === 'affiliate_network'
+          ? [{ href: `${SOURCES_PATH}/feed/${feed.id}/editar`, label: t('editFeed'), ariaLabel: t('editFeedName', values) }]
+          : [],
+    },
     labels: {
       tagApproved: t('feedApproved'),
       tagNotApproved: t('feedNotApproved'),
@@ -90,6 +125,16 @@ function shopView(shop: AdminShop, t: Translate): ShopGroupView {
     }),
     note,
     approved: shop.approved,
+    noFeeds: t('shopNoFeeds'),
+    extras: {
+      demo: shop.demo,
+      demoLabel: t('demoMark'),
+      valueLine: { label: t('slugLabel'), value: shop.slug },
+      links: [
+        { href: `${SOURCES_PATH}/tienda/${shop.id}/editar`, label: t('editShop'), ariaLabel: t('editShopName', values) },
+        { href: `${SOURCES_PATH}/feed/nuevo?tienda=${shop.id}`, label: t('addFeed'), ariaLabel: t('addFeedName', values) },
+      ],
+    },
     labels: {
       tagApproved: t('shopApproved'),
       tagNotApproved: t('shopNotApproved'),
@@ -114,28 +159,72 @@ function shopView(shop: AdminShop, t: Translate): ShopGroupView {
   };
 }
 
-export default async function AdminSourcesPage() {
-  // The role check of this page (guardrail 3); the layout also checks, once per request.
-  await requireAdminPage();
-  const [t, shops] = await Promise.all([getTranslations('Admin.Sources'), listSourcesForAdmin()]);
+function networkView(network: AdminNetwork, t: Translate): NetworkView {
+  return {
+    id: network.id,
+    name: network.name,
+    slugLabel: t('slugLabel'),
+    slug: network.slug,
+    demo: network.demo,
+    editHref: `${SOURCES_PATH}/red/${network.id}/editar`,
+    editLabel: t('editNetwork'),
+    editName: t('editNetworkName', { network: network.name }),
+  };
+}
 
-  if (shops.length === 0) {
-    return <AdminMessage heading={t('heading')} body={t('emptyBody')} />;
-  }
+export default async function AdminSourcesPage({ searchParams }: { searchParams: SearchParams }) {
+  // The role check of this page (guardrail 3); the layout also checks, once per request.
+  // `aviso` is read only after it: an anonymous request is redirected before any of it.
+  await requireAdminPage();
+  const [t, shops, networks, params] = await Promise.all([
+    getTranslations('Admin.Sources'),
+    listSourcesForAdmin(),
+    listNetworksForAdmin(),
+    searchParams,
+  ]);
+  const aviso = Array.isArray(params.aviso) ? params.aviso[0] : params.aviso;
+  const notice = isSourceNotice(aviso) ? t(NOTICE_KEYS[aviso]) : null;
 
   const feedCount = shops.reduce((sum, shop) => sum + shop.feeds.length, 0);
   return (
     <SourcesPage
       heading={t('heading')}
+      notice={notice}
       intro={t('intro')}
       summary={t('summary', { shops: shops.length, feeds: feedCount })}
     >
-      <SourcesList
-        label={t('listLabel')}
-        shops={shops.map((shop) => shopView(shop, t))}
-        shopAction={setShopApprovalAction}
-        feedAction={setFeedApprovalAction}
+      <CreateToolbar
+        label={t('createGroupLabel')}
+        links={[
+          { href: `${SOURCES_PATH}/tienda/nueva`, label: t('addShop'), testId: 'add-shop' },
+          { href: `${SOURCES_PATH}/feed/nuevo`, label: t('addFeed'), testId: 'add-feed' },
+        ]}
       />
+      {shops.length === 0 ? (
+        <EmptyList text={t('shopsEmpty')} testId="shops-empty" />
+      ) : (
+        <SourcesList
+          label={t('listLabel')}
+          shops={shops.map((shop) => shopView(shop, t))}
+          shopAction={setShopApprovalAction}
+          feedAction={setFeedApprovalAction}
+        />
+      )}
+      <NetworksSection
+        heading={t('networksHeading')}
+        count={t('networksCount', { count: networks.length })}
+        add={{ href: `${SOURCES_PATH}/red/nueva`, label: t('addNetwork') }}
+      >
+        {networks.length === 0 ? (
+          <EmptyList text={t('networksEmpty')} testId="networks-empty" />
+        ) : (
+          <NetworkList
+            label={t('networksListLabel')}
+            demoLabel={t('demoMark')}
+            networks={networks.map((network) => networkView(network, t))}
+          />
+        )}
+      </NetworksSection>
     </SourcesPage>
   );
 }

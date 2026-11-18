@@ -1,0 +1,8 @@
+.link {
+  composes: button outlined from './PendingButton.module.css';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}

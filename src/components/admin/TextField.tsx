@@ -1,12 +1,13 @@
 import type { Ref } from 'react';
 
+import { FieldHint } from './FieldHint';
 import styles from './TextField.module.css';
 
 export type TextFieldProps = {
   id: string;
   name: string;
   label: string;
-  type: 'email' | 'password';
+  type: 'email' | 'password' | 'text' | 'url';
   autoComplete: string;
   inputMode?: 'email';
   /** The value to start from; an uncontrolled field, so a form reset restores it. */
@@ -15,6 +16,10 @@ export type TextFieldProps = {
   readOnly?: boolean;
   /** The field message, already translated. Its presence marks the field invalid. */
   error?: string;
+  /** A hint under the field, already translated. Joined to the field with aria-describedby. */
+  hint?: string;
+  /** Ids of other elements that describe this field, such as a warning block above it. */
+  describedBy?: string;
   inputRef?: Ref<HTMLInputElement>;
 };
 
@@ -33,9 +38,13 @@ export function TextField({
   defaultValue,
   readOnly,
   error,
+  hint,
+  describedBy,
   inputRef,
 }: TextFieldProps) {
   const messageId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const described = [describedBy, error ? messageId : null, hint ? hintId : null].filter(Boolean).join(' ');
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>
@@ -51,7 +60,7 @@ export function TextField({
         defaultValue={defaultValue}
         readOnly={readOnly}
         aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? messageId : undefined}
+        aria-describedby={described || undefined}
         className={error ? `${styles.input} ${styles.invalid}` : styles.input}
         spellCheck={false}
         autoCapitalize="none"
@@ -61,6 +70,7 @@ export function TextField({
           {error}
         </span>
       ) : null}
+      {hint ? <FieldHint id={hintId} text={hint} /> : null}
     </div>
   );
 }
