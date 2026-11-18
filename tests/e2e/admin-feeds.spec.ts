@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { createAdminWithCommand, psql, signInAs } from '../support/admin-e2e';
+import { createAdminWithCommand, psql, psqlScalar, signInAs } from '../support/admin-e2e';
 import { expectNoSetCookie, reflowProblems, stripScripts } from '../support/page-checks';
 
 // US-3.1 against the Compose stack: the admin registers a network, a shop and a feed through
@@ -9,16 +9,20 @@ import { expectNoSetCookie, reflowProblems, stripScripts } from '../support/page
 // promises in a browser.
 //
 // This spec writes to the development database, which admin-sources.spec.ts (S2.3, read-only)
-// never does, so it is bounded: every row it creates has a slug or an address carrying this
-// run's id, the one feed it approves is un-approved again by the spec itself (that is what AC 20
-// shows) and, as a safety net, by `releaseRows()` before and after the run, so an approved
-// e2e feed with an https address never reaches the next `import-feeds`. There is no delete
-// verb, so the unapproved rows stay. It owns its own admin account.
+// never does, so it is bounded: it uses two FIXED, test-only sets of rows (a network, a shop and a
+// feed each, identified by a stable slug and a stable host), created through the forms the first
+// time and found again on every later run, so repeated runs never add a row (S3.1 follow-up,
+// #295). `resetRows()` puts a found set back in the state the creation leaves (names, the feed's
+// address and network, nothing approved). The one feed it approves is un-approved again by the
+// spec itself (that is what AC 20 shows) and, as a safety net, by `releaseRows()` before and
+// after the run, so an approved e2e feed with an https address never reaches the next
+// `import-feeds`. There is no delete verb. It owns its own admin account.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 const EMAIL = 'e2e-feeds-admin@example.test';
 const PASSWORD = 'e2e-feeds-password-1';
-const RUN = Date.now().toString(36);
+/** A fixed token, not a run id: the rows of this spec are reused from run to run. */
+const RUN = 'fixed';
 
 const copy = messages.Admin.Sources;
 const form = messages.Admin.Form;
@@ -37,19 +41,48 @@ const LEAKS = [KEY, TOKEN, 'apikey', 'token=', ':8443', '/private/', 'catalogo.c
 
 /** The longest values validation accepts: a 120-character name, a 64-character slug, a 253-character host. */
 const LONG_NAME = 'W'.repeat(120);
-const LONG_NETWORK_SLUG = `e2e-red-${RUN}-`.padEnd(64, 'x');
-const LONG_SHOP_SLUG = `e2e-tienda-${RUN}-`.padEnd(64, 'x');
+const LONG_NETWORK_SLUG = `e2e-long-red-${RUN}-`.padEnd(64, 'x');
+const LONG_SHOP_SLUG = `e2e-long-tienda-${RUN}-`.padEnd(64, 'x');
 const LONG_HOST = ['a'.repeat(63), 'b'.repeat(63), 'c'.repeat(63), 'd'.repeat(61)].join('.');
+const LONG_URL = `https://${LONG_HOST}/feed.csv`;
 
 /** Un-approves everything this spec may have approved. */
 function releaseRows(): void {
   psql("update feeds set is_approved = false where url like 'https://e2e-feeds-%'");
-  psql("update shops set is_approved = false where slug like 'e2e-tienda-%'");
+  psql("update shops set is_approved = false where slug like 'e2e-tienda-%' or slug like 'e2e-long-tienda-%'");
+}
+
+/** The two fixed sets of rows: what a later run finds, and the state each is reset to. */
+const FIXED_SETS = [
+  { network: NETWORK, shop: SHOP, url: URL_FIRST },
+  { network: { name: LONG_NAME, slug: LONG_NETWORK_SLUG }, shop: { name: LONG_NAME, slug: LONG_SHOP_SLUG }, url: LONG_URL },
+];
+
+const count = (statement: string): number => Number(psqlScalar(statement));
+const networkExists = (slug: string): boolean => count(`select count(*) from networks where slug = '${slug}'`) > 0;
+const shopExists = (slug: string): boolean => count(`select count(*) from shops where slug = '${slug}'`) > 0;
+const feedExists = (shopSlug: string): boolean =>
+  count(`select count(*) from feeds f join shops s on s.id = f.shop_id where s.slug = '${shopSlug}'`) > 0;
+
+/**
+ * Puts every fixed row that already exists back in the state its creation leaves: names, nothing
+ * approved, and the feed on its first address and network. A row that does not exist is not
+ * touched: the forms create it.
+ */
+function resetRows(): void {
+  for (const { network, shop, url } of FIXED_SETS) {
+    psql(`update networks set name = '${network.name}' where slug = '${network.slug}'`);
+    psql(`update shops set name = '${shop.name}', is_approved = false where slug = '${shop.slug}'`);
+    psql(
+      `update feeds set url = '${url}', is_approved = false, network_id = (select id from networks where slug = '${network.slug}') where shop_id = (select id from shops where slug = '${shop.slug}')`,
+    );
+  }
 }
 
 test.beforeAll(() => {
   createAdminWithCommand(EMAIL, PASSWORD, 'admin feeds e2e');
   releaseRows();
+  resetRows();
 });
 test.afterAll(() => {
   releaseRows();
@@ -272,39 +305,52 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
     await expect(page.getByTestId('create-toolbar')).toBeVisible();
     await expect(page.getByTestId('networks-section').getByRole('heading', { level: 2, name: copy.networksHeading })).toBeVisible();
 
-    // The network.
-    await createNetwork(page, NETWORK.name, NETWORK.slug);
-    await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeNetworkCreated);
+    // The network: created through the form the first time, found (and reset) on later runs.
+    if (!networkExists(NETWORK.slug)) {
+      await createNetwork(page, NETWORK.name, NETWORK.slug);
+      await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeNetworkCreated);
+    } else {
+      await page.goto(SOURCES);
+    }
     const network = page.getByTestId('networks-list').locator('li').filter({ hasText: NETWORK.slug });
     await expect(network).toHaveCount(1);
     await expect(network).toContainText(NETWORK.name);
     await expect(network.getByTestId('demo-mark')).toHaveCount(0);
 
-    // The shop: unapproved, with no feed, no Demo mark.
-    await createShop(page, SHOP.name, SHOP.slug);
-    await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeShopCreated);
+    // The shop: unapproved, no Demo mark, and no feed until the feed is created.
+    const hadFeed = shopExists(SHOP.slug) && feedExists(SHOP.slug);
+    if (!shopExists(SHOP.slug)) {
+      await createShop(page, SHOP.name, SHOP.slug);
+      await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeShopCreated);
+    } else {
+      await page.goto(SOURCES);
+    }
     const group = shopGroup(page, SHOP.name);
     await expect(group).toHaveCount(1);
     await expect(group.getByTestId(/^source-shop-/).getByTestId('source-tag')).toHaveText(copy.shopNotApproved);
     await expect(group.getByTestId('source-value').first()).toContainText(SHOP.slug);
-    await expect(group.getByTestId('shop-no-feeds')).toBeVisible();
+    if (!hadFeed) await expect(group.getByTestId('shop-no-feeds')).toBeVisible();
     await expect(group.getByTestId('demo-mark')).toHaveCount(0);
 
-    // The feed, from the shop's own link: the shop is preselected.
-    await group.getByRole('link', { name: /^Añadir feed/ }).click();
-    await expect(page).toHaveURL(/\/admin\/tiendas\/feed\/nuevo\?tienda=\d+$/);
-    await expect(page.locator('#source-shop option:checked')).toHaveText(SHOP.name);
-    await expect(page.getByLabel(form.Feed.urlLabelNew, { exact: true })).toHaveValue('');
-    await page.getByLabel(form.Feed.networkLabel, { exact: true }).selectOption({ label: NETWORK.name });
-    await page.getByLabel(form.Feed.urlLabelNew, { exact: true }).fill(URL_FIRST);
-    await page.getByTestId('form-submit').click();
-    await expect(page).toHaveURL(/\/admin\/tiendas\?aviso=feed-creado$/);
-    await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeFeedCreated);
-    // The notice sits under the heading and carries no value.
-    const heading = await page.getByRole('heading', { level: 1 }).boundingBox();
-    const notice = await page.getByTestId('admin-notice').boundingBox();
-    expect(notice!.y).toBeGreaterThan(heading!.y);
-    expect(await page.getByTestId('admin-notice').innerText()).not.toContain(HOST);
+    // The feed, from the shop's own link: the shop is preselected. A reused feed is already there.
+    if (!hadFeed) {
+      await group.getByRole('link', { name: /^Añadir feed/ }).click();
+      await expect(page).toHaveURL(/\/admin\/tiendas\/feed\/nuevo\?tienda=\d+$/);
+      await expect(page.locator('#source-shop option:checked')).toHaveText(SHOP.name);
+      await expect(page.getByLabel(form.Feed.urlLabelNew, { exact: true })).toHaveValue('');
+      await page.getByLabel(form.Feed.networkLabel, { exact: true }).selectOption({ label: NETWORK.name });
+      await page.getByLabel(form.Feed.urlLabelNew, { exact: true }).fill(URL_FIRST);
+      await page.getByTestId('form-submit').click();
+      await expect(page).toHaveURL(/\/admin\/tiendas\?aviso=feed-creado$/);
+      await expect(page.getByTestId('admin-notice')).toHaveText(copy.noticeFeedCreated);
+      // The notice sits under the heading and carries no value.
+      const heading = await page.getByRole('heading', { level: 1 }).boundingBox();
+      const notice = await page.getByTestId('admin-notice').boundingBox();
+      expect(notice!.y).toBeGreaterThan(heading!.y);
+      expect(await page.getByTestId('admin-notice').innerText()).not.toContain(HOST);
+    } else {
+      await page.goto(SOURCES);
+    }
 
     const feed = shopGroup(page, SHOP.name).getByTestId(/^source-feed-/);
     await expect(feed).toHaveCount(1);
@@ -506,9 +552,10 @@ test.describe('the longest values the validation accepts reflow at 390 and 1280 
 
   test('creates a 120-character network and shop, a 64-character slug and a feed on a 253-character host', async ({ page }) => {
     await signInAs(page, EMAIL, PASSWORD);
-    await createNetwork(page, LONG_NAME, LONG_NETWORK_SLUG);
-    await createShop(page, LONG_NAME, LONG_SHOP_SLUG);
-    await createFeed(page, LONG_SHOP_SLUG, LONG_NAME, `https://${LONG_HOST}/feed.csv`);
+    // Found on a later run (and reset in beforeAll); created through the forms only when missing.
+    if (!networkExists(LONG_NETWORK_SLUG)) await createNetwork(page, LONG_NAME, LONG_NETWORK_SLUG);
+    if (!shopExists(LONG_SHOP_SLUG)) await createShop(page, LONG_NAME, LONG_SHOP_SLUG);
+    if (!feedExists(LONG_SHOP_SLUG)) await createFeed(page, LONG_SHOP_SLUG, LONG_NAME, LONG_URL);
     await page.goto(SOURCES);
     const group = shopGroupBySlug(page, LONG_SHOP_SLUG);
     await expect(group.getByTestId(/^source-feed-/).getByTestId('source-value')).toContainText(LONG_HOST);

@@ -483,10 +483,31 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     }
   });
 
-  it('puts no recovery, sign-up or remember-me wording in the sign-in copy (AC 1)', () => {
-    // Scoped to the sign-in screen: the S2.1 rule is about what the sign-in page offers. The S3.1 copy
-    // legitimately says "registrar" (a feed is registered), so scanning all of Admin was a mis-scope.
-    const text = leaves(admin.SignIn).map(([, value]) => value).join(' | ');
-    expect(text).not.toMatch(/olvid|registr|recuérd|recuerd|restablec/i);
+  it('puts no recovery, sign-up or remember-me wording in any admin copy but Sources and Form (AC 1)', () => {
+    // Sources and Form legitimately say "registrar" (a feed is registered); every other Admin leaf
+    // (SignIn, Chrome, Meta, Nav, Home, NotFound, ...) is scanned, so a new namespace is covered by default.
+    expect(signInWordingOffenders(admin)).toEqual([]);
+    // The scan reads the sign-in screen itself, so it cannot go vacuous.
+    expect(leaves(admin).filter(([key]) => key.startsWith('SignIn.')).length).toBeGreaterThan(5);
+  });
+
+  it('proves the wording scan: it flags an offender in any other namespace and skips Sources and Form', () => {
+    const tree = {
+      SignIn: { heading: 'Acceso', hint: 'Si lo has olvidado, restablece la clave' },
+      Chrome: { signOut: 'Cerrar sesión', remember: 'Recuérdame en este equipo' },
+      Home: { cta: 'Registrar una cuenta' },
+      Sources: { add: 'Registrar un feed' },
+      Form: { Feed: { title: 'Registrar feed' } },
+    };
+    expect(signInWordingOffenders(tree)).toEqual(['SignIn.hint', 'Chrome.remember', 'Home.cta']);
+    expect(signInWordingOffenders({ Sources: tree.Sources, Form: tree.Form })).toEqual([]);
   });
 });
+
+/** The keys of every leaf outside Sources and Form whose text offers recovery, sign-up or remember-me. */
+function signInWordingOffenders(adminTree: Record<string, unknown>): string[] {
+  const scanned = Object.fromEntries(Object.entries(adminTree).filter(([name]) => name !== 'Sources' && name !== 'Form'));
+  return leaves(scanned)
+    .filter(([, value]) => /olvid|registr|recuérd|recuerd|restablec/i.test(value))
+    .map(([key]) => key);
+}

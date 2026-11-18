@@ -192,6 +192,50 @@ for (const mode of ['with JavaScript', 'with JavaScript off'] as const) {
   });
 }
 
+/** The vertical centre of the label's first rendered line, and of the link, in page pixels (#293). */
+const noFitGeometry = (page: Page) =>
+  page.evaluate(() => {
+    const root = document.querySelector('[data-testid="fit-banner"]')!;
+    const link = root.querySelector('[data-testid="fit-banner-link"]')!.getBoundingClientRect();
+    const labelNode = root.querySelector('span:not([aria-hidden])')!;
+    const lead = labelNode.closest('div')!.parentElement!;
+    const range = document.createRange();
+    range.selectNodeContents(labelNode);
+    const first = range.getClientRects()[0];
+    const label = labelNode.getBoundingClientRect();
+    return {
+      linkCentre: link.top + link.height / 2,
+      linkTop: link.top,
+      linkLeft: link.left,
+      firstLineCentre: first.top + first.height / 2,
+      labelBottom: label.bottom,
+      labelLeft: label.left,
+      leadPaddingTop: getComputedStyle(lead).paddingTop,
+    };
+  });
+
+test.describe('the no-fit link lines up with the lead (#293)', () => {
+  test('at 1280 the link centre is within 2px of the first line of the lead, and the link sits beside the lead', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(urlOf(MAHLE_OIL, CAR.slug));
+    await expect(page.getByTestId('fit-banner-link')).toBeVisible();
+    const g = await noFitGeometry(page);
+    expect(Math.abs(g.linkCentre - g.firstLineCentre)).toBeLessThanOrEqual(2);
+    // Beside, not under: the link starts to the right of the label.
+    expect(g.linkLeft).toBeGreaterThan(g.labelLeft);
+  });
+
+  test('at 390 the link wraps under the lead, which keeps no extra top padding', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(urlOf(MAHLE_OIL, CAR.slug));
+    await expect(page.getByTestId('fit-banner-link')).toBeVisible();
+    const g = await noFitGeometry(page);
+    expect(g.linkTop).toBeGreaterThanOrEqual(g.labelBottom - 0.5);
+    expect(g.linkCentre).toBeGreaterThan(g.firstLineCentre);
+    expect(g.leadPaddingTop).toBe('0px');
+  });
+});
+
 test.describe('no banner without a selected car (ACs 7, 8, 11)', () => {
   test('a product page with no coche shows no banner, with JavaScript off too', async ({ page, browser, baseURL }) => {
     for (const state of STATES) {

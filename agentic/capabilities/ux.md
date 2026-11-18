@@ -39,6 +39,12 @@ the price they see. `docs/product/mvp.md` is the scope; read it before a UX orde
 The admin screens are for the owner and two friends: approving feeds, mapping
 categories, working the matching queue. Dense and fast beats pretty there.
 
+**Admin review scope (owner ruling, D-1).** Do not review admin screens at phone
+widths (390, 360, 195) and raise no visual-only finding on them: spacing,
+alignment, looks and taste are out. Review them at desktop width for function,
+the guardrails and copy correctness, and the other checks of this pack still
+apply. Public screens keep their full bar: phone and desktop, every state.
+
 ## Where the design lives
 
 | Path | What lives there | Owner |
@@ -143,7 +149,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin signed in | run the `CLAUDE.md` § Commands `create-admin` command for the e2e admin in `tests/e2e/admin.spec.ts` (credentials are in that file), then sign in with a Playwright script at `/admin/acceso` |
 | admin submitting | `page.route` delays the POST to `/admin/acceso*` |
 | admin 404 | `/admin/no-existe` (signed in: the admin 404; anonymous: redirect to sign-in) |
-| admin shops and feeds page | sign in as the e2e admin, open `/admin/tiendas` at 390 and 1280 wide; re-approve every demo shop and feed you disable, or the e2e import finds no approved feed |
+| admin shops and feeds page | sign in as the e2e admin, open `/admin/tiendas` at 1280 wide only; re-approve every demo shop and feed you disable, or the e2e import finds no approved feed |
 | admin shops and feeds, paused feed and shop note | press "Desactivar tienda" on a demo shop and confirm; its approved feed reads "Aprobado, en pausa" |
 | admin shops and feeds, confirm open | press any "Desactivar …" button |
 | admin shops and feeds, pending | `page.route` delays the action POST by 1.5 s, then press |
@@ -153,7 +159,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin form routes (S3.1) | signed in, six routes under `/admin/tiendas`: `red/nueva`, `tienda/nueva`, `feed/nuevo`, `red/<id>/editar`, `tienda/<id>/editar`, `feed/<id>/editar`; each is also reached from a link on the list page |
 | admin shops and feeds, shop with no feeds | create a shop through the new-shop form (it starts unapproved with no feed); it lists with the empty-feeds state |
 | admin shops and feeds, empty lists, missing prerequisite | not producible on the shared dev database (demo rows always exist); empty states are proved in integration (`admin-source-pages.test.ts`); report not checked |
-| admin shops and feeds, longest content | create rows through the forms with a 120-character name, a 64-character slug and a feed URL with a 253-character host; open `/admin/tiendas` and the forms at 390 and 1280 |
+| admin shops and feeds, longest content | create rows through the forms with a 120-character name, a 64-character slug and a feed URL with a 253-character host; open `/admin/tiendas` and the forms at 1280 only |
 | admin form, refused and failed | submit a form with a blank name, a bad slug, or an `http` URL (refused, field message); for failed use the `page.route` 500 as for the shop rows |
 | admin feed edit, confirm | edit an approved non-demo feed and press submit with an address typed: the inline confirm opens |
 | car selected | `?coche=seat-leon-iii-2012-2020-1-6-tdi-115cv`, or localStorage key `mi-coche` set to that slug (an init script; not `lostres.coche`, renamed by D-21), which reloads the page once to `?coche=` |
@@ -231,7 +237,7 @@ UX mode:
 
 UX-REVIEW mode:
 
-- [ ] Phone and desktop screenshots of every screen in scope, each opened and
-      cited
+- [ ] Phone and desktop screenshots of every public screen in scope, each opened
+      and cited; admin screens desktop only (see Who the screens are for)
 - [ ] Every spec check marked `SATISFIED`, `GAP`, `DRIFTED` or `not checked`
 - [ ] Taste observations in `handoff` as `SHOULD_FIX`, never in the verdict

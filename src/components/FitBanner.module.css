@@ -77,6 +77,16 @@
   min-width: 0;
 }
 
+/* From 40rem the link sits beside the lead, centred on the lead's first line: the
+   lead drops by half the difference between the link and one line, so the two centres
+   meet. A phone keeps the link wrapped under an unshifted lead. Only the no-fit kind
+   has a link. */
+@media (min-width: 40rem) {
+  .noFit .lead {
+    padding-top: calc((var(--tap-target) - var(--text-md) * var(--leading-snug)) / 2);
+  }
+}
+
 /* A span, not a p: `.page p` in globals is muted grey and the lead takes the full text colour. */
 .label {
   display: block;
