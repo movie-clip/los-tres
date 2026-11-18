@@ -1,7 +1,9 @@
 /* Row 2 of the site header, on the ink bar. The label takes the room beside the buttons
    and wraps by words; the buttons keep their size and wrap under the label as a row when
    the label cannot keep 10rem. The label never stretches past its own text, so on a wide
-   page the buttons sit right after it and not at the far edge. */
+   page the buttons sit right after it and not at the far edge. From 22rem to 23.43rem
+   (352 to 374 px) with a car selected they never wrap: see the range after the no-car
+   media queries. */
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -112,6 +114,37 @@
     max-width: 100%;
     white-space: normal;
     text-align: center;
+  }
+}
+
+/* A selected car, from 22rem to below 23.44rem (352 to 374 px): the label and the two
+   buttons share one row, so the header keeps the 112.8 px it has from 375 px up. The label
+   takes what is left (a basis of 0 never pushes the buttons under it), wraps by words and
+   stops at two lines with an ellipsis; the whole name stays in the text. The buttons give up
+   4 px of padding per side and the gaps shrink so the longest name in the vehicle list
+   (Citroën C3 Aircross I 1.2 PureTech) fits in two lines at 352 px. Below 22rem the label
+   sits above the buttons, as before. */
+@media (min-width: 22rem) and (max-width: 23.43rem) {
+  .row {
+    column-gap: var(--space-1);
+  }
+
+  .label {
+    display: -webkit-box;
+    flex: 1 1 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .actions {
+    flex-wrap: nowrap;
+    gap: var(--space-0);
+  }
+
+  .compact {
+    padding-inline: var(--space-1);
   }
 }
 
