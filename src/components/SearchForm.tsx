@@ -22,6 +22,11 @@ export type SearchFormProps = {
    * choice survives the search without script; null or omitted adds none.
    */
   car?: string | null;
+  /**
+   * The field's placeholder. Only the header form passes one; null or omitted renders no
+   * placeholder attribute. Never the term.
+   */
+  placeholder?: string | null;
 };
 
 // Test ids per presentation. The hero keeps the ids the home page always had.
@@ -33,7 +38,7 @@ const TEST_IDS: Record<SearchFormVariant, { form: string; input: string; button:
 
 /**
  * The one search form: a native GET form that works without JavaScript, in three
- * presentations. No placeholder anywhere. Display strings only.
+ * presentations. A placeholder only when one is passed (the header). Display strings only.
  */
 export function SearchForm({
   variant,
@@ -44,6 +49,7 @@ export function SearchForm({
   hint,
   value,
   car = null,
+  placeholder = null,
 }: SearchFormProps) {
   // Per variant: the header form and a page form can share one document.
   const inputId = `search-${variant}-q`;
@@ -76,6 +82,7 @@ export function SearchForm({
           name="q"
           maxLength={100}
           autoComplete="off"
+          placeholder={placeholder === null || placeholder === '' ? undefined : placeholder}
           enterKeyHint="search"
           defaultValue={variant === 'page' ? (value ?? undefined) : undefined}
           aria-label={showsLabel ? undefined : fieldLabel}

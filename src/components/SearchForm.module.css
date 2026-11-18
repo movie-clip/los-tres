@@ -139,6 +139,13 @@
 .header .input {
   flex-basis: 5rem;
   font-size: var(--text-md);
+  text-overflow: ellipsis;
+}
+
+/* Firefox greys a placeholder with opacity unless it is reset. */
+.header .input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
 }
 
 /* Below 40rem the button's inline padding is a step smaller, so the car control

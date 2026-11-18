@@ -4,6 +4,16 @@
   margin-top: var(--space-4);
 }
 
+/* From 40rem the grid has several columns and a group's last row can leave cells empty:
+   a hairline marks where one group ends and the next begins. */
+@media (min-width: 40rem) {
+  .group + .group {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
 .heading {
   margin: 0 0 var(--space-2);
   color: var(--color-text);
