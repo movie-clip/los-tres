@@ -128,6 +128,21 @@ export function FeedForm(props: FeedFormProps) {
   const addressError = fieldMessage(errors, labels.errors, 'url');
   const refilled = state.status === 'refused' || state.status === 'failed';
   const defaultNetwork = values.networkId ?? (props.mode === 'edit' ? props.defaultNetworkId : '');
+  const shopChoice = state.status === 'idle' ? (props.mode === 'create' ? props.defaultShopId : '') : (values.shopId ?? '');
+
+  // React does not move a select's default when defaultValue changes, so the form reset after an action
+  // puts back the first one. After each result the two choices are set again to what the server echoed.
+  useEffect(() => {
+    if (state.status === 'idle') return;
+    const form = formRef.current;
+    if (!form) return;
+    for (const [name, choice] of [['shopId', shopChoice], ['networkId', defaultNetwork]] as const) {
+      const field = form.elements.namedItem(name);
+      if (field instanceof HTMLSelectElement) field.value = choice;
+    }
+    // Only a new result moves the selects; a later render must not undo the admin's own change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form
