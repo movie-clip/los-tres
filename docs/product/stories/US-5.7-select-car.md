@@ -1,6 +1,6 @@
 # S5.7 The visitor picks their car once, the site remembers it on this device, and they can change or remove it
 
-Status: approved 2026-10-30 (the human, D-9) and built on branch `269-select-car`; the review gate passed with all 61 ACs satisfied (`agentic/runs/2026-10-30-s5-7-select-car/23-review.md`). Rulings since approval that changed what the text below says: D-21 (the storage key is `mi-coche`, not `lostres.coche`; AC 31), D-17 (no options route, the options are embedded server-side), D-18 (404 and error pages read the car like any page), D-22 (the no-car control sits in header row 1, not a second row) and D-23 (the no-script car links carry `volver` with the `/buscar` query). The privacy page is unchanged (D-1). Board status follows the human's own move
+Status: approved 2026-10-30 (the human, D-9) and built on branch `269-select-car`; the review gate passed with all 61 ACs satisfied (`agentic/runs/2026-10-30-s5-7-select-car/23-review.md`). Rulings since approval that changed what the text below says: D-21 (the storage key is `mi-coche`, not `lostres.coche`; AC 31), D-17 (no options route, the options are embedded server-side), D-18 (404 and error pages read the car like any page), D-22 (the no-car control sits in header row 1, not a second row) and D-23 (the no-script car links carry `volver` with the `/buscar` query). The privacy page is unchanged (D-1; changed later in S5.8, D-18, D-22, D-23). Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: L
 Issue: #269 · Tickets: #270-#273 (T5.7.1-T5.7.4) and one new ticket (T5.7.5, issue to be created; ruling D-2)
 Depends on: S5.5 (#261), merged: the vehicle list and `findActiveVehicle`. S5.6 (#265), merged, gives the demo feeds their fitment, but this story reads no fitment. S5.8 (#274) and S5.9 (#278) depend on this story.
@@ -16,6 +16,8 @@ Nothing here blocks ticketing except the creation of the new ticket's issue (D-2
 4. **OD-S3. Where does a missing or invalid `volver` land?** Stated as an assumption: **the home page**, with the car set. A different fallback (the last category, a "car saved" page) is a UX call and changes AC 19 only.
 
 ### Carried open item (D-1): the privacy page
+
+> **Resolved later, 2026-11-18.** The privacy page was changed in S5.8 (D-18, D-22, D-23): `Privacy.cookiesHeading` and `Privacy.cookiesBody` now name the local storage of the car, and the "ni tecnologías similares" denial is gone. The text below is the history of S5.7 as approved and is kept unchanged.
 
 Ruling D-1, 2026-10-30: "ignore privacy page for now". **This story does not change the privacy page.** `Privacy.cookiesBody` still says the site installs no cookies "ni tecnologías similares" in the visitor's browser, which stops being true once `mi-coche` (named `lostres.coche` when this was written; D-21) is written to `localStorage`. Spec rule 5 and decision 0016 both say "the privacy page gets one sentence", and that is **not** done by this story: reconcile must not mark it as shipped. The wording needs more than one sentence (the "similar technologies" denial and the heading `Privacy.cookiesHeading` need review) and the owner decides it. Recommended: the owner rules on it, and it ships before any public deploy; until then it is a known false statement on a page that is only live on the demo. The human may add a Backlog item or a line in the S9.1 deploy checklist; this story creates neither.
 
@@ -41,7 +43,7 @@ In:
 - updating the pinned tests this changes: the header tab order, the reflow checks, the SEO and robots pins.
 
 Out, for this story (listed so a lane does not do them here):
-- **the privacy page change, including the "one sentence" of spec rule 5 and decision 0016: out of scope, ruling D-1.** The "ni tecnologías similares" text stays as it is, carried as an open item above;
+- **the privacy page change, including the "one sentence" of spec rule 5 and decision 0016: out of scope, ruling D-1.** The "ni tecnologías similares" text stays as it is, carried as an open item above (resolved later in S5.8, D-18, D-22, D-23);
 - filtering, grouping, ordering and counting listings by fit state, brand-chip counts, and search results filtering (S5.8, #274 and #277);
 - the fit banner and the "vehicles it fits" list on the product page (S5.9, #278, which has since shipped both);
 - any change to the vehicle list, to how a fitment counts, or any fitment write (S5.5 owns the list and the rule; the import is the only writer);
@@ -199,13 +201,13 @@ The docs lane reconciles from the actual diff:
 - `docs/design/system.md`: the Site header row and measured heights, and rows for the car control, the picker and the dialog, from the UX spec;
 - `CLAUDE.md` § Search engines: `/mi-coche` in the `robots.txt` disallow list, and `coche` among the parameters dropped from canonical, with `noindex` on pages that carry it;
 - `docs/product/vehicle-fitment.md`: rule 7's route shape once chosen; rule 4's wording on clearing the stored value, if OD-S2 is approved;
-- **not** rule 5's "privacy page gets one sentence" and **not** the consequence in decision 0016: both stay pending (D-1);
+- **not** rule 5's "privacy page gets one sentence" and **not** the consequence in decision 0016: both stayed pending in S5.7 (D-1) and were done later in S5.8 (D-18, D-22, D-23);
 - the frontend, testing and backend packs, for the conventions this story sets (a public client script, the dialog, link carrying, the 390 and 1280 px checks).
 
 ## Notes for the human
 
 - **The listings do not change yet.** After this story the visitor can pick, see, keep, change and remove a car, but filtering is S5.8 and the fit banner is S5.9. Deployed alone, the control looks inert; no public deploy is scheduled.
-- **The privacy page is knowingly left false for now (D-1).** The page says no similar technologies are used in the browser while `localStorage` holds the car. The owner decides the wording; see the carried open item.
+- **The privacy page is knowingly left false for now (D-1).** The page says no similar technologies are used in the browser while `localStorage` holds the car. The owner decides the wording; see the carried open item. (Resolved later, 2026-11-18: the privacy page was fixed in S5.8, D-18, D-22, D-23.)
 - **The link mechanism is on trial, not settled (D-2).** T5.7.5 is the only ticket that depends on it. Ask for the comparison before that ticket is built, not after.
 - **Without JavaScript the car is not remembered across visits.** The URL carries it on every link, and the remove action leaves the stored value alone, because storage needs script. A visitor who turns script on later and has an old stored car gets it restored.
 - **Size and iteration** are not set in this draft; the board holds them.

@@ -77,7 +77,7 @@ that device until they change or remove it.
    - never the `no-fit` products, with one exception on search (below). The
      result count says how many fit and how many are unknown, and how many were
      hidden as not compatible.
-   - **Exact-code exception (amended by S5.8, D-1; for the owner to review).**
+   - **Exact-code exception (amended by S5.8, D-1; approved by the owner 2026-11-18, D-1 of run 2026-11-18-fitment-wording-docs).**
      On the search page only, a `no-fit` product reached by an exact EAN (8 or
      13 digits) or an exact normalised part number is shown, marked "No
      compatible", after the unknown group, under its own heading. It is never
@@ -85,7 +85,7 @@ that device until they change or remove it.
      part. A hit that fits the car or has no data stays in its own group. A
      category page never lists a `no-fit` product. Text-only matches that are
      `no-fit` stay hidden.
-   - **Unavailable car (S5.8, D-4).** If the selected car cannot be read (the
+   - **Unavailable car (S5.8, D-4; approved by the owner 2026-11-18).** If the selected car cannot be read (the
      vehicle read failed), the listing renders as without a car: unfiltered, no
      headings, marks or fit counts, with the status the page would have had
      without a car. If the car is known and the read of fit fails, the listing
@@ -117,11 +117,10 @@ that device until they change or remove it.
    nothing about the visitor: no cookie, no session, no log of the selection
    (guardrail 5). It is a preference the visitor asked for, so no consent
    banner is needed.
-   - Open: the privacy page was not changed in S5.7 (owner ruling D-1 of that
-     run, "ignore privacy page for now"). Its "ni tecnologías similares" line
-     still contradicts the `mi-coche` write, and the sentence this rule asked
-     for is not written. The owner decides the wording; do it before any
-     public deploy.
+   - The privacy page names the local storage of the car: its "Cookies y
+     almacenamiento local" section says the choice is kept only in the
+     visitor's own browser and is not sent to or stored on the servers (done in
+     S5.8, D-18 and D-22; S5.7 had deferred it).
    - `/go/<offer>` does not log the vehicle.
 6. **Change and remove.** The header always shows the selection control:
    - none selected: a button "Selecciona tu coche";
