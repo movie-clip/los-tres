@@ -46,8 +46,9 @@ for (const [width, height] of [
       expect(three.height).toBeCloseTo(one.height, 0);
       expect(two.closeY).toBeCloseTo(one.closeY, 0);
       expect(three.closeY).toBeCloseTo(one.closeY, 0);
-      // The panel stays on screen: min(44rem, viewport minus 2 x space-4).
-      expect(one.height).toBeLessThanOrEqual(height);
+      // The value, not only equality: min(44rem, viewport minus 2 x space-4), 704 and 504 here.
+      expect(one.height).toBeCloseTo(Math.min(704, height - 96), 0);
+      expect(three.height).toBeCloseTo(Math.min(704, height - 96), 0);
     });
   });
 }
@@ -68,6 +69,26 @@ test.describe('F2: the header search placeholder', () => {
     await page.goto('/buscar?q=filtro');
     await expect(page.getByTestId('search-input')).not.toHaveAttribute('placeholder', /.*/);
   });
+});
+
+test.describe('F2 check 8: the whole word fits the header field at 352 and 353 px', () => {
+  for (const width of [352, 353]) {
+    test(`at ${width}px "Buscar" is not clipped and the header stays 64px tall`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/categoria/aceite-de-motor');
+      const input = page.getByTestId('header-search-input');
+      await expect(input).toHaveAttribute('placeholder', 'Buscar');
+      // A typed value measures the same text width as the placeholder, which scrollWidth cannot see.
+      const sizes = await input.evaluate((node) => {
+        const field = node as HTMLInputElement;
+        field.value = 'Buscar';
+        return { scroll: field.scrollWidth, client: field.clientWidth };
+      });
+      expect(sizes.scroll).toBeLessThanOrEqual(sizes.client);
+      const header = await page.locator('header').first().boundingBox();
+      expect(header!.height).toBeCloseTo(64, 0);
+    });
+  }
 });
 
 test.describe('F3: the home h1 at 14rem and below', () => {
@@ -94,18 +115,26 @@ test.describe('F4: the divider above listing groups after the first', () => {
     page
       .getByTestId('listing-group')
       .nth(index)
-      .evaluate((node) => parseFloat(getComputedStyle(node).borderTopWidth));
+      .evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { width: parseFloat(style.borderTopWidth), color: style.borderTopColor };
+      });
+  // --color-border (#dcdfe4) as the browser computes it.
+  const BORDER = 'rgb(220, 223, 228)';
 
   for (const [width, expected] of [
     [1280, 1],
+    [768, 1],
     [390, 0],
   ] as const) {
     test(`at ${width}px the second group has a ${expected}px top border and the first has none`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`/categoria/mantenimiento-del-coche?coche=${CAR.slug}`);
       await expect(page.getByTestId('listing-group')).toHaveCount(2);
-      expect(await topBorder(page, 0)).toBe(0);
-      expect(await topBorder(page, 1)).toBe(expected);
+      expect((await topBorder(page, 0)).width).toBe(0);
+      const second = await topBorder(page, 1);
+      expect(second.width).toBe(expected);
+      if (expected > 0) expect(second.color).toBe(BORDER);
     });
   }
 });
