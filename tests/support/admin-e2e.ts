@@ -37,13 +37,22 @@ export async function signInAs(page: Page, email: string, password: string): Pro
   });
 }
 
-/** Runs one SQL statement as the database owner inside the Compose `db` container. */
-export function psql(statement: string): string {
+function runPsql(statement: string, flags: string): string {
   const result = spawnSync(
     'docker',
-    ['compose', 'exec', '-T', 'db', 'sh', '-c', `psql -U "$POSTGRES_USER" "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "${statement.replace(/"/g, '\\"')}"`],
+    ['compose', 'exec', '-T', 'db', 'sh', '-c', `psql -U "$POSTGRES_USER" "$POSTGRES_DB" -v ON_ERROR_STOP=1 ${flags} -c "${statement.replace(/"/g, '\\"')}"`],
     { encoding: 'utf8', timeout: 30_000 },
   );
   if (result.status !== 0) throw new Error(`psql failed (exit ${result.status ?? 'none'}): ${result.stderr?.trim() ?? ''}`);
   return result.stdout ?? '';
+}
+
+/** Runs one SQL statement as the database owner inside the Compose `db` container. */
+export function psql(statement: string): string {
+  return runPsql(statement, '');
+}
+
+/** Runs one SQL query and returns its single value, trimmed (psql `-tA`). */
+export function psqlScalar(statement: string): string {
+  return runPsql(statement, '-tA').trim();
 }
