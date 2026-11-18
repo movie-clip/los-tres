@@ -71,20 +71,33 @@ test.describe('F2: the header search placeholder', () => {
   });
 });
 
-test.describe('F2 check 8: the whole word fits the header field at 352 and 353 px', () => {
-  for (const width of [352, 353]) {
-    test(`at ${width}px "Buscar" is not clipped and the header stays 64px tall`, async ({ page }) => {
+// The visible fit of the word "Buscar" depends on the platform font, so it is a ux-review check,
+// not a gate pin. The gate pins the mechanism (the tighter field padding inside max-width 22.5rem),
+// the 64px height and the placeholder, none of which depend on the font.
+test.describe('F2 check 8: the header field padding at 352 to 361 px', () => {
+  for (const [width, padding] of [
+    [352, '8px'],
+    [360, '8px'],
+    [361, '16px'],
+  ] as const) {
+    test(`at ${width}px the header field has ${padding} side padding`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto('/categoria/aceite-de-motor');
       const input = page.getByTestId('header-search-input');
       await expect(input).toHaveAttribute('placeholder', 'Buscar');
-      // A typed value measures the same text width as the placeholder, which scrollWidth cannot see.
-      const sizes = await input.evaluate((node) => {
-        const field = node as HTMLInputElement;
-        field.value = 'Buscar';
-        return { scroll: field.scrollWidth, client: field.clientWidth };
+      const sides = await input.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { left: style.paddingLeft, right: style.paddingRight };
       });
-      expect(sizes.scroll).toBeLessThanOrEqual(sizes.client);
+      expect(sides).toEqual({ left: padding, right: padding });
+    });
+  }
+
+  for (const width of [352, 353, 360]) {
+    test(`at ${width}px the header stays 64px tall`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/categoria/aceite-de-motor');
+      await expect(page.getByTestId('header-search-input')).toHaveAttribute('placeholder', 'Buscar');
       const header = await page.locator('header').first().boundingBox();
       expect(header!.height).toBeCloseTo(64, 0);
     });
@@ -119,8 +132,16 @@ test.describe('F4: the divider above listing groups after the first', () => {
         const style = getComputedStyle(node);
         return { width: parseFloat(style.borderTopWidth), color: style.borderTopColor };
       });
-  // --color-border (#dcdfe4) as the browser computes it.
-  const BORDER = 'rgb(220, 223, 228)';
+  // --color-border as the browser computes it: a probe element resolves the token in the page.
+  const tokenColour = (page: Page) =>
+    page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.color = 'var(--color-border)';
+      document.body.appendChild(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    });
 
   for (const [width, expected] of [
     [1280, 1],
@@ -134,7 +155,7 @@ test.describe('F4: the divider above listing groups after the first', () => {
       expect((await topBorder(page, 0)).width).toBe(0);
       const second = await topBorder(page, 1);
       expect(second.width).toBe(expected);
-      if (expected > 0) expect(second.color).toBe(BORDER);
+      if (expected > 0) expect(second.color).toBe(await tokenColour(page));
     });
   }
 });

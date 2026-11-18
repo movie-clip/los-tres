@@ -8,6 +8,7 @@ import { DEMO_SHARED } from '../fixtures/demo';
 import {
   CAR,
   CONTROL_PAGES,
+  LONGEST_CAR,
   OTHER_MAKE,
   UNKNOWN_SLUG,
   carName,
@@ -383,6 +384,72 @@ test.describe('the header height with a car (ceiling for the first card)', () =>
       expect(card.y).toBeLessThanOrEqual(840);
     });
   });
+});
+
+// 352 to 374 px (22rem to 23.43rem): the label and the two buttons share one row, so the header is
+// 112.8 px; a wrapped row adds 25.6 px and fails the 4 px tolerance. At 351 the buttons sit under
+// the label (138.4), pinned on purpose: below 22rem is left as is (D-6). The visible fit of the
+// last word of the longest label is font-dependent and left to ux-review (D-3).
+test.describe('the header with a car from 352 to 374 px (one-row car control)', () => {
+  const TOLERANCE = 4;
+  const CARS = [
+    ['the short car', CAR],
+    ['the longest car', LONGEST_CAR],
+  ] as const;
+
+  for (const [carLabel, car] of CARS) {
+    for (const [width, expected] of [
+      [351, 138.4],
+      [352, 112.8],
+      [360, 112.8],
+      [374, 112.8],
+    ] as const) {
+      test(`${carLabel} at ${width}px: the header is ${expected}px tall`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 740 });
+        await page.goto(withCoche('/', car.slug));
+        await expect(page.getByTestId('car-label')).toBeVisible();
+        const header = (await page.getByRole('banner').boundingBox())!;
+        expect(Math.abs(header.height - expected)).toBeLessThanOrEqual(TOLERANCE);
+      });
+    }
+  }
+
+  for (const width of [352, 374]) {
+    test(`at ${width}px the buttons are 44px targets on the same row as the label`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 740 });
+      await page.goto(withCoche('/', LONGEST_CAR.slug));
+      const label = (await page.getByTestId('car-label').boundingBox())!;
+      for (const id of ['car-change', 'car-remove']) {
+        const box = (await page.getByTestId(id).boundingBox())!;
+        expect(box.width, id).toBeGreaterThanOrEqual(44);
+        expect(box.height, id).toBeGreaterThanOrEqual(44);
+        expect(box.y, id).toBeLessThan(label.y + label.height);
+      }
+    });
+  }
+
+  test('at 352px the longest label keeps its whole text and the page does not scroll sideways', async ({ page }) => {
+    await page.setViewportSize({ width: 352, height: 740 });
+    await page.goto(withCoche('/', LONGEST_CAR.slug));
+    await expect(page.getByTestId('car-label')).toHaveText(selectedText(LONGEST_CAR));
+    const widths = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      view: window.innerWidth,
+    }));
+    expect(widths.scroll).toBe(widths.view);
+  });
+
+  // The tighter treatment ends at 374: from 375 the buttons keep their own padding (86.6 and 71.7 px).
+  for (const width of [375, 390]) {
+    test(`at ${width}px the buttons keep their widths`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 740 });
+      await page.goto(withCoche('/', LONGEST_CAR.slug));
+      const change = (await page.getByTestId('car-change').boundingBox())!;
+      const remove = (await page.getByTestId('car-remove').boundingBox())!;
+      expect(Math.abs(change.width - 86.6)).toBeLessThanOrEqual(1);
+      expect(Math.abs(remove.width - 71.7)).toBeLessThanOrEqual(1);
+    });
+  }
 });
 
 test.describe('the header keyboard order (AC 61)', () => {
