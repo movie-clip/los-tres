@@ -5,7 +5,8 @@ Status: accepted, 2026-10-16
 ## Decision
 
 - Every outgoing link goes through `/go/<offer>`, which writes one click row
-  and redirects (HTTP 302) to the offer's affiliate URL.
+  and redirects (HTTP 302) to the offer's shop URL, an affiliate tracking URL when
+  the feed carries one.
 - A click row holds **offer, shop, product, timestamp and source page** only.
   It holds **no IP address, no user agent and no cookie**. Los Tres sets no
   cookie on public visitors.

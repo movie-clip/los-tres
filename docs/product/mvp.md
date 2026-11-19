@@ -5,6 +5,8 @@ earlier marketplace scope of 2026-10-12, which was deleted. Amended on
 2026-10-18 after the backlog revision, and the owner approved the amendment.
 Amended again on 2026-10-22: the goal is now a working **prototype** (owner
 ruling, see *Prototype phase*).
+Amended on 2026-11-19 (owner ruling, decision 0017): data sources, the
+prototype's done line, feed offer links and outgoing clicks.
 This is the approved MVP scope: what is in, what is out, and the owner calls
 already settled. A change to anything here is the owner's call.
 
@@ -17,9 +19,9 @@ buy there. Los Tres never sells anything itself.
 **Current target: a working prototype** that is quick to change. It runs
 locally on Docker Compose with the proper stack and architecture, but without
 production, legal or ops work. The prototype is done when the feed import,
-matching, catalogue, search and admin core work end to end locally: at least
-one real affiliate feed imported on the local stack, its offers in the five
-maintenance categories, matched, searchable by text, EAN or part number, and
+matching, catalogue, search and admin core work end to end locally: real
+shop data, hand-built or from a feed, imported on the local stack, its offers
+in the five maintenance categories, matched, searchable by text, EAN or part number, and
 sorted by price.
 
 The full MVP (live site, at least 3 approved feeds, 10k products indexed by
@@ -103,8 +105,15 @@ Decision 0008 holds the detail.
 
 ## Data sources
 
-- **Affiliate network feeds only** in the MVP (decision 0007).
-- **No scraping, ever**, of any site, for any purpose. This is a guardrail.
+- **Registered feeds only** (decisions 0007 and 0017): affiliate network
+  feeds, feed files written by hand, and feed files made by the owner's
+  local-only collector, a separate tool in a separate private repository that
+  runs by hand and is never deployed.
+- **No scraping in this repository.** The app, its image, its scripts and its
+  tests never crawl a shop, drive a browser against one or parse its HTML. This
+  is a guardrail.
+- **Collected data never appears on a public site.** Using it there needs a new
+  owner decision (0017).
 - First shops to apply to:
 
   | Area | Shop | Network |
@@ -112,8 +121,9 @@ Decision 0008 holds the detail.
   | Auto | Oscaro | Kwanko |
   | Auto | Norauto | Effinity |
 
-  Autodoc is the **design and UX reference**. It becomes a data source only if
-  its affiliate programme provides a feed.
+  Autodoc is the **design and UX reference**. It becomes a data source only
+  through a registered feed: its affiliate programme's feed, a hand-written
+  file, or a file from the owner's local-only collector (0017).
 - **Later (out of MVP):** shops upload their own feed directly, as on
   hotline.ua. The data model must allow it without rework.
 
@@ -131,8 +141,11 @@ marker is derived, and no form sets it. The admin sees a feed URL as its host
 only: never prefilled in a form, never in a log. Registering and approving a
 feed does not by itself make real offers appear on the site. S3.5 maps each network's feed columns in code, chosen
 by the network, with no admin screen and no mapping editor; offers use the tracking URL the
-feed carries (a per-shop link pattern is deferred). A product's offer list is built
-only from imported data.
+feed carries, an affiliate tracking URL when it has one and otherwise the
+shop's own URL (a per-shop link pattern is deferred). A hand-written or
+collected feed is a registered shop and feed like any other, behind the same two
+approvals (decision 0017). A product's offer list is built only from imported
+data.
 
 A feed URL may hold an API key. Feed URLs are encrypted at rest before the
 site goes live (owner ruling, 2026-10-18; moved from "first real feed" to
@@ -180,7 +193,8 @@ and a hidden item is never public.
 ## Outgoing clicks
 
 Every "go to shop" link goes through our own `/go/<offer>` redirect. It logs the
-click and sends the visitor to the affiliate URL. The log holds offer, shop,
+click and sends the visitor to the offer's shop URL, an affiliate tracking URL
+when the feed carries one. The log holds offer, shop,
 product, time and source page only: **no IP, no user agent, no cookie**
 (decision 0009). It is the basis for per-click billing later. Prefetch and
 HEAD requests, known crawlers and demo offers are not counted. The count is

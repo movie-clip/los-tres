@@ -14,9 +14,16 @@ site name is configuration.
   has approved are public, and an admin can hide any product or offer. No
   import, seed, script or API publishes data from an unapproved feed or shows a
   hidden item.
-- **No scraping.** Data enters only through a registered feed: an affiliate
-  network feed now, or a feed a shop submits later. No crawler, headless
-  browser or HTML parsing of any shop's site, for any purpose.
+- **No scraping in this repository, and no collected data on a public site.**
+  The app, its image, its scripts and its tests never crawl a shop, drive a
+  browser against one or parse its HTML. Data enters the app only through a
+  registered feed: an affiliate network feed, a feed a shop submits later, a
+  feed file written by hand, or a feed file made by the owner's local-only
+  collector (decision 0017). The collector is a separate tool kept in a
+  separate private repository, run by hand on the owner's machine and never
+  deployed. Rows that come from it are visible only where the local flag is
+  set, are never indexed or committed, and never appear on a public site. Using
+  collected data on a public site needs a new owner decision.
 - **Roles are enforced on the server.** Public visitors are anonymous. Only
   admins log in, and every admin route and action checks the role on the
   server. An admin feature hidden only in the UI counts as unprotected.
@@ -40,8 +47,9 @@ line here is the owner's call: propose it and stop.
 - **Data:** PostgreSQL with Drizzle ORM; search in PostgreSQL (0002)
 - **Delivery:** Docker Compose (app, db), local first, then an EU VPS (0004)
 - **Gate:** ESLint, `tsc`, Vitest, Playwright (0006)
-- **Data source:** affiliate network feeds only, imported by a manual
-  `import-feeds` command (an admin button is deferred); no scraping (0007)
+- **Data source:** feeds only (affiliate network, hand-written, or from the
+  owner's local-only collector), imported by a manual `import-feeds` command
+  (an admin button is deferred); the app never scrapes (0007, 0017)
 - **Matching:** EAN, then brand + normalised part number; on a conflict the
   offer stays its own product, the admin queue is deferred (0008)
 - **Vehicle fitment:** own vehicle list in code, fitment from feeds only (the `fitment` field, `|`-separated slugs; the import is its only writer),

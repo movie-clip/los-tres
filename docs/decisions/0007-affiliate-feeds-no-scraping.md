@@ -1,16 +1,22 @@
 # 0007 — Affiliate network feeds as the only data source; no scraping
 
-Status: accepted, 2026-10-16
+Status: accepted, 2026-10-16. Amended by 0017, 2026-11-19: the sources now
+include hand-written feed files and files from the owner's local-only
+collector, and "no scraping, ever" is narrowed to no scraping in this
+repository.
 
 ## Decision
 
-Products and prices come only from **product feeds of affiliate networks**
-(Awin, Kwanko, Effinity, and others the admin adds). Each network, shop and
-feed is a row the admin manages. A feed is imported only once an admin has
-approved it.
+Products and prices come only from **registered feeds**: product feeds of
+affiliate networks (Awin, Kwanko, Effinity, and others the admin adds), and,
+under 0017, hand-written feed files and files from the owner's local-only
+collector. Each network, shop and feed is a row the admin manages. A feed is
+imported only once an admin has approved it.
 
-**No scraping, ever**: no crawler, headless browser or HTML parsing of any
-shop's site, for any purpose, including price checks. This is a guardrail.
+**No scraping in this repository**: the app, its image, its scripts and its
+tests never crawl a shop, drive a browser against one or parse its HTML, for
+any purpose, including price checks. Collected data never appears on a public
+site without a new owner decision (0017). This is a guardrail.
 
 Later, shops will be able to upload their own feed, as on hotline.ua. The feed
 model has a source type (`affiliate_network` now, `shop_upload` later), so that
