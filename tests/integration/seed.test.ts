@@ -12,11 +12,13 @@ import {
   products,
   shops,
 } from '@/db/schema';
+import { assignCategory, markOutsideScope, removeCategoryMapping } from '@/server/admin/category-mappings';
 import { createFeed, createNetwork, createShop, listNetworksForAdmin, listSourcesForAdmin } from '@/server/admin/sources';
 import { seedDemoData } from '@/server/seed';
 
 import { DEMO_COUNTS, DEMO_FEED_URLS, DEMO_SHOPS } from '../fixtures/demo';
-import { insertFeed, insertShop } from '../support/catalogue';
+import { insertFeed, insertOffer, insertProduct, insertShop } from '../support/catalogue';
+import { categoryForm } from '../support/categories';
 import { resetDatabase } from '../support/db';
 
 /** resetDatabase leaves the migrated state: the fixed tree, one root and its children. */
@@ -273,5 +275,81 @@ describe('a restart after an admin edited the demo rows (S3.1, AC 36)', () => {
     expect(network.name).toBe('Red renombrada');
     expect(feed.isApproved).toBe(false);
     expect((await getDb().select().from(shops).where(eq(shops.slug, 'tienda-demo-uno')))).toHaveLength(1);
+  });
+});
+
+// S4.2, AC 23: the demo mappings are editable by the admin's own writers with no special case, and a
+// restart (the seed again) returns a removed one as a mapping, leaves a changed or outside-scope one as
+// the admin set it, adds no duplicate and changes no product.
+describe('the demo mappings under the admin writers (S4.2, AC 23)', () => {
+  const DEMO_CATEGORY = 'Filtros de aceite'; // a seeded mapping of the second demo feed
+  const mappingsOf = async () =>
+    (await getDb().select().from(feedCategoryMappings).where(eq(feedCategoryMappings.feedCategory, DEMO_CATEGORY))).map((row) => ({
+      feedId: row.feedId,
+      categoryId: row.categoryId,
+    }));
+
+  async function demoWorld() {
+    await seedDemoData(getDb());
+    const [feed] = await getDb().select().from(feeds).where(eq(feeds.url, DEMO_FEED_URLS[1]));
+    const [target] = await getDb().select().from(categories).where(eq(categories.slug, 'filtros-de-aceite'));
+    const [other] = await getDb().select().from(categories).where(eq(categories.slug, 'filtros-de-aire'));
+    // A product the seed's mapping would place: with an offer in this demo feed carrying the string.
+    const product = await insertProduct({ slug: 'demo-aparte', categoryId: target.id });
+    await insertOffer({ productId: product.id, feedId: feed.id, feedCategory: DEMO_CATEGORY });
+    return { feed, target, other, product };
+  }
+
+  const categoryOf = async (id: number) =>
+    (await getDb().select({ categoryId: products.categoryId }).from(products).where(eq(products.id, id)))[0].categoryId;
+
+  it('a removed demo mapping returns as a mapping at the next seed, and the seed moves no product', async () => {
+    const { feed, target, product } = await demoWorld();
+    const removed = await removeCategoryMapping(categoryForm({ feedId: feed.id, feedCategory: DEMO_CATEGORY }));
+    expect(removed).toMatchObject({ status: 'saved', productsChanged: 1 });
+    expect(await mappingsOf()).toEqual([]);
+    expect(await categoryOf(product.id)).toBeNull();
+
+    const report = await seedDemoData(getDb());
+
+    expect(report.categoryMappings).toBe(1);
+    expect(await mappingsOf()).toEqual([{ feedId: feed.id, categoryId: target.id }]);
+    expect(await categoryOf(product.id)).toBeNull(); // the importer's rule fills it later, not the seed
+  });
+
+  it('a changed demo mapping survives a second seed as the admin set it, with no duplicate and no product moved', async () => {
+    const { feed, other, product } = await demoWorld();
+    await assignCategory(categoryForm({ feedId: feed.id, feedCategory: DEMO_CATEGORY, target: other.id }));
+    expect(await categoryOf(product.id)).toBe(other.id);
+    const before = await counts();
+
+    const report = await seedDemoData(getDb());
+
+    expect(report.categoryMappings).toBe(0);
+    expect(await mappingsOf()).toEqual([{ feedId: feed.id, categoryId: other.id }]);
+    expect(await counts()).toEqual(before);
+    expect(await categoryOf(product.id)).toBe(other.id);
+  });
+
+  it('an outside-scope demo category survives a second seed as outside scope, with no duplicate', async () => {
+    const { feed, product } = await demoWorld();
+    await markOutsideScope(categoryForm({ feedId: feed.id, feedCategory: DEMO_CATEGORY }));
+    expect(await categoryOf(product.id)).toBeNull();
+    const before = await counts();
+
+    const report = await seedDemoData(getDb());
+
+    expect(report.categoryMappings).toBe(0);
+    expect(await mappingsOf()).toEqual([{ feedId: feed.id, categoryId: null }]);
+    expect(await counts()).toEqual(before);
+    expect(await categoryOf(product.id)).toBeNull();
+  });
+
+  it('still reports every other demo mapping as already there, so a restart inserts nothing else', async () => {
+    const { feed } = await demoWorld();
+    await removeCategoryMapping(categoryForm({ feedId: feed.id, feedCategory: DEMO_CATEGORY }));
+
+    expect((await seedDemoData(getDb())).categoryMappings).toBe(1);
+    expect((await counts()).categoryMappings).toBe(DEMO_COUNTS.categoryMappings);
   });
 });

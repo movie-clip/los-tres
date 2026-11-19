@@ -104,9 +104,10 @@ describe('the page language (AC 27)', () => {
 
 // S3.1, AC 40 and 39 (D-6): no text on the page says or implies that approving a registered
 // feed makes its offers appear. S3.1 alone does not publish a real feed (the importer reads
-// canonical columns only, S3.5; categories are mapped by the seed only, S4.2), so a line that
-// promised it would be false. The scan covers the whole Admin.Sources block, which is where the
-// S2.3 result lines live, and Admin.Form, where the S3.1 forms add copy.
+// canonical columns only, S3.5; since S4.2 an admin also maps categories on /admin/categorias,
+// but a mapping gives a category and nothing else, see the Admin.Categories describe below), so
+// a line that promised it would be false. The scan covers the whole Admin.Sources block, which
+// is where the S2.3 result lines live, and Admin.Form, where the S3.1 forms add copy.
 
 function leaves(node: unknown, prefix = ''): [string, string][] {
   if (typeof node === 'string') return [[prefix, node]];
@@ -190,5 +191,58 @@ describe('no copy promises that approval publishes offers (AC 40, D-6)', () => {
     ] as const) {
       expect(messages.Admin.Sources[key], key).not.toMatch(/[{}]|https?:/);
     }
+  });
+});
+
+// S4.2, AC 47 and 46: no text on the category screen says or implies that mapping a category, or
+// approving a feed, makes products appear. The only sentence about visibility is a necessary
+// condition ("únicamente si ... aprobados, no está oculto y tiene categoría"), and the removal and
+// "not approved" lines are negative, so the same scan as for Sources applies to every Admin.Categories key.
+describe('no copy on the category screen promises that a mapping publishes (AC 47)', () => {
+  const block = leaves(messages.Admin.Categories, 'Categories');
+
+  it('scans the whole Admin.Categories block and its page title, so the rule is not vacuous', () => {
+    expect(block.length).toBeGreaterThan(40);
+    expect(block.map(([key]) => key)).toEqual(
+      expect.arrayContaining(['Categories.rulePublic', 'Categories.ruleRemove', 'Categories.doneMapped', 'Categories.confirmBody']),
+    );
+  });
+
+  it('finds no sentence that says a mapping or an approval shows products, in any key', () => {
+    const found = [...block, ['Meta.categoriesTitle', messages.Admin.Meta.categoriesTitle] as [string, string]].flatMap(([key, value]) =>
+      offerPromises(value).map((sentence) => `${key}: ${sentence}`),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('is shown to fail on promises about mapping and about approving a feed', () => {
+    for (const promise of [
+      'Guardado: los productos de esta categoría ya se muestran en el sitio.',
+      'Al asignar la categoría, los productos aparecen en la tienda.',
+      'Con la categoría asignada, los productos serán visibles.',
+      'Feed aprobado: sus productos se publican.',
+    ]) {
+      expect(offerPromises(promise), promise).not.toEqual([]);
+    }
+  });
+
+  it('keeps the one true statement about visibility: it needs the feed and shop approved, not hidden and a category', () => {
+    const copy = messages.Admin.Categories;
+    expect(copy.rulePublic).toContain('no aprueba ningún feed ni ninguna tienda');
+    expect(copy.rulePublic).toContain('únicamente si su feed y su tienda están aprobados, no está oculto y tiene categoría');
+    expect(copy.ruleRemove).toContain('dejan de mostrarse en el sitio al instante');
+  });
+
+  it('says in no key that a saved mapping is public, and the result lines state only what changed', () => {
+    const results = ['doneMapped', 'doneOutside', 'doneRemoved', 'doneUnchanged', 'productsMoved', 'productsCleared'] as const;
+    for (const key of results) {
+      expect(messages.Admin.Categories[key], key).not.toMatch(/p[úu]blic|visible|aparec/i);
+    }
+    // "no se muestra en el sitio" appears only after a clearing, which is true and negative.
+    expect(messages.Admin.Categories.productsCleared).toContain('no se muestra');
+  });
+
+  it('keeps the notice that a not-approved feed shows nothing, true wherever it is said', () => {
+    expect(messages.Admin.Categories.feedNoteNotApproved).toContain('no se muestran en el sitio aunque tengan categoría');
   });
 });
