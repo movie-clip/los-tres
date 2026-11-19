@@ -1,6 +1,6 @@
 # S5.9 With a car selected, the product page tells me whether the part fits it, and any visitor can see which cars it fits
 
-Status: approved 2026-11-17 (the human, D-8) and built on branch `278-product-fit`; the review gate passed with every AC met or met with a note. Rulings that shaped the text below: D-1 (a failed fit read degrades the page), D-2 (the demo extension), D-6 and D-7 (the list for every visitor; an unavailable car renders as without a car), now written into `docs/product/vehicle-fitment.md` rule 8, marked for the owner to review. Board status follows the human's own move
+Status: approved 2026-11-17 (the human, D-8) and built on branch `278-product-fit`; the review gate passed with every AC met or met with a note. Rulings that shaped the text below: D-1 (a failed fit read degrades the page), D-2 (the demo extension), D-6 and D-7 (the list for every visitor; an unavailable car renders as without a car), now written into `docs/product/vehicle-fitment.md` rule 8, marked for the owner to review (reviewed and approved 2026-11-18, S5.9 D-12; the marker is gone from the spec). Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: set on the board
 Issue: #278 · Tickets: #279-#280 (T5.9.1-T5.9.2)
 Depends on: S5.5 (#261), S5.6 (#265), S5.7 (#269) and S5.8 (#274), all merged: the fit state, the fitment data, the selected car in the URL, and the listings that use it. S5.9 is the last story of the car feature.
@@ -153,7 +153,7 @@ If the demo extension stalls on the importer pins, T5.9.2 ships its integration 
 
 Listed for the docs lane, which reconciles from the actual diff. None is made by this story's drafting.
 
-- `docs/product/vehicle-fitment.md` rule 8: required. One clarifying sentence (the drafting brief's contract note, ruled by D-6): the list shows for every visitor, with or without a selected car, and is omitted when the product has no counted fitment; and one for the product page with an unavailable car (D-7) and a failed fit read (D-1). The docs lane drafts and the owner reviews, as for S5.8 D-1.
+- `docs/product/vehicle-fitment.md` rule 8: required. One clarifying sentence (the drafting brief's contract note, ruled by D-6): the list shows for every visitor, with or without a selected car, and is omitted when the product has no counted fitment; and one for the product page with an unavailable car (D-7) and a failed fit read (D-1). The docs lane drafts and the owner reviews, as for S5.8 D-1. (Review done 2026-11-18: the owner approved the three rule 8 sub-bullets and the "make, model and generation" lead, S5.9 D-12.)
 - `docs/design/system.md`: rows for the fit banner (four states), the compatible-vehicles list and its collapse control, from the UX pass; its counts or inventory row if it has one for the product page.
 - `docs/product/stories/US-5.5-vehicle-fitment-model.md` (line 35) and `US-5.7-select-car.md` (line 46): the pointers that defer the banner and the list to S5.9, if the docs lane records built state in them.
 - the frontend, backend and testing packs, for the conventions this story sets (a supplementary read that degrades instead of failing the page; a synthetic-row unit test for a boundary demo data cannot reach).

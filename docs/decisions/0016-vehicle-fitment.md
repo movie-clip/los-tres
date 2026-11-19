@@ -24,7 +24,7 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
   parts whose fitment excludes the car are left out, except an exact EAN or
   exact part-number search hit, which is shown, marked as not compatible, after
   the unknown group, and not counted as left out. *Amended by S5.8 (D-1,
-  2026-11-16, #274): drafted by the docs lane, for the owner to review.*
+  2026-11-16, #274): drafted by the docs lane, approved by the owner 2026-11-18.*
 
 ## Why
 
@@ -43,4 +43,5 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
   fitments).
 - Every internal link must carry `coche` while one is selected; a page with
   `coche` is `noindex`.
-- The privacy page gains one sentence about the stored car choice.
+- The privacy page names the stored car choice (local storage, kept only in the
+  visitor's browser). Deferred in S5.7, done in S5.8 (D-18, D-22).
