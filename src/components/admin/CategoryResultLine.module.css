@@ -1,0 +1,20 @@
+/* Plain text colour and one sentence per line. A span, not a paragraph, so the page's muted paragraph colour does not apply. */
+.line {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+/* Focus arrives by script after a result, so the ring shows on focus and not only on a keyboard focus. */
+.line:focus {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.sentence {
+  display: block;
+}
+
+.error {
+  margin-top: var(--space-1);
+}

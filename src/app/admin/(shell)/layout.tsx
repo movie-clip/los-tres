@@ -42,7 +42,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
         items={[
           { key: 'home', label: nav('home'), href: '/admin' },
           { key: 'feeds', label: nav('feeds'), href: '/admin/tiendas' },
-          { key: 'categories', label: nav('categories') },
+          { key: 'categories', label: nav('categories'), href: '/admin/categorias' },
           { key: 'products', label: nav('products') },
           { key: 'review', label: nav('review') },
         ]}

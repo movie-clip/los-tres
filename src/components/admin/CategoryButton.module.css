@@ -1,0 +1,16 @@
+/* The Pending button look, composed from its module so the two never drift apart. */
+.button {
+  composes: button from './PendingButton.module.css';
+}
+
+.filled {
+  composes: filled from './PendingButton.module.css';
+}
+
+.outlined {
+  composes: outlined from './PendingButton.module.css';
+}
+
+.pending {
+  composes: pending from './PendingButton.module.css';
+}
