@@ -435,7 +435,7 @@ for (const [width, height] of VIEWPORTS) {
   test.describe(`the fit banner at ${width}x${height}`, () => {
     test.use({ viewport: { width, height } });
 
-    for (const { name, slug, car, kind, link } of BANNER_PAGES) {
+    for (const { name, slug, car, kind } of BANNER_PAGES) {
       test(`${name}: no sideways scroll, no text cut, as wide as the cards above and below it`, async ({ page }) => {
         await page.goto(`/producto/${slug}?coche=${car.slug}`);
         const banner = page.getByTestId('fit-banner');

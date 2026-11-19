@@ -264,6 +264,7 @@ describe('messages/es-ES.json Search and Error namespaces (S5.4)', () => {
         'fieldLabel',
         'hint',
         'button',
+        'headerPlaceholder',
         'summary',
         'summaryPaged',
         'promptHeading',

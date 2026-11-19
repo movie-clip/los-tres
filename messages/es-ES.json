@@ -73,6 +73,7 @@
     "heading": "Buscar productos",
     "formLabel": "Buscar",
     "fieldLabel": "Buscar un producto",
+    "headerPlaceholder": "Buscar",
     "hint": "Por nombre, referencia o EAN",
     "button": "Buscar",
     "summary": "{count, plural, one {# producto} other {# productos}} para «{term}»",

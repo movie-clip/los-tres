@@ -48,6 +48,18 @@ describe('SiteHeader search box', () => {
     expect(html).not.toContain('data-search-page');
   });
 
+  it('renders the header placeholder only when one is passed, and keeps the accessible name', () => {
+    const html = render({ search: { ...search, placeholder: 'Buscar' } });
+    const input = html.match(/<input [^>]*name="q"[^>]*>/)?.[0] ?? '';
+    expect(input).toMatch(/\splaceholder="Buscar"/);
+    expect(input).toMatch(/aria-label="Buscar un producto"/);
+    expect(input).not.toMatch(/\svalue=/);
+    for (const empty of ['', null]) {
+      const bare = render({ search: { ...search, placeholder: empty } });
+      expect(bare.match(/<input [^>]*name="q"[^>]*>/)?.[0] ?? '').not.toMatch(/placeholder=/);
+    }
+  });
+
   it('renders the site name alone when no search is given', () => {
     const html = render({ search: null });
     expect(html).toContain('data-testid="site-header-link"');

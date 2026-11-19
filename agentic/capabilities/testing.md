@@ -50,7 +50,7 @@ Home e2e selects `home-panel`, `home-search[-input|-button|-notice]`, `home-all-
 
 Privacy assertions are contains/absent, never counts: the failing search logs its fixed code three times per request.
 
-The Compose app image goes stale across branches: run `npm run stack:up` before iterating on e2e, or /buscar answers 404 from an old build.
+The Compose app image goes stale across branches: run `npm run stack:up` before iterating on e2e, or /buscar answers 404 from an old build. The same holds for a CSS mutation, or any `src` edit an e2e checks: it needs `npm run stack:up` to take effect, because the app image bakes the build; without it the pins pass against the old image.
 
 A raw-HTML "value never appears" assertion must strip `<script>` blocks first: Next puts the request URL (query included) in the inline flight payload, so the typed `q` is in the raw response even though app code never renders it.
 

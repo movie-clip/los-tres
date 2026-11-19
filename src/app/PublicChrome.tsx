@@ -138,6 +138,7 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
           action: SEARCH_PATH,
           formLabel: tSearch('formLabel'),
           fieldLabel: tSearch('fieldLabel'),
+          placeholder: tSearch('headerPlaceholder'),
           button: tSearch('button'),
           hint: null,
           value: null,

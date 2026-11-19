@@ -139,6 +139,21 @@
 .header .input {
   flex-basis: 5rem;
   font-size: var(--text-md);
+  text-overflow: ellipsis;
+}
+
+/* Firefox greys a placeholder with opacity unless it is reset. */
+.header .input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+/* The field is about 94px wide at 352px and the placeholder word "Buscar" needs more than
+   its text box leaves, so up to 22.5rem the field's inline padding is a step smaller. */
+@media (max-width: 22.5rem) {
+  .header .input {
+    padding-inline: var(--space-1);
+  }
 }
 
 /* Below 40rem the button's inline padding is a step smaller, so the car control

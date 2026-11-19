@@ -27,6 +27,13 @@
   overflow-wrap: anywhere;
 }
 
+/* At 200% zoom on a narrow phone the title steps down the type scale. */
+@media (max-width: 14rem) {
+  .title {
+    font-size: var(--text-title);
+  }
+}
+
 /* The short amber bar under the title: an empty pseudo-element, no text. */
 .title::after {
   content: '';
