@@ -47,7 +47,9 @@ export const products = pgTable(
     eanNormalised: text('ean_normalised'),
     description: text('description'),
     // The category a mapped feed category assigned. Null = unmapped = not
-    // public. Written by the importer only, from null, never cleared (D-3).
+    // public. Two writers: the importer sets it from null only and never clears
+    // it (D-3); the admin mapping writer (src/server/admin/category-mappings.ts,
+    // S4.2) sets, moves and clears it when an admin saves a mapping.
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'restrict' }),
     // Set by an admin only (guardrail 1).
     isHidden: boolean('is_hidden').notNull().default(false),
@@ -115,9 +117,8 @@ export const feedCategoryMappings = pgTable(
       .notNull()
       .references(() => feeds.id, { onDelete: 'restrict' }),
     feedCategory: text('feed_category').notNull(),
-    categoryId: integer('category_id')
-      .notNull()
-      .references(() => categories.id, { onDelete: 'restrict' }),
+    // Null = outside scope (S4.2, D-2): reviewed, deliberately not mapped.
+    categoryId: integer('category_id').references(() => categories.id, { onDelete: 'restrict' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

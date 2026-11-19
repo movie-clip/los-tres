@@ -178,6 +178,16 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 
+  it('scans the category mapping actions (S4.2, AC 44) and finds them, guarded and only these three exports', () => {
+    const entry = filesWithServerActions(root, 'src').find(
+      ({ file }) => file === 'src/app/admin/(shell)/categorias/actions.ts',
+    );
+    expect(entry).toBeDefined();
+    const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
+    expect(exported).toEqual(['assignCategoryAction', 'markOutsideScopeAction', 'removeCategoryMappingAction']);
+    expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
+  });
+
   it('keeps server actions to the admin code: none sits in a public page or component', () => {
     const outside = filesWithServerActions(root, 'src')
       .map(({ file }) => file)

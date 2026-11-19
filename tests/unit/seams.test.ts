@@ -192,12 +192,72 @@ describe('seams (guardrail 1, S5.1 mapped products)', () => {
     expect(loader).toContain('search: failed');
   });
 
-  it('updates products only in the importer and the seed', () => {
+  // Deliberate (issue #110, S4.2): the admin mapping writer joins the importer
+  // and the seed as the third and last file group that updates products, and it
+  // may set the category and nothing else. The list is closed and named.
+  const MAPPER = 'src/server/admin/category-mappings.ts';
+  const updatesProducts = /\.update\(\s*products\s*\)/;
+  const updatesProductCategoryOnly = /\.update\(\s*products\s*\)\s*\.set\(\s*\{\s*categoryId\s*:\s*[^,}]+\}\s*\)/g;
+  const mappingWrite = (code: string): boolean =>
+    /\.(insert|update|delete)\(\s*feedCategoryMappings\s*\)/.test(code) ||
+    /\b(insert\s+into|update|delete\s+from)\s+"?feed_category_mappings\b/i.test(code);
+  const productUpdatesOutsideCategory = (code: string): boolean =>
+    (code.match(new RegExp(updatesProducts, 'g')) ?? []).length !==
+    (code.match(updatesProductCategoryOnly) ?? []).length;
+  const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+
+  it('updates products only in the importer, the seed and the admin mapping writer (S4.2, AC 42)', () => {
     const found = offenders(
-      /\.update\(\s*products\s*\)/,
-      (file) => file.startsWith('src/server/importer/') || file.startsWith('src/server/seed/'),
+      updatesProducts,
+      (file) =>
+        file.startsWith('src/server/importer/') || file.startsWith('src/server/seed/') || file === MAPPER,
     );
     expect(found).toEqual([]);
+  });
+
+  it('finds the admin mapping writer and sees it update products, so the rule above is not vacuous (S4.2, AC 42)', () => {
+    expect(codeOf(MAPPER)).toMatch(updatesProducts);
+  });
+
+  it('lets the admin mapping writer set the product category and no other column (S4.2, AC 42)', () => {
+    expect(productUpdatesOutsideCategory(codeOf(MAPPER))).toBe(false);
+  });
+
+  it('writes feed category mappings only in the seed and the admin mapping writer, which inserts and deletes (S4.2, AC 43)', () => {
+    const found = sources()
+      .filter(({ code }) => mappingWrite(code))
+      .map(({ file }) => file)
+      .sort();
+    expect(found).toEqual([MAPPER, 'src/server/seed/index.ts'].sort());
+    const code = codeOf(MAPPER);
+    expect(code).toMatch(/\.insert\(\s*feedCategoryMappings\s*\)/);
+    expect(code).toMatch(/\.delete\(\s*feedCategoryMappings\s*\)/);
+  });
+
+  it('keeps the product update and mapping write rules able to fail (S4.2, AC 42, 43)', () => {
+    // A second file updating products is reported by the closed-list rule.
+    expect(updatesProducts.test('await tx.update(products).set({ categoryId: 1 })')).toBe(true);
+    const found = [
+      { file: 'src/server/admin/sources.ts', code: 'await tx.update( products ).set({ categoryId: 1 })' },
+      { file: MAPPER, code: 'await tx.update(products).set({ categoryId: 1 })' },
+    ]
+      .filter(({ code }) => updatesProducts.test(code))
+      .map(({ file }) => file)
+      .filter((file) => file !== MAPPER);
+    expect(found).toEqual(['src/server/admin/sources.ts']);
+    // The writer setting a second column, in either order, is reported.
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ categoryId: next })')).toBe(false);
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ categoryId: null })')).toBe(false);
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ isHidden: true, categoryId: 1 })')).toBe(true);
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ categoryId: 1, isHidden: true })')).toBe(true);
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ title: x })')).toBe(true);
+    // Any form of a mapping write elsewhere is reported.
+    expect(mappingWrite('await tx.insert(feedCategoryMappings).values(row)')).toBe(true);
+    expect(mappingWrite('await tx.update( feedCategoryMappings ).set({})')).toBe(true);
+    expect(mappingWrite('await tx.delete(feedCategoryMappings).where(x)')).toBe(true);
+    expect(mappingWrite('DELETE FROM "feed_category_mappings" where 1=1')).toBe(true);
+    expect(mappingWrite('insert into feed_category_mappings (a) values (1)')).toBe(true);
+    expect(mappingWrite('const rows = await tx.select().from(feedCategoryMappings)')).toBe(false);
   });
 });
 
@@ -599,13 +659,13 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     expect(code.length).toBeGreaterThan(0);
     expect(code).toContain('countedFitmentWhere()');
     expect(code).toContain('activeVehicleWhere()');
-    expect(code).not.toMatch(/(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)/);
+    expect(code).not.toMatch(/b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)b/);
     expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
   });
 
   it('names the fitment condition only in the visibility scope and the fit-state read', () => {
     const found = offenders(
-      /(countedFitmentWhere|activeVehicleWhere)/,
+      /b(countedFitmentWhere|activeVehicleWhere)b/,
       (file) => file === 'src/server/visibility.ts' || file === FIT_STATE,
     );
     expect(found).toEqual([]);

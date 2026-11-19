@@ -12,3 +12,16 @@ export function errorCode(error: unknown): string {
   }
   return 'UNKNOWN';
 }
+
+/**
+ * The code of a failed database call: that of the driver error under a Drizzle
+ * wrapper (`error.cause`) when it has one, else of the error itself. Only a
+ * short code comes out, never a message (a Drizzle message embeds the bound
+ * parameters).
+ */
+export function driverErrorCode(error: unknown): string {
+  const cause =
+    typeof error === 'object' && error !== null ? (error as { cause?: unknown }).cause : undefined;
+  const code = errorCode(cause);
+  return code === 'UNKNOWN' ? errorCode(error) : code;
+}
