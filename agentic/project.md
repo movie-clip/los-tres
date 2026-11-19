@@ -51,10 +51,18 @@ canonical docs, commands (already in your context).
    matching queue. No path — import, seed script, API — publishes data from an
    unapproved feed or shows a hidden item. Approving and disabling feeds, and
    hiding products and offers, are the admin's alone.
-2. **No scraping.** Product and price data enter only through a registered
-   feed: an affiliate network feed now, a feed a shop submits later
-   (`docs/decisions/0007`). No crawler, headless browser or HTML parsing of any
-   shop's site, for any purpose, including price checks.
+2. **No scraping in this repo; no collected data on a public site.** Product
+   and price data enter only through a registered feed: an affiliate network
+   feed, a feed a shop submits later, a hand-written feed file, or a file from
+   the owner's local-only collector, a separate tool in a separate private
+   repository, run by hand and never deployed (`docs/decisions/0017`, which
+   amends the "never" in `0007`). The app, its image, its scripts and its tests
+   never crawl a shop, drive a browser against one or parse its HTML. No lane
+   adds a crawler, headless browser or HTML parser to this repo, fetches any
+   shop page, including for price checks, or makes collected rows visible
+   without the local flag. Collected rows are never indexed or committed and never
+   appear on a public site; using collected data on a public site needs a new
+   owner decision.
 3. **Roles are enforced on the server.** Public visitors are anonymous, and
    admin is the only logged-in role. Every admin route and action checks the
    role on the server. An admin capability hidden only in the UI counts as

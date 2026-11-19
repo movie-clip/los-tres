@@ -61,9 +61,10 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
   Drizzle 0.45 `update().set().from(table).where().returning()` works and qualifies RETURNING columns (`setFeedApproval` reads the shop's flag in the same statement).
   The category and product read models inner-join `categories` and return `categorySlug`; the join is not a filter (`isNotNull` stays in `visibility.ts`).
   Sitemap and `indexable` = `visibleProductWhere()` AND `hasNonDemoOfferWhere()`; the two literal calls must appear in `sitemap.ts`; `demo.ts` names `feeds.isDemo` only inside `src/server/catalogue`.
-- **(2) No scraping.** The importer fetches only the URL of a feed registered in
-  the database, and parses it as CSV or XML feed data. Never add a crawler, a
-  headless browser or an HTML parser for shop pages.
+- **(2) No scraping in this repo.** The importer fetches only the URL of a feed registered in
+  the database, and parses it as CSV or XML feed data (a file from the owner's
+  separate local-only collector is such a feed, decision 0017). Never add a
+  crawler, a headless browser or an HTML parser for shop pages to this repo.
   `src/server/importer/source.ts` is the only place that fetches or reads a
   feed. `src/server/importer/fitments.ts` is the only writer of `fitments` (a seams test fails on any other); a new optional feed column is appended last to `OPTIONAL_COLUMNS` in `validate.ts`, which XML picks up through `CANONICAL_COLUMNS`; new report fields are zeroed in `emptyReport` and printed in `report.ts`.
 - **(3) Roles.** Every route declares whether it is public or admin. Admin

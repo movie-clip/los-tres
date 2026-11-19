@@ -65,9 +65,11 @@ The five are in the project profile. Three shape scope decisions specifically:
 - **Admin approval (1).** A request to publish a feed's data before an admin
   approves the feed is a request to weaken guardrail 1. Name it as such and
   leave it to the owner.
-- **No scraping (2).** A request for data from a shop with no feed (including
-  Autodoc) is answered with "apply to its affiliate programme" or "out of MVP",
-  never with scraping.
+- **No scraping in this repo (2).** A request for data from a shop with no feed
+  (including Autodoc) is answered with a hand-written feed file, "apply to its
+  affiliate programme" or "out of MVP". The only collector is the owner's
+  separate local-only tool (decision 0017); never propose scraping inside this
+  repo, and never propose putting collected data on a public site.
 - **Personal data (5).** Anything that stores data about public visitors
   (accounts, alerts, ads, a cookie) is an owner call with RGPD and consent
   consequences. Flag it.
