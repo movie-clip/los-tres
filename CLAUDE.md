@@ -4,7 +4,7 @@ A price-comparison site in and for Spain, in the family of hotline.ua: a
 catalogue of products, each with the shops that sell it, sorted by price, and
 a link to buy there. The MVP covers **car maintenance basics** only: engine
 oil and oil, air, fuel and cabin filters, in one fixed category tree. The Sixt car-rental results page is the design reference for the catalogue, and Autodoc for auto-parts content. Products and prices
-come from affiliate network feeds, and revenue is affiliate commission. The
+come from registered feeds (affiliate networks, hand-written files, or the owner's local-only collector, 0017), and revenue is affiliate commission. The
 goal is an **MVP**, not feature parity. "Los Tres" is a code name: the public
 site name is configuration.
 

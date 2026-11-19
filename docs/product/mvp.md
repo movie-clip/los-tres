@@ -121,9 +121,8 @@ Decision 0008 holds the detail.
   | Auto | Oscaro | Kwanko |
   | Auto | Norauto | Effinity |
 
-  Autodoc is the **design and UX reference**. It becomes a data source only
-  through a registered feed: its affiliate programme's feed, a hand-written
-  file, or a file from the owner's local-only collector (0017).
+  Autodoc is the **design and UX reference**. It becomes a data source only if
+  its affiliate programme provides a feed.
 - **Later (out of MVP):** shops upload their own feed directly, as on
   hotline.ua. The data model must allow it without rework.
 

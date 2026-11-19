@@ -46,8 +46,9 @@ Status: accepted, 2026-11-19. Amends 0007.
 
 - The owner has no affiliate partnership available now and wants real products
   and links to judge the prototype (`mvp.md` § Goal).
-- The legal risk named in 0007 (database right, shop terms, copyright of
-  descriptions and photos) is about a **public** site. Keeping the collector
+- The legal risk named in 0007 (database right, shop terms) is about a
+  **public** site. Copyright of descriptions and photos is a further risk, which
+  is why images and descriptions are out of scope here. Keeping the collector
   outside this repository, local, manual and polite, and keeping its data off
   any public site, leaves 0007's reasoning in force where it matters.
 - A separate private repository means this public repository does not publish

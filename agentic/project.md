@@ -59,8 +59,8 @@ canonical docs, commands (already in your context).
    amends the "never" in `0007`). The app, its image, its scripts and its tests
    never crawl a shop, drive a browser against one or parse its HTML. No lane
    adds a crawler, headless browser or HTML parser to this repo, fetches any
-   shop page, or makes collected rows visible without the local flag, including
-   for price checks. Collected rows are never indexed or committed and never
+   shop page, including for price checks, or makes collected rows visible
+   without the local flag. Collected rows are never indexed or committed and never
    appear on a public site; using collected data on a public site needs a new
    owner decision.
 3. **Roles are enforced on the server.** Public visitors are anonymous, and
