@@ -68,6 +68,8 @@ Product JSON-LD e2e reads the raw `request.get` HTML with a regex over script ta
 
 The nested 404 (missing product, missing category, page or brand past the last) is a full server-rendered page: `src/proxy.ts` rewrites it to the root not-found. Assert the served body with `expectServerRenderedNotFound(html, siteName)` (`tests/support/page-checks.ts`), which strips `<script>` first; a `toContain` on the raw body passes on the flight payload and proves nothing. A Tab walk right after `goto` can lose the first Tab to hydration: wait for the button visible and `networkidle` before pressing.
 
+A page-title or generateMetadata pin must run against the Compose image: Next dev and the production build differ on whether a not-found boundary's metadata replaces the page's, so a dev-server curl is not proof.
+
 Expected site name and copy come from `SITE_NAME` in `.env` and `messages/es-ES.json`, never a literal. Raw server HTML is parsed by `page.setContent` in a context with `javaScriptEnabled: false`, not by an HTML parser dependency.
 
 ## What must always be covered
@@ -166,6 +168,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - Admin pages render in vitest with `next-intl/server` mocked by a real `createTranslator`, then `renderToStaticMarkup(await Page(props))`; `propStrings` in `admin-source-privacy.test.ts` walks the element props as the client payload.
 - A DB failure is forced without a mock by a temporary plpgsql trigger that raises `P0001` with the new address in its message; drop it in `finally`.
 - `reflowProblems(page)` in `page-checks.ts` returns sideways scroll and clipped text; it skips 1px hidden labels, select and input.
+- A Range over an element's contents (selectNodeContents(element)) also reports the element's own box, so a line count from its rect tops is inflated; count lines from the text nodes' ranges, and test word integrity per word.
 - Pressed-state e2e: `whilePressed(page, locator, read)` holds the mouse down on a locator, runs `read`, releases away from it (no click). `snapshotOf(locator)` returns background, border, colour, decoration, thickness, radius and the box; `cssColour(page, 'var(--color-x)')` turns a token into the rgb string. Compare against tokens, never against literals.
 - `tests/e2e/reflow.spec.ts` holds the no-scroll and no-cut-text pass (viewports: see the `reflow.spec.ts` `VIEWPORTS` bullet below); a new public page URL is added to its PAGES list.
 - `expectLocalScriptsAndLinks(page, { allowHrefs })` lets exact hrefs through (legal pages pass the `mailto:` and `https://www.aepd.es`); `expectLegalFooter(page)` asserts the contentinfo landmark, three exact hrefs and labels, no `p` or heading. Legal content components render in unit tests with `createTranslator` from `use-intl/core` and the real messages; the owner fake values are in `tests/unit/owner-config.test.ts` and `legal-pages.test.ts`.

@@ -171,7 +171,7 @@ and the backup passphrase are kept in a password manager plus an offline copy
   reports in the admin area is deferred.
 - One broken feed never stops the others, and an import never takes the site
   down.
-- An offer missing from a feed's latest successful import is removed.
+- An offer missing from a feed's latest successful import is removed (S3.3, not built yet).
 
 ## Admin area
 
@@ -264,6 +264,29 @@ and reports (S3.2), per-shop link patterns (S3.6), the matching review queue
 (S7.2), brand aliases (S7.3), price and shop filters (S5.3; brand filter and sort shipped in S11.4), product images (S8.1),
 price history (S8.3), the no-offers page (S8.4), feed attributes (S8.6) and
 click counts (S1.3).
+
+## Before going live
+
+A short checklist for the day the site goes on a server (owner ruling, review
+2026-11-20, D-14). The deploy story (S9.1) is deferred and closed, so this
+section is its home until one exists.
+
+- **Vehicle list.** The owner reviews the list in `src/db/vehicle-catalogue.ts`
+  before launch, or at the first real feed with fitment, whichever comes first.
+- **Reverse proxy logs.** The proxy must not log the query string of `/buscar`
+  or `/mi-coche` (a search term travels there, and `/mi-coche?volver=` can hold
+  one). The privacy page promises the term is neither stored nor logged
+  (`CLAUDE.md` § Search engines).
+- **Database pool.** Check the application's connection pool size against the
+  server's PostgreSQL `max_connections`.
+- **`SITE_URL`.** It must be the public https origin, or canonical links, the
+  sitemap and `robots.txt` point at `127.0.0.1` (`CLAUDE.md` § Search engines).
+- **Admin second factor.** The admin area is not deployed before the TOTP
+  second factor (S2.2) lands (see Admin area, decision 0012), and feed URLs are
+  encrypted at rest before go-live (see Shops and feeds are data).
+- **Runtime image: done.** The image no longer holds `drizzle-kit`, `esbuild`,
+  `tsx`, `vitest` or `playwright` (D-2). The Dockerfile guard fails the build if
+  any of them reappears, and the gate's e2e runs on that image.
 
 Removed: Umami analytics (S1.2), an owner review of the copy, and on
 2026-10-26 the category tree editor (S4.1, replaced by the fixed tree in
