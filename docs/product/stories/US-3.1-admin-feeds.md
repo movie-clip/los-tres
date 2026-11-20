@@ -1,6 +1,7 @@
 # S3.1 Admin manages networks, shops and feeds
 
 Status: approved 2026-11-18 (the human, D-11; board status Ready follows the human's own move)
+Amended 2026-11-20 by S3.7 (`US-3.7-catalogue-file.md`, run `2026-11-20-s3-7-catalogue-file`): the feed form now also offers a catalogue-file source with no network. AC 14 ("the form offers no other source type") and AC 16 (https only) hold for the https source only; the https source still requires a network (AC 15). The prerequisite that a feed needs a network no longer blocks the form: only a missing shop does, and a missing network is shown inline for the https source (AC 38 amended). The ACs below are left as approved.
 Epic: E3 (#11) · Iteration 3 · Priority: P0 · Size: M
 Issue: #26 · Tickets: #85-#87 (T3.1.1-T3.1.3)
 Depends on: S2.1 and S2.3, both shipped (the admin shell, the server-side guard, and `/admin/tiendas` with its approve and disable toggles). No open dependency. S3.1 does not wait for S3.5 or S4.2.
