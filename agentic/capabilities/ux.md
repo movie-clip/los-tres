@@ -186,6 +186,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | car picker, dialog | with script, click `[data-testid=car-select]` (or `car-change` with a car); wait for `aria-haspopup="dialog"` first, since before hydration it is a link |
 | car header on the 404 and error page | with a stored car, the page reloads once to `?coche=` (D-18); the error page cannot resolve a car without a database, so it is not e2e-reachable with one |
 | car header heights | no car: one 64 px row with the control at its right edge (glyph only from 352 to 639 px); below 352 px the control wraps to its own row (112 px at 320 and 351); a selected car adds a 44 px row 2 (112 to 112.8 px at 352 to 1280; at 320 and 351 the label sits above the buttons: 138.4 px, 160.8 px at 320 with the longest car) |
+| secondary button wrapped | `/buscar?q=zzzz` at 195 (wraps at 261 and below), `/categoria/filtros-de-aire?marca=no-existe` at 195, `/buscar?q=bosch%20aire&coche=<car>` at 195; two lines, 66 px tall |
 | retired car | not producible on the demo database (no retired vehicle in the shipped list); report not checked |
 | product, banner fits (S5.9; `<car>` is `seat-leon-iii-2012-2020-1-6-tdi-115cv`, `<bosch>` is `demo-filtro-de-aceite-bosch-of-3306`) | `/producto/<bosch>?coche=<car>` |
 | product, banner no fit (link) | `/producto/demo-filtro-de-aceite-mahle-of-1124?coche=<car>`; with the longest car, `/producto/<bosch>?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |

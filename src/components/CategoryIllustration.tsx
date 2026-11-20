@@ -77,8 +77,8 @@ function CabinFilter() {
       <path className={styles.detail} d="M32 60 H64" />
       <path className={styles.detail} d="M32 74 H64" />
       <circle className={styles.ring} cx="78" cy="84" r="20" />
-      <path className={styles.paper} d="M68 92 C68 80 78 74 90 74 C90 86 82 94 68 92 Z" />
-      <path className={styles.stem} d="M67 94 L82 80" />
+      <path className={styles.paper} d="M74 87 C74 79 80 75 89 75 C89 83 84 88 74 87 Z" />
+      <path className={styles.stem} d="M68 93 L79 83" />
     </>
   );
 }
