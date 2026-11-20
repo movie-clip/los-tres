@@ -339,7 +339,7 @@ describe('legal pages messages (S9.3)', () => {
       'Privacy',
       [
         'metaTitle', 'heading', 'controllerHeading', 'controllerBody', 'cookiesHeading',
-        'cookiesBody', 'dataHeading', 'dataClicks', 'dataLogs', 'dataBasis',
+        'cookiesBody', 'dataHeading', 'dataClicks', 'dataLogs', 'dataSearch', 'dataBasis',
         'leavingHeading', 'leavingBody', 'writingHeading', 'writingBody', 'adminsHeading',
         'adminsBody', 'recipientsHeading', 'recipientsBody', 'rightsHeading', 'rightsBody',
         'changesHeading', 'changesBody',
@@ -390,7 +390,7 @@ describe('legal pages messages (S9.3)', () => {
 
   it('keeps bold as <b> tags and never leaves a ** marker in any message', () => {
     expect(collectStrings(messages).filter((value) => value.includes('**'))).toEqual([]);
-    for (const key of ['Privacy.dataClicks', 'Privacy.dataLogs', 'Funding.noExtraCost', 'Funding.noSales', 'Funding.noPaidRanking']) {
+    for (const key of ['Privacy.dataClicks', 'Privacy.dataLogs', 'Privacy.dataSearch', 'Funding.noExtraCost', 'Funding.noSales', 'Funding.noPaidRanking']) {
       expect(lookup(key)).toMatch(/^<b>[^<]+<\/b>/);
     }
   });
@@ -450,6 +450,19 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     for (const key of ['title', 'signInTitle', 'homeTitle']) {
       expect(admin.Meta[key]).toContain('{siteName}');
     }
+  });
+
+  it('has the admin not-found tab title, which takes {siteName} (6B)', () => {
+    expect(admin.Meta.notFoundTitle).toBe('Página no encontrada | Administración | {siteName}');
+  });
+
+  it('names the Búsquedas item in the third data lead-in of the privacy page (6A)', () => {
+    const lead = (key: string) => String(lookup(key)).match(/^<b>([^<]+)<\/b>/)?.[1];
+    expect([lead('Privacy.dataClicks'), lead('Privacy.dataLogs'), lead('Privacy.dataSearch')]).toEqual([
+      'Clics hacia las tiendas.',
+      'Registros del servidor.',
+      'Búsquedas.',
+    ]);
   });
 
   it('keeps the S4.2 screen copy in Admin.Categories, its title in Admin.Meta and the Nav keys as they were (AC 46)', () => {

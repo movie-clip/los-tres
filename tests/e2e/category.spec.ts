@@ -1229,7 +1229,7 @@ test.describe('category brand chips, two lists (S11.6)', () => {
 // of a populated category starts high enough on a phone to show a product.
 // ---------------------------------------------------------------------------
 
-test.describe('category sort row and first card geometry (S11.6, CR-4)', () => {
+test.describe('category sort row and first card geometry (S11.6, CR-4)', { tag: '@layout' }, () => {
   for (const [width, height] of [
     [375, 812],
     [390, 844],
@@ -1302,7 +1302,7 @@ const sortOptionRoom = (page: Page) =>
     return [...select.options].map((option) => ({ text: option.text, width: context.measureText(option.text).width, room }));
   });
 
-test.describe('category sort at narrow widths (S11.7, 03-ux checks 8 and 9)', () => {
+test.describe('category sort at narrow widths (S11.7, 03-ux checks 8 and 9)', { tag: '@layout' }, () => {
   test.describe('at 195 wide', () => {
     test.use({ viewport: PHONE_195 });
 

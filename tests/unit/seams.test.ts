@@ -659,16 +659,37 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     expect(code.length).toBeGreaterThan(0);
     expect(code).toContain('countedFitmentWhere()');
     expect(code).toContain('activeVehicleWhere()');
-    expect(code).not.toMatch(/b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)b/);
+    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)\b/);
     expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
   });
 
-  it('names the fitment condition only in the visibility scope and the fit-state read', () => {
-    const found = offenders(
-      /b(countedFitmentWhere|activeVehicleWhere)b/,
-      (file) => file === 'src/server/visibility.ts' || file === FIT_STATE,
-    );
-    expect(found).toEqual([]);
+  it('names the fitment condition only in the visibility scope and the fit-state read, and the vehicle filter also in the vehicle list (D-1)', () => {
+    const VEHICLES = 'src/server/car/vehicles.ts';
+    const inScope = (file: string) => file === 'src/server/visibility.ts' || file === FIT_STATE;
+    expect(offenders(/\bcountedFitmentWhere\b/, inScope)).toEqual([]);
+    expect(offenders(/\bactiveVehicleWhere\b/, (file) => inScope(file) || file === VEHICLES)).toEqual([]);
+  });
+
+  it('keeps the fitment naming rules non-vacuous: the allowed files match and the patterns catch a violation (D-1)', () => {
+    const counted = /\bcountedFitmentWhere\b/;
+    const active = /\bactiveVehicleWhere\b/;
+    const visibility = codeOf('src/server/visibility.ts');
+    expect(visibility).toMatch(counted);
+    expect(visibility).toMatch(active);
+    const vehicles = codeOf('src/server/car/vehicles.ts');
+    expect(vehicles).toMatch(active);
+    expect(vehicles).not.toMatch(counted);
+    expect(counted.test('.where(countedFitmentWhere())')).toBe(true);
+    expect(active.test('.where(activeVehicleWhere())')).toBe(true);
+    // A file outside the allowed set is reported.
+    const found = [{ file: 'src/app/x.ts', code: 'and(activeVehicleWhere(), countedFitmentWhere())' }]
+      .filter(({ code }) => active.test(code) || counted.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual(['src/app/x.ts']);
+    // The flag-word rule is a word match, not a literal "b...b".
+    const flags = /\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)\b/;
+    expect(flags.test('where(eq(feeds.isApproved, true))')).toBe(true);
+    expect(flags.test('where(notAnisApprovedX)')).toBe(false);
   });
 
   it('writes nothing and logs nothing in the fit-state read (AC 28, guardrail 5)', () => {

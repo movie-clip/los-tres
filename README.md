@@ -1,6 +1,6 @@
 # Los Tres
 
-A price-comparison site for Spain (auto parts and tools). The public site and
+A price-comparison site for Spain (car maintenance basics: engine oil and oil, air, fuel and cabin filters). The public site and
 the admin area are one Next.js app, run with Docker Compose together with
 PostgreSQL.
 

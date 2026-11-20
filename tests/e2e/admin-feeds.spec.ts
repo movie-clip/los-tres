@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { createAdminWithCommand, psql, psqlScalar, signInAs } from '../support/admin-e2e';
+import { loadEnv } from '../support/env';
 import { expectNoSetCookie, reflowProblems, stripScripts } from '../support/page-checks';
 
 // US-3.1 against the Compose stack: the admin registers a network, a shop and a feed through
@@ -212,6 +213,42 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
       await expect(page.getByTestId('admin-nav'), path).toBeVisible();
       await expect(page.getByTestId('source-form'), path).toHaveCount(0);
     }
+  });
+
+  test('every admin not-found carries the not-found tab title, an existing id keeps its edit title (6B)', async ({ page }) => {
+    loadEnv();
+    const siteName = (process.env.SITE_NAME ?? '').trim();
+    const notFoundTitle = messages.Admin.Meta.notFoundTitle.replace('{siteName}', siteName);
+    await signInAs(page, EMAIL, PASSWORD);
+    const titles: Record<string, string> = {};
+    for (const path of [
+      '/admin/tiendas/feed/999999/editar',
+      '/admin/tiendas/red/999999/editar',
+      '/admin/tiendas/tienda/999999/editar',
+      '/admin/tiendas/feed/abc/editar',
+      '/admin/x',
+    ]) {
+      const response = await page.goto(path);
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByRole('heading', { level: 1, name: messages.Admin.NotFound.heading }), path).toBeVisible();
+      titles[path] = await page.title();
+    }
+    // One comparison, so a failure lists every route whose tab title is not the not-found one.
+    expect(titles).toEqual(Object.fromEntries(Object.keys(titles).map((path) => [path, notFoundTitle])));
+
+    await page.goto(SOURCES);
+    const existing = (await page.getByRole('link', { name: /^Editar feed / }).first().getAttribute('href'))!;
+    const response = await page.goto(existing);
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveTitle(messages.Admin.Meta.editFeedTitle.replace('{siteName}', siteName));
+    await expect(page).not.toHaveTitle(notFoundTitle);
+  });
+
+  test('signed out, an edit URL still redirects to sign-in and is not a 404 (6B)', async ({ request }) => {
+    const raw = await request.get('/admin/tiendas/feed/999999/editar', { maxRedirects: 0 });
+    expect(raw.status()).toBeGreaterThanOrEqual(300);
+    expect(raw.status()).toBeLessThan(400);
+    expect(raw.headers().location).toContain('/admin/acceso');
   });
 
   test('the list offers no delete control and no field mapping choice anywhere (AC 18, 34)', async ({ page }) => {

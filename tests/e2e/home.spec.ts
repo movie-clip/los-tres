@@ -349,7 +349,7 @@ const lineCount = (locator: Locator) =>
     return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
   });
 
-test.describe('home root link at narrow widths (S11.7)', () => {
+test.describe('home root link at narrow widths (S11.7)', { tag: '@layout' }, () => {
   test.describe('at 195 wide', () => {
     test.use({ viewport: { width: 195, height: 422 } });
 

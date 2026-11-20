@@ -28,6 +28,8 @@ Vitest 5 with two projects in `vitest.config.mts` (the package stays CommonJS; t
 
 `CLAUDE.md` § Commands is the authority for the command list.
 
+`@layout` tag (D-6): a Playwright `describe` whose assertions depend on font metrics (heights, widths, tops, line counts, no-text-cut, same-row) is tagged `test.describe('name', { tag: '@layout' }, () => {...})`. CI runs `npm run gate:ci` (`test:e2e:ci`, `--grep-invert @layout`) on ubuntu-latest and skips them, because they are written against Windows system-ui metrics; the local `npm run gate` runs them. Functional specs stay untagged so CI still runs them.
+
 `vitest.config.mts` and `playwright.config.ts` must not import from `tests/`: tsconfig includes them, `next build` typechecks them in the image, and `.dockerignore` removes `tests/`. Put shared logic behind `setupFiles` or `globalSetup` instead (Playwright's takes a string path).
 
 E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), which runs `docker compose run --rm -T --no-deps app import-feeds` and throws a named message on `feeds=0` (quoted in `CLAUDE.md` § Commands). The e2e write rule is in § What must always be covered.
@@ -67,6 +69,8 @@ The product e2e clicks nothing; the Referer click source is proven once in `go.s
 Product JSON-LD e2e reads the raw `request.get` HTML with a regex over script tags (expect one match) and `JSON.parse`, then `openRawHtml` for the selector and the visible-price comparison; selector `script[type="application/ld+json"][data-testid="product-jsonld"]`.
 
 The nested 404 (missing product, missing category, page or brand past the last) is a full server-rendered page: `src/proxy.ts` rewrites it to the root not-found. Assert the served body with `expectServerRenderedNotFound(html, siteName)` (`tests/support/page-checks.ts`), which strips `<script>` first; a `toContain` on the raw body passes on the flight payload and proves nothing. A Tab walk right after `goto` can lose the first Tab to hydration: wait for the button visible and `networkidle` before pressing.
+
+A page-title or generateMetadata pin must run against the Compose image: Next dev and the production build differ on whether a not-found boundary's metadata replaces the page's, so a dev-server curl is not proof.
 
 Expected site name and copy come from `SITE_NAME` in `.env` and `messages/es-ES.json`, never a literal. Raw server HTML is parsed by `page.setContent` in a context with `javaScriptEnabled: false`, not by an HTML parser dependency.
 
@@ -166,6 +170,7 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - Admin pages render in vitest with `next-intl/server` mocked by a real `createTranslator`, then `renderToStaticMarkup(await Page(props))`; `propStrings` in `admin-source-privacy.test.ts` walks the element props as the client payload.
 - A DB failure is forced without a mock by a temporary plpgsql trigger that raises `P0001` with the new address in its message; drop it in `finally`.
 - `reflowProblems(page)` in `page-checks.ts` returns sideways scroll and clipped text; it skips 1px hidden labels, select and input.
+- A Range over an element's contents (selectNodeContents(element)) also reports the element's own box, so a line count from its rect tops is inflated; count lines from the text nodes' ranges, and test word integrity per word.
 - Pressed-state e2e: `whilePressed(page, locator, read)` holds the mouse down on a locator, runs `read`, releases away from it (no click). `snapshotOf(locator)` returns background, border, colour, decoration, thickness, radius and the box; `cssColour(page, 'var(--color-x)')` turns a token into the rgb string. Compare against tokens, never against literals.
 - `tests/e2e/reflow.spec.ts` holds the no-scroll and no-cut-text pass (viewports: see the `reflow.spec.ts` `VIEWPORTS` bullet below); a new public page URL is added to its PAGES list.
 - `expectLocalScriptsAndLinks(page, { allowHrefs })` lets exact hrefs through (legal pages pass the `mailto:` and `https://www.aepd.es`); `expectLegalFooter(page)` asserts the contentinfo landmark, three exact hrefs and labels, no `p` or heading. Legal content components render in unit tests with `createTranslator` from `use-intl/core` and the real messages; the owner fake values are in `tests/unit/owner-config.test.ts` and `legal-pages.test.ts`.

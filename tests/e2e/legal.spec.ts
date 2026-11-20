@@ -159,6 +159,25 @@ test.describe('/aviso-legal and /privacidad (S9.3)', () => {
     await close();
   });
 
+  test('/privacidad lists three data items, the third a bold Búsquedas lead-in (6A)', async ({ request, browser }) => {
+    test.skip(!identityConfigured, 'required owner values are blank: the page answers 500');
+    const { page, close } = await openRawHtml(browser, await (await request.get('/privacidad')).text());
+    const list = page.locator('main h2', { hasText: messages.Privacy.dataHeading }).locator('xpath=following-sibling::ul[1]');
+    const items = list.locator('li');
+    await expect(items).toHaveCount(3);
+    const lead = (key: string) => key.match(/^<b>([^<]+)<\/b>/)![1];
+    const bold = await items.locator('strong').allTextContents();
+    expect(bold).toEqual([
+      lead(messages.Privacy.dataClicks),
+      lead(messages.Privacy.dataLogs),
+      lead(messages.Privacy.dataSearch),
+    ]);
+    expect(bold[2]).toBe('Búsquedas.');
+    expect((await items.nth(2).innerText()).trim()).toBe(messages.Privacy.dataSearch.replace(/<\/?b>/g, ''));
+    await expect(page.locator('main h2')).toHaveCount(9);
+    await close();
+  });
+
   test('/privacidad has the nine sections, the AEPD link and the page title', async ({
     request,
     browser,

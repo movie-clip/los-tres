@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { cache } from 'react';
 
 import { FormScreen } from '@/components/admin/FormScreen';
 import { NameSlugForm } from '@/components/admin/NameSlugForm';
@@ -14,11 +15,19 @@ import { updateShopAction } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata(): Promise<Metadata> {
+// One lookup per request, shared by `generateMetadata` and the page.
+const load = cache((id: number) => getShopForEdit(id));
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   // A server entry point of an admin route: the role check comes first (guardrail 3).
   await requireAdminPage();
   const t = await getTranslations('Admin.Meta');
-  return { title: t('editShopTitle', { siteName: getSiteName() }) };
+  const siteName = getSiteName();
+  // The production build keeps the page's own title when the page throws notFound(), so the
+  // not-found title is decided here: an id that does not parse, or has no row, is the 404.
+  const id = parseId((await params).id);
+  if (id === null || !(await load(id))) return { title: t('notFoundTitle', { siteName }) };
+  return { title: t('editShopTitle', { siteName }) };
 }
 
 export default async function EditShopPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +35,7 @@ export default async function EditShopPage({ params }: { params: Promise<{ id: s
   await requireAdminPage();
   const id = parseId((await params).id);
   if (id === null) notFound();
-  const shop = await getShopForEdit(id);
+  const shop = await load(id);
   if (!shop) notFound();
 
   const t = await getTranslations('Admin.Form');

@@ -63,7 +63,7 @@ Matching
 8. Products matched by exact EAN or exact part number are listed before products matched by text only.
 9. The order is the same on every request for the same data. Among products of equal relevance the lowest visible price comes first, and ties after that are broken stably, so a page never reshuffles between requests.
 10. Leading and trailing whitespace is ignored and runs of whitespace inside the term count as one space. When the `q` parameter is given more than once, the first value is used. A term longer than 100 characters is cut to 100 characters; it is not an error.
-11. No term produces a server error. Terms made only of punctuation, a lone `%` or `_`, quotes, a backslash, the operator characters of the search mechanism (for example `&`, `|`, `!`, `:`, `(`), an emoji and an encoded NUL character (`%00`) answer 200 with the no-result state, and `%` or `_` never match "everything".
+11. No term produces a server error. Terms made only of punctuation, a lone `%` or `_`, quotes, a backslash, the operator characters of the search mechanism (for example `&`, `|`, `!`, `:`, `(`), an emoji and an encoded NUL character (`%00`) answer 200 with the no-result state, and `%` or `_` never match "everything". A punctuation-only word beside a real word (for example "filtro &") is dropped and the other words still search, as intended (review 2026-11-20, D-4): "filtro &" finds what "filtro" finds.
 12. A product created by `import-feeds` is findable after the import with no further step by anyone (no manual re-index), and a migrated database needs nothing beyond the normal migrate on start.
 
 Visibility (guardrail 1)

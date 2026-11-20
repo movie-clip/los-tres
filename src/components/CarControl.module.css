@@ -117,7 +117,7 @@
   }
 }
 
-/* A selected car, from 22rem to below 23.44rem (352 to 374 px): the label and the two
+/* A selected car, from 22rem to 23.43rem (352 to 374 px): the label and the two
    buttons share one row, so the header keeps the 112.8 px it has from 375 px up. The label
    takes what is left (a basis of 0 never pushes the buttons under it), wraps by words and
    stops at two lines with an ellipsis; the whole name stays in the text. The buttons give up

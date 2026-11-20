@@ -183,7 +183,9 @@ deploy it must be the public https origin**, or all of them point at
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
 | e2e | `npm run test:e2e` (`playwright test`; its setup runs `docker compose run --rm -T --no-deps app import-feeds`) | `npm run stack:up` with `SEED_DEMO_DATA=true`, Playwright browser |
+| e2e (CI) | `npm run test:e2e:ci` (`playwright test --grep-invert @layout`: `test:e2e` without the specs tagged `@layout`) | as `test:e2e` |
 | **gate** | `npm run gate` | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
+| gate (CI) | `npm run gate:ci` (`gate` with `test:e2e:ci` as its last step; what CI runs) | as `gate` |
 
 `npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
 in that order. It rebuilds the app image and runs the e2e against the Compose
@@ -191,6 +193,14 @@ stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. The gate has no
 migrate step: the test database is dropped, recreated and migrated on every
 integration run, and the app container migrates on start.
+
+**CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate:ci` on every
+pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
+(random secrets, `SEED_DEMO_DATA=true`, blank owner identity). `gate:ci` is
+`gate` except that its e2e step skips the tests tagged `@layout`: pixel
+geometry written against Windows system-ui font metrics, which fails on the
+Linux runner. The local `npm run gate` stays the gate and runs everything,
+`@layout` included; a story is still not done until it exits 0.
 
 Helpers:
 

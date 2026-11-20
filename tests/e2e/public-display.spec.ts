@@ -74,7 +74,7 @@ test.describe('F2: the header search placeholder', () => {
 // The visible fit of the word "Buscar" depends on the platform font, so it is a ux-review check,
 // not a gate pin. The gate pins the mechanism (the tighter field padding inside max-width 22.5rem),
 // the 64px height and the placeholder, none of which depend on the font.
-test.describe('F2 check 8: the header field padding at 352 to 361 px', () => {
+test.describe('F2 check 8: the header field padding at 352 to 361 px', { tag: '@layout' }, () => {
   for (const [width, padding] of [
     [352, '8px'],
     [360, '8px'],
