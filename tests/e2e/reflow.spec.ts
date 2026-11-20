@@ -83,7 +83,7 @@ const VIEWPORTS = [
 ] as const;
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`public pages at ${width}x${height}`, () => {
+  test.describe(`public pages at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, url } of PAGES) {
@@ -171,7 +171,7 @@ const dialogProblems = (page: Page) =>
   });
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the car control and dialog at ${width}x${height}`, () => {
+  test.describe(`the car control and dialog at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, url } of SELECTED_PAGES) {
@@ -238,7 +238,7 @@ const FIT_PAGES: { name: string; url: string; marker: string }[] = [
 ];
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the category page with the longest car at ${width}x${height}`, () => {
+  test.describe(`the category page with the longest car at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, url, marker } of FIT_PAGES) {
@@ -298,7 +298,7 @@ const SEARCH_FIT_PAGES: { name: string; url: string; marker: string }[] = [
 ];
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the search page with the longest car at ${width}x${height}`, () => {
+  test.describe(`the search page with the longest car at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, url, marker } of SEARCH_FIT_PAGES) {
@@ -400,7 +400,7 @@ const partProblems = (page: Page, testId: string) =>
   }, testId);
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the counts line with the longest car at ${width}x${height}`, () => {
+  test.describe(`the counts line with the longest car at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     const LINES: { name: string; url: string; testId: string }[] = [
@@ -432,7 +432,7 @@ const BANNER_PAGES: { name: string; slug: string; car: { slug: string }; kind: s
 ];
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the fit banner at ${width}x${height}`, () => {
+  test.describe(`the fit banner at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, slug, car, kind } of BANNER_PAGES) {
@@ -512,7 +512,7 @@ const LIST_PAGES: { name: string; car: { slug: string } | null }[] = [
 ];
 
 for (const [width, height] of VIEWPORTS) {
-  test.describe(`the vehicle list at ${width}x${height}`, () => {
+  test.describe(`the vehicle list at ${width}x${height}`, { tag: '@layout' }, () => {
     test.use({ viewport: { width, height } });
 
     for (const { name, car } of LIST_PAGES) {
@@ -627,7 +627,7 @@ for (const [width, height] of VIEWPORTS) {
 // its term over its value) and OfferList.module.css (the price drops under the shop name) keep the
 // Referencia and EAN values on one line, and the shop names with their words whole, at 195 CSS px. A per-character wrap is
 // neither sideways scroll nor cut text, so the checks above cannot see it.
-test.describe('product details and shop names at 195x422', () => {
+test.describe('product details and shop names at 195x422', { tag: '@layout' }, () => {
   test.use({ viewport: { width: 195, height: 422 } });
 
   /**
@@ -711,7 +711,7 @@ const buttonBox = (page: Page, label: string) =>
       };
     });
 
-test.describe('the empty-state secondary button', () => {
+test.describe('the empty-state secondary button', { tag: '@layout' }, () => {
   for (const { name, url, label } of SECONDARY_BUTTONS) {
     test(`${name} at 195: two lines, padded, at least 60 px tall`, async ({ page }) => {
       await page.setViewportSize({ width: 195, height: 422 });

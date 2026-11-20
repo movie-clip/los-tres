@@ -353,7 +353,7 @@ test.describe('the page query in the no-script links (AC 20)', () => {
 // A third row, or a wrapped row, adds 40 px or more, so a 4 px tolerance catches it. The first-card
 // ceiling is not the 700 px budget of category.spec.ts (no car, 64 px header): the extra row pushes
 // the card to about 741 px on filtros-de-aire at 390, and this pin stops it growing past that.
-test.describe('the header height with a car (ceiling for the first card)', () => {
+test.describe('the header height with a car (ceiling for the first card)', { tag: '@layout' }, () => {
   const TOLERANCE = 4;
   for (const [width, height, expected] of [
     [390, 844, 112.8],
@@ -390,7 +390,7 @@ test.describe('the header height with a car (ceiling for the first card)', () =>
 // 112.8 px; a wrapped row adds 25.6 px and fails the 4 px tolerance. At 351 the buttons sit under
 // the label (138.4), pinned on purpose: below 22rem is left as is (D-6). The visible fit of the
 // last word of the longest label is font-dependent and left to ux-review (D-3).
-test.describe('the header with a car from 352 to 374 px (one-row car control)', () => {
+test.describe('the header with a car from 352 to 374 px (one-row car control)', { tag: '@layout' }, () => {
   const TOLERANCE = 4;
   const CARS = [
     ['the short car', CAR],

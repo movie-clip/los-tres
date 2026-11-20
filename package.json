@@ -24,8 +24,10 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --grep-invert @layout",
     "test:e2e:install": "playwright install chromium",
-    "gate": "npm run lint && npm run typecheck && npm run db:up && npm test && npm run stack:up && npm run test:e2e"
+    "gate": "npm run lint && npm run typecheck && npm run db:up && npm test && npm run stack:up && npm run test:e2e",
+    "gate:ci": "npm run lint && npm run typecheck && npm run db:up && npm test && npm run stack:up && npm run test:e2e:ci"
   },
   "dependencies": {
     "better-auth": "1.7.12",
