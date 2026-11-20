@@ -144,9 +144,14 @@ describe('PrivacyContent', () => {
     expect(html).toMatch(/\(<a[^>]*href="https:\/\/www\.aepd\.es"[^>]*>www\.aepd\.es<\/a>\)/);
   });
 
-  it('renders the two data lead-ins in <strong> and no ** marker', () => {
+  it('renders the three data lead-ins in <strong>, the third naming Búsquedas, and no ** marker', () => {
     const html = privacy();
-    expect(count(html, '<strong>')).toBe(2);
+    expect(count(html, '<strong>')).toBe(3);
+    expect([...html.matchAll(/<strong>([^<]*)<\/strong>/g)].map((m) => m[1])).toEqual([
+      'Clics hacia las tiendas.',
+      'Registros del servidor.',
+      'Búsquedas.',
+    ]);
     expect(text(html)).not.toContain('**');
   });
 

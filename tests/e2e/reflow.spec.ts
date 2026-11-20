@@ -622,3 +622,64 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// Open points follow-ups, item 5: the 14rem rules of ProductHero.module.css (the detail row stacks
+// its term over its value) and OfferList.module.css (the price drops under the shop name) keep the
+// Referencia and EAN values on one line, and the shop names with their words whole, at 195 CSS px. A per-character wrap is
+// neither sideways scroll nor cut text, so the checks above cannot see it.
+test.describe('product details and shop names at 195x422', () => {
+  test.use({ viewport: { width: 195, height: 422 } });
+
+  /**
+   * Per matched element: the number of text lines it renders, and the words that are split across
+   * lines (a per-character wrap). A range over the text nodes only: an element range also reports
+   * its own box, whose top is not a text line.
+   */
+  const linesOf = (page: Page, selector: string) =>
+    page.evaluate((css) => {
+      return [...document.querySelectorAll(css)].map((element) => {
+        const tops = new Set<number>();
+        const broken: string[] = [];
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          const text = node.textContent ?? '';
+          for (const match of text.matchAll(/\S+/g)) {
+            const range = document.createRange();
+            range.setStart(node, match.index!);
+            range.setEnd(node, match.index! + match[0].length);
+            const wordTops = new Set<number>();
+            for (const rect of range.getClientRects()) {
+              if (rect.width > 0) {
+                wordTops.add(Math.round(rect.top));
+                tops.add(Math.round(rect.top));
+              }
+            }
+            if (wordTops.size > 1) broken.push(match[0]);
+          }
+        }
+        return { text: (element.textContent ?? '').trim().slice(0, 40), lines: tops.size, broken };
+      });
+    }, selector);
+
+  test('the Referencia and EAN values each render on one line', async ({ page }) => {
+    await page.goto(`/producto/${DEMO_FOUR_OFFERS.slug}`);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const values = await linesOf(page, 'dl dd');
+    // Referencia and EAN are the two values of the hero; the demo product carries both.
+    expect(values.length).toBeGreaterThanOrEqual(2);
+    for (const value of values) {
+      expect(value.lines, value.text).toBe(1);
+      expect(value.broken, value.text).toEqual([]);
+    }
+  });
+
+  test('each shop name keeps its words whole', async ({ page }) => {
+    await page.goto(`/producto/${DEMO_FOUR_OFFERS.slug}`);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const shops = await linesOf(page, '[data-testid="offer-shop"]');
+    expect(shops).toHaveLength(DEMO_FOUR_OFFERS.offers.length);
+    // Words may wrap between each other at this width; a word must never be cut in the middle.
+    for (const shop of shops) expect(shop.broken, shop.text).toEqual([]);
+  });
+});
