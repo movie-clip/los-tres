@@ -622,3 +622,52 @@ for (const [width, height] of VIEWPORTS) {
     });
   });
 }
+
+// #316 fix 2a (01-ux checks 1 to 3 and 5): the secondary button of an empty state keeps its own
+// padding when its label wraps. At 195 it is two lines with at least 8 px above and below and a box
+// of at least 60 px; at 390 it is one line, 44 px. A padding of 0 vertically puts the letters on the border.
+const SECONDARY_BUTTONS: { name: string; url: string; label: string }[] = [
+  { name: 'search no results', url: '/buscar?q=zzzz', label: messages.Search.browseAction },
+  { name: 'category brand with no match', url: '/categoria/filtros-de-aire?marca=no-existe', label: messages.Category.noMatchAction },
+  { name: 'search all left out by the car', url: `/buscar?q=bosch%20aire&coche=${CAR.slug}`, label: messages.Fit.changeCar },
+];
+
+/** The box, the vertical padding and the line count of the link, read from the rendered page. */
+const buttonBox = (page: Page, label: string) =>
+  page
+    .getByTestId('category-empty')
+    .getByRole('link', { name: label, exact: true })
+    .evaluate((node) => {
+      const style = getComputedStyle(node);
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const lineTops = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+      return {
+        height: node.getBoundingClientRect().height,
+        paddingTop: parseFloat(style.paddingTop),
+        paddingBottom: parseFloat(style.paddingBottom),
+        lines: lineTops.size,
+      };
+    });
+
+test.describe('the empty-state secondary button', () => {
+  for (const { name, url, label } of SECONDARY_BUTTONS) {
+    test(`${name} at 195: two lines, padded, at least 60 px tall`, async ({ page }) => {
+      await page.setViewportSize({ width: 195, height: 422 });
+      await page.goto(url);
+      const box = await buttonBox(page, label);
+      expect(box.lines).toBe(2);
+      expect(box.paddingTop).toBeGreaterThanOrEqual(8);
+      expect(box.paddingBottom).toBeGreaterThanOrEqual(8);
+      expect(box.height).toBeGreaterThanOrEqual(60);
+    });
+
+    test(`${name} at 390: one line, 44 px tall`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(url);
+      const box = await buttonBox(page, label);
+      expect(box.lines).toBe(1);
+      expect(Math.round(box.height)).toBe(44);
+    });
+  }
+});
