@@ -36,7 +36,7 @@ one lives in code:
   offer from an approved feed that is not hidden, and a product that is not
   hidden and not in the matching queue. Every public read (catalogue, search,
   product page, sitemap, `/go/<offer>`) goes through it (guardrail 1).
-- **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch). One importer, `import-feeds`, is the only writer of
+- **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of the catalogue folder `catalogue-files/` (S3.7)). One importer, `import-feeds`, is the only writer of
   products and offers from outside data. It reads only feeds registered in the
   database and has no code path that fetches a shop's web pages (guardrail 2).
 - **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The

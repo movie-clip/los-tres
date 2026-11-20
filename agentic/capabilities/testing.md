@@ -36,6 +36,8 @@ E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), whic
 
 An e2e must never leave a feed approved: `import-feeds` reads every approved feed, so a transient approved e2e feed changes `entrypoint.spec.ts`'s `feeds=N` under `fullyParallel`. `admin-categories.spec.ts` keeps its fixed shop and feeds unapproved and proves the public side of guardrail 1 that way (a mapping on an unapproved feed publishes nothing); a removal taking an approved product off the public readers is integration only.
 
+S3.7 `catalogue-file-flow.spec.ts` is the one exception: it approves its own feed and runs in the Playwright project `catalogue-file`, which depends on `chromium`, so no other spec runs beside it; it unapproves in the spec and `cleanRows()` in `beforeAll` and `afterAll`. A spec in a project with dependencies cannot be run alone by name: use `npx playwright test <file> --project catalogue-file --no-deps`.
+
 `legal.spec.ts` branches on the host `.env`: all four required `OWNER_*` values non-blank means 200 and values asserted as booleans (never printed), otherwise 500 and no brace in the visible text. To exercise the 200 branch without touching `.env`, export fake `OWNER_*` in the shell, run `docker compose up -d app`, run playwright with the same exports, then unset and run `docker compose up -d app` again.
 
 Integration workers get fixed `AUTH_SECRET` and `SITE_URL` (`http://127.0.0.1:3000`) from `tests/support/test-database-env.ts`, so admin tests run without them in `.env`. Server components and actions are called directly with `next/headers` mocked: `vi.mock('next/headers', async () => (await import('../support/next-request')).nextHeadersModule)`; `startAdminRequest({cookie, origin})` sets the request, `nextRequest.cookieWrites` records every cookie the code under test would send, `redirectOf(fn)` returns the `NEXT_REDIRECT` target.
@@ -142,6 +144,9 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - `tests/support/feeds.ts`: `fixtureDeps`, where a feed row's `url` is the
   fixture file name, and `textDeps`. Local feed files live in
   `tests/fixtures/feeds/`; shipped-demo expectations in `tests/fixtures/demo.ts`.
+- `tests/support/catalogue-files.ts`: `catalogueCsv(rows)` (nine columns incl. category, quotes cells with a comma), `tempCatalogueFolder()`, `insertFileFeed`, `aFileFeed`, `importFromFolder(dir, {feedId})`; catalogue tests pass `catalogueDir` through `readFeedSource` and never touch the repo `catalogue-files/`.
+- `csvOf` and `xmlOf` have no category or part_number column; an unquoted decimal-comma price (12,99) splits the CSV cell and the row is rejected as `invalid_currency`. Use `catalogueCsv`.
+- A Python read/replace/write of a test file that holds a `\n` or `\r\n` escape expands it into a real newline and breaks the file (hit three times in S3.7, as for regexes above): use Edit.
 - `tests/support/network-off.ts`: `stubNetworkOff`; every importer test stubs
   fetch to throw.
 - `tests/support/go.ts`: `callGo(offer, {method, headers})` calls the route's GET/HEAD/OPTIONS with a countable default request (Host `shop.test`, browser UA; a header set to null is removed), `allClicks()`, `insertGoOffer({shop, feed, product, offer})` (visible by default, `feed.isDemo` for demo).

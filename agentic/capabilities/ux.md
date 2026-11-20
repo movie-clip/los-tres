@@ -161,6 +161,9 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, empty lists, missing prerequisite | not producible on the shared dev database (demo rows always exist); empty states are proved in integration (`admin-source-pages.test.ts`); report not checked |
 | admin shops and feeds, longest content | create rows through the forms with a 120-character name, a 64-character slug and a feed URL with a 253-character host; open `/admin/tiendas` and the forms at 1280 only |
 | admin form, refused and failed | submit a form with a blank name, a bad slug, or an `http` URL (refused, field message); for failed use the `page.route` 500 as for the shop rows |
+| admin feed form, file source (S3.7) | sign in, open `/admin/tiendas/feed/nuevo?tienda=<id>`, `selectOption` `#source-origin` to `catalogue_file` (label "Archivo de catálogo"); field ids `#source-file`, `#source-file-error`, `#source-file-hint`; an edit needs a file feed made through the form |
+| admin file feed edit, approved (S3.7) | create a file feed through the form, approve it in the list, open its Editar feed link; the warning shows before typing and a changed name opens the confirm |
+| admin no network (S3.7) | not producible on the shared database (the demo network always exists); report not checked |
 | admin feed edit, confirm | edit an approved non-demo feed and press submit with an address typed: the inline confirm opens |
 | admin categories, populated (S4.2) | sign in as `e2e-categories-admin@example.test` (password in `tests/e2e/admin-categories.spec.ts`) with no `create-admin`, open `/admin/categorias` at 1280; demo feeds 1 to 4 (every category Asignada) plus the e2e feeds 650 and 651 render |
 | admin categories, not reviewed | press "Quitar asignación" and confirm on a demo category, then restore it with "Asignar" to the same target, which gives its products their category back (AC 26) |
