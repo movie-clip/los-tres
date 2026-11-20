@@ -227,6 +227,51 @@ test.describe('a shop and a file feed, registered through the forms (AC 1, 2, 9,
     await expect(shopGroup(page).getByTestId(/^source-feed-/)).toHaveCount(sql.feedRows());
   });
 
+  test('typed text never crosses the Origen switch, either way, and the Red choice is kept (CR-4)', async ({ page }) => {
+    await openList(page);
+    await shopGroup(page).getByRole('link', { name: /^Añadir feed/ }).click();
+    await page.waitForLoadState('networkidle');
+    const origin = page.locator('#source-origin');
+    const network = page.locator('#source-network');
+    const address = page.locator('#source-address');
+    const file = page.locator('#source-file');
+    const SECRET_URL = 'https://secreto-e2e.example/feed.csv?token=abc';
+    const TYPED_NAME = 'escrito-e2e.csv';
+
+    // Keep a Red choice that is not the first option when there is one, so "kept" means something.
+    const values = await network.locator('option').evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+    const chosen = values[values.length - 1];
+    await network.selectOption(chosen);
+
+    // URL typed, then the file source: the name field is empty, not the URL.
+    await address.fill(SECRET_URL);
+    await expect(address).toHaveValue(SECRET_URL);
+    await origin.selectOption('catalogue_file');
+    await expect(file).toBeVisible();
+    await expect(file).toHaveValue('');
+
+    // Back: the URL field is empty and Red is what it was.
+    await origin.selectOption('affiliate_network');
+    await expect(address).toBeVisible();
+    await expect(address).toHaveValue('');
+    await expect(network).toHaveValue(chosen);
+
+    // The reverse: a typed file name does not appear in the URL field and is gone on switching back.
+    await origin.selectOption('catalogue_file');
+    await file.fill(TYPED_NAME);
+    await expect(file).toHaveValue(TYPED_NAME);
+    await origin.selectOption('affiliate_network');
+    await expect(address).toBeVisible();
+    await expect(address).toHaveValue('');
+    await origin.selectOption('catalogue_file');
+    await expect(file).toHaveValue('');
+    await origin.selectOption('affiliate_network');
+    await expect(network).toHaveValue(chosen);
+
+    // Nothing was submitted.
+    await expect(page).toHaveURL(/\/admin\/tiendas\/feed\/nuevo\?tienda=\d+$/);
+  });
+
   test('creates the fixed file feed with no file in the folder, then refuses the same name again (AC 4, 9)', async ({ page }) => {
     expect(existsSync(FILE_PATH), 'no file yet: registering does not read the folder').toBe(false);
     await openList(page);
