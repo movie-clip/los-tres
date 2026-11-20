@@ -21,7 +21,7 @@ A CSV or XML file, plain or gzip, in the same layout `import-feeds` already read
 | `id` | yes | Your own key for the row, unique inside this file. A row with no id is rejected. |
 | `title` | yes | The product name shown on the site. |
 | `price` | yes | The **final price with IVA included**, as decimal text with at most two decimals, dot or comma: `12.99` or `12,99`. The page shows `12,99 €`. A price with more than two decimals, a thousands separator, a sign, an exponent or zero is rejected, never rounded. |
-| `url` | yes | The shop link. The visitor's "Ir a la tienda" button goes to exactly this address through `/go/<offer>`, with nothing appended. It must start with `http://` or `https://`. A plain link earns no commission. |
+| `url` | yes | The shop link. The visitor's "Ir a la tienda" button goes to exactly this address through `/go/<offer>`, with nothing appended. It must start with `http://` or `https://`. |
 | `ean` | no, but write it | The product's EAN (8 or 13 digits with a correct check digit; spaces and hyphens are ignored). **It is what makes two shops converge**: two files that carry the same valid EAN land on one product page that lists both shops, cheapest first. An invalid EAN rejects the row. |
 | `brand` | no | The brand. |
 | `part_number` | no | The part number. Stored and shown, but it does not make two files converge yet: matching by brand and part number is S7.1 (#40, not built). |
@@ -43,7 +43,7 @@ Rows are checked one by one. A rejected row is listed by record number and field
 
 ## 2. Name the file and place it in the folder
 
-The folder is `catalogue-files/` at the repository root, for example `C:\projects\investments\los-tres\catalogue-files\`. It is the only folder catalogue files are read from. There is no setting, field or argument to name another.
+The folder is `catalogue-files/` at the repository root. It is the only folder catalogue files are read from. There is no setting, field or argument to name another.
 
 **The file-name rule, in words.** Give the bare file name only, with no folder part. The name:
 
