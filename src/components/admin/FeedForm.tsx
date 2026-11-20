@@ -299,7 +299,10 @@ export function FeedForm(props: FeedFormProps) {
           {props.mode === 'create' ? <LinkButton href={props.addNetwork.href} label={props.addNetwork.label} /> : null}
         </InfoBlock>
       ) : source === 'catalogue_file' ? (
+        // A key per source: without it React reuses the one input between the two fields and the typed
+        // text (a secret address) would cross the switch.
         <TextField
+          key="file"
           id="source-file"
           name={FILE_FIELD}
           label={labels.file.label}
@@ -321,6 +324,7 @@ export function FeedForm(props: FeedFormProps) {
         />
       ) : props.mode === 'create' || !props.demo ? (
         <TextField
+          key="address"
           id="source-address"
           name={ADDRESS_FIELD}
           label={labels.address}
