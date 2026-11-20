@@ -142,7 +142,12 @@ URL in the admin area. Since S3.1 the admin creates and edits networks,
 shops and feeds on the admin shops page, with no code change and no delete
 (disable is the only removal). A new shop and a new feed start unapproved, and
 a feed's approval is separate from its shop's. Replacing an approved feed's URL
-returns that feed to unapproved in the same write. A shop or network is marked
+returns that feed to unapproved in the same write. Since S3.7 a feed is either
+an affiliate feed (network and https address) or a catalogue-file feed (a bare
+file name in a fixed local folder, no network). Changing the file name of an
+approved file feed returns it to unapproved in the same write, as replacing a
+URL does. A file feed's file name is shown in the admin; the folder's location
+is not. A shop or network is marked
 demo only when it has at least one feed and every feed is a demo feed; the
 marker is derived, and no form sets it. The admin sees a feed URL as its host
 only: never prefilled in a form, never in a log. Registering and approving a
@@ -163,8 +168,10 @@ and the backup passphrase are kept in a password manager plus an offline copy
 
 ## Feed import
 
-- A **separate import command**, `import-feeds`, reads each approved feed (CSV
-  or XML from the network's URL). It checks every row and prints counts and
+- A **separate import command**, `import-feeds`, reads each approved feed: CSV
+  or XML, plain or gzip, from the feed's https address, or, for a catalogue-file
+  feed, from a file the owner placed in the fixed folder `catalogue-files/`
+  (S3.7). It checks every row and prints counts and
   rejected rows.
 - **It is not scheduled.** It runs when someone starts it from the command
   line (all feeds, or one with `--feed`). An "Import now" button with stored
