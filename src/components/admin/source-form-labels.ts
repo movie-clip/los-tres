@@ -13,11 +13,23 @@ import type { SourceErrorLabels } from './useSourceForm';
 /** The translator of the form strings, `getTranslations('Admin.Form')`. */
 export type FormTranslate = Awaited<ReturnType<typeof getTranslations<'Admin.Form'>>>;
 
-/** The three length limits of the forms, as the server holds them (source-rules.ts). The page passes them in. */
-export type FormLimits = { name: number; slug: number; address: number };
+/**
+ * The three length limits of the forms, as the server holds them (source-rules.ts). The page passes them in.
+ * The feed form adds the file-name limit and the allowed endings (S3.7), already formatted by `fileKindsText`;
+ * the network and shop forms pass neither, and their file-name messages stay empty because they never show one.
+ */
+export type FormLimits = { name: number; slug: number; address: number; fileName?: number; fileKinds?: string };
 
 // CLDR drops the separator on four digits; the limit of an address reads 2.048.
 const limitFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
+
+// ".csv, .xml, .csv.gz o .xml.gz": the endings the file-name rule accepts, as the messages quote them.
+const kindsFormat = new Intl.ListFormat(LOCALE, { style: 'long', type: 'disjunction' });
+
+/** The accepted endings of a catalogue file name as one phrase, for the `{kinds}` value of the feed form copy. */
+export function fileKindsText(kinds: readonly string[]): string {
+  return kindsFormat.format(kinds);
+}
 
 /**
  * One string per refusal code of each field, beside the field at fault (05-ux
@@ -25,6 +37,13 @@ const limitFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
  * form creates; a feed form never gets a slug refusal.
  */
 export function sourceErrorLabels(t: FormTranslate, kind: 'network' | 'shop', limits: FormLimits): SourceErrorLabels {
+  // Only the feed form gives the file-name limits; without them its messages are empty, never a made-up limit.
+  const fileValues =
+    limits.fileName !== undefined && limits.fileKinds !== undefined
+      ? { max: limitFormat.format(limits.fileName), kinds: limits.fileKinds }
+      : null;
+  const file = (key: 'fileRequired' | 'fileTooLong' | 'fileNotAName' | 'fileUnusable' | 'fileWrongKind' | 'fileDuplicate') =>
+    fileValues ? t(`Errors.${key}`, fileValues) : '';
   return {
     name: {
       required: t('Errors.nameRequired'),
@@ -45,6 +64,15 @@ export function sourceErrorLabels(t: FormTranslate, kind: 'network' | 'shop', li
       credentials: t('Errors.urlCredentials'),
       too_long: t('Errors.urlTooLong', { max: limitFormat.format(limits.address) }),
       duplicate: t('Errors.urlDuplicate'),
+    },
+    source: { invalid: t('Errors.sourceInvalid') },
+    fileName: {
+      required: file('fileRequired'),
+      too_long: file('fileTooLong'),
+      not_a_name: file('fileNotAName'),
+      unusable: file('fileUnusable'),
+      wrong_kind: file('fileWrongKind'),
+      duplicate: file('fileDuplicate'),
     },
   };
 }
@@ -72,6 +100,9 @@ export function nameSlugFormLabels(
   };
 }
 
+/** The limits of the feed form: the file-name limit and the endings are always given (S3.7). */
+export type FeedFormLimits = FormLimits & { fileName: number; fileKinds: string };
+
 /**
  * The strings of the feed form. The feed id and the demo flag matter on an edit only: the
  * confirmation names the feed, and a demonstration feed's domain line reads
@@ -79,7 +110,7 @@ export function nameSlugFormLabels(
  */
 export function feedFormLabels(
   t: FormTranslate,
-  options: { mode: 'create' | 'edit'; feedId: number; demo: boolean; limits: FormLimits },
+  options: { mode: 'create' | 'edit'; feedId: number; demo: boolean; limits: FeedFormLimits },
 ): FeedFormLabels {
   const { mode, feedId, demo, limits } = options;
   const creating = mode === 'create';
@@ -100,6 +131,27 @@ export function feedFormLabels(
     confirmBody: t('Feed.confirmBody'),
     confirmYes: t('Feed.confirmYes'),
     confirmYesPending: t('Feed.confirmYesPending'),
+    source: {
+      label: t('Feed.sourceLabel'),
+      optionNetwork: t('Feed.sourceOptionNetwork'),
+      optionFile: t('Feed.sourceOptionFile'),
+      hintNetwork: t('Feed.sourceHintNetwork'),
+      hintFile: t('Feed.sourceHintFile'),
+      fixedLabel: t('Feed.sourceFixedLabel'),
+      fixedNetwork: t('Feed.sourceFixedNetwork'),
+      fixedFile: t('Feed.sourceFixedFile'),
+    },
+    file: {
+      label: t('Feed.fileLabel'),
+      hint: creating ? t('Feed.fileHintNew', { kinds: limits.fileKinds }) : t('Feed.fileHintEdit', { kinds: limits.fileKinds }),
+      refill: creating ? t('Feed.fileRefillNew') : t('Feed.fileRefillEdit'),
+      storedUnavailable: t('Feed.fileStoredUnavailable'),
+      warningTitle: t('Feed.fileWarningTitle'),
+      warningBody: t('Feed.fileWarningBody'),
+      confirmTitle: t('Feed.fileConfirmTitle', { id: feedId }),
+    },
+    missingNetworkTitle: t('Feed.missingNetworkTitle'),
+    missingNetworkBody: t('Feed.missingNetworkBody'),
     cancel: t('cancel'),
     submit: creating ? t('Feed.submitNew') : t('save'),
     submitting: creating ? t('Feed.submittingNew') : t('saving'),

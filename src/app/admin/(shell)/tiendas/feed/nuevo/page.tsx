@@ -5,11 +5,12 @@ import { FeedForm } from '@/components/admin/FeedForm';
 import { FormScreen } from '@/components/admin/FormScreen';
 import { InfoBlock } from '@/components/admin/InfoBlock';
 import { LinkButton } from '@/components/admin/LinkButton';
-import { feedFormLabels } from '@/components/admin/source-form-labels';
+import { feedFormLabels, fileKindsText } from '@/components/admin/source-form-labels';
 import { getSiteName } from '@/config/site';
 import { FEED_URL_MAX, NAME_MAX, SLUG_MAX, parseId } from '@/server/admin/source-rules';
 import { listNetworksForAdmin, listSourcesForAdmin } from '@/server/admin/sources';
 import { requireAdminPage } from '@/server/auth/guard';
+import { CATALOGUE_FILE_KINDS, CATALOGUE_FILE_NAME_MAX } from '@/server/catalogue-file-name';
 
 import { createFeedAction } from '../../actions';
 
@@ -38,20 +39,14 @@ export default async function NewFeedPage({ searchParams }: { searchParams: Sear
   ]);
   const back = { href: SOURCES_PATH, label: t('backLink') };
 
-  // A feed needs a shop and a network: with either missing there is no form to submit (AC 38).
-  if (shops.length === 0 || networks.length === 0) {
+  // A feed of either source needs a shop: with none there is no form to submit (AC 38). A missing network
+  // blocks only the https source, inside the form (S3.7).
+  if (shops.length === 0) {
     return (
       <FormScreen heading={t('Feed.headingNew')} intro={t('Feed.introNew')}>
-        {networks.length === 0 ? (
-          <InfoBlock title={t('Feed.missingNetworkTitle')} body={t('Feed.missingNetworkBody')} testId="missing-network">
-            <LinkButton href={`${SOURCES_PATH}/red/nueva`} label={sources('addNetwork')} />
-          </InfoBlock>
-        ) : null}
-        {shops.length === 0 ? (
-          <InfoBlock title={t('Feed.missingShopTitle')} body={t('Feed.missingShopBody')} testId="missing-shop">
-            <LinkButton href={`${SOURCES_PATH}/tienda/nueva`} label={sources('addShop')} />
-          </InfoBlock>
-        ) : null}
+        <InfoBlock title={t('Feed.missingShopTitle')} body={t('Feed.missingShopBody')} testId="missing-shop">
+          <LinkButton href={`${SOURCES_PATH}/tienda/nueva`} label={sources('addShop')} />
+        </InfoBlock>
         <div>
           <LinkButton href={back.href} label={back.label} testId="form-back-button" />
         </div>
@@ -79,11 +74,18 @@ export default async function NewFeedPage({ searchParams }: { searchParams: Sear
           label: network.demo ? t('demoOptionNetwork', { network: network.name }) : network.name,
         }))}
         defaultShopId={defaultShopId}
+        addNetwork={{ href: `${SOURCES_PATH}/red/nueva`, label: sources('addNetwork') }}
         labels={feedFormLabels(t, {
           mode: 'create',
           feedId: 0,
           demo: false,
-          limits: { name: NAME_MAX, slug: SLUG_MAX, address: FEED_URL_MAX },
+          limits: {
+            name: NAME_MAX,
+            slug: SLUG_MAX,
+            address: FEED_URL_MAX,
+            fileName: CATALOGUE_FILE_NAME_MAX,
+            fileKinds: fileKindsText(CATALOGUE_FILE_KINDS),
+          },
         })}
       />
     </FormScreen>

@@ -54,17 +54,25 @@ const countFormat = new Intl.NumberFormat(LOCALE, { useGrouping: 'always' });
 function feedView(feed: AdminFeed, shop: AdminShop, t: Translate): FeedRowView {
   const paused = feed.approved && !shop.approved;
   const offersText = countFormat.format(feed.offerCount);
+  // The kind of feed decides the identity line and the meta line (S3.7, C-7); "Subido por la tienda" is
+  // only for a stored shop upload, never the fallback for a feed with no network.
   const metaParts = [
-    feed.source === 'shop_upload'
-      ? t('feedMetaUpload')
-      : feed.networkName !== null
-        ? t('feedMetaNetwork', { network: feed.networkName })
-        : null,
+    feed.source === 'catalogue_file'
+      ? t('feedMetaFile')
+      : feed.source === 'shop_upload'
+        ? t('feedMetaUpload')
+        : feed.networkName !== null
+          ? t('feedMetaNetwork', { network: feed.networkName })
+          : null,
     t('feedMetaOffers', { offers: feed.offerCount, offersText }),
   ].filter((part): part is string => part !== null);
   const values = { id: feed.id, shop: shop.name };
-  // The host or a fixed phrase: the stored value is never a fallback (AC 24).
-  const domain = feed.host ?? (feed.demo ? t('domainNone') : t('domainUnavailable'));
+  // The file name or a fixed phrase for a catalogue file; the host or a fixed phrase otherwise. The stored
+  // value is never a fallback (AC 24).
+  const valueLine =
+    feed.source === 'catalogue_file'
+      ? { label: t('fileLabel'), value: feed.fileName ?? t('fileUnavailable') }
+      : { label: t('domainLabel'), value: feed.host ?? (feed.demo ? t('domainNone') : t('domainUnavailable')) };
   return {
     id: feed.id,
     title: t('feedTitle', { id: feed.id }),
@@ -75,10 +83,10 @@ function feedView(feed: AdminFeed, shop: AdminShop, t: Translate): FeedRowView {
     extras: {
       demo: feed.demo,
       demoLabel: t('demoMark'),
-      valueLine: { label: t('domainLabel'), value: domain },
+      valueLine,
       // A shop upload has no form (D-T12): no edit link.
       links:
-        feed.source === 'affiliate_network'
+        feed.source === 'affiliate_network' || feed.source === 'catalogue_file'
           ? [{ href: `${SOURCES_PATH}/feed/${feed.id}/editar`, label: t('editFeed'), ariaLabel: t('editFeedName', values) }]
           : [],
     },
