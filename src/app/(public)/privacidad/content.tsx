@@ -39,6 +39,7 @@ export function PrivacyContent({ t, siteName, owner }: PrivacyContentProps) {
       <LegalList>
         <LegalItem>{t.rich('dataClicks', tags)}</LegalItem>
         <LegalItem>{t.rich('dataLogs', tags)}</LegalItem>
+        <LegalItem>{t.rich('dataSearch', tags)}</LegalItem>
       </LegalList>
       <LegalParagraph>{t('dataBasis')}</LegalParagraph>
       <LegalHeading>{t('leavingHeading')}</LegalHeading>
