@@ -49,6 +49,8 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
         'admin/(shell)/tiendas/tienda/[id]/editar/page.tsx',
         'admin/(shell)/tiendas/feed/nuevo/page.tsx',
         'admin/(shell)/tiendas/feed/[id]/editar/page.tsx',
+        // S4.2: the category mapping screen, guarded in the page and in generateMetadata.
+        'admin/(shell)/categorias/page.tsx',
       ]),
     );
   });
@@ -175,6 +177,16 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
       'createFeedAction',
       'updateFeedAction',
     ]);
+    expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
+  });
+
+  it('scans the category mapping actions (S4.2, AC 44) and finds them, guarded and only these three exports', () => {
+    const entry = filesWithServerActions(root, 'src').find(
+      ({ file }) => file === 'src/app/admin/(shell)/categorias/actions.ts',
+    );
+    expect(entry).toBeDefined();
+    const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
+    expect(exported).toEqual(['assignCategoryAction', 'markOutsideScopeAction', 'removeCategoryMappingAction']);
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 

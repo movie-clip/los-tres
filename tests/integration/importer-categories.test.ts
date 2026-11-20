@@ -2,7 +2,8 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
-import { feeds, offers, products as productsTable } from '@/db/schema';
+import { feedCategoryMappings, feeds, offers, products as productsTable } from '@/db/schema';
+import { listCategoryMappingsForAdmin } from '@/server/admin/category-mappings';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { importExitCode, importFeeds } from '@/server/importer';
@@ -154,7 +155,10 @@ describe('a re-run changes no assignment (AC 6)', () => {
   });
 });
 
-describe('first mapped wins and is never cleared (OD-F, D-3)', () => {
+// These cases describe the importer only (S4.2, AC 35): it sets a category while the product has
+// none and never overwrites or clears. An admin's save is a second, explicit writer that moves and
+// clears products itself in its own transaction; its cases are in category-mapping-writer.test.ts.
+describe('the importer: first mapped wins and is never cleared (OD-F, D-3)', () => {
   async function twoFeeds() {
     const one = await insertFixtureFeed('category-ean-one.csv', { shopName: 'Tienda A' });
     const two = await insertFixtureFeed('category-ean-two.csv', { shopName: 'Tienda B' });
@@ -195,10 +199,11 @@ describe('first mapped wins and is never cleared (OD-F, D-3)', () => {
     expect((await allProducts())[0].categoryId).toBe(catA.id);
   });
 
-  it('does not overwrite an assignment when the mapping that made it is later changed', async () => {
+  it('the importer does not overwrite an assignment when the mapping that made it is changed behind its back', async () => {
     const { one, catA, catB } = await twoFeeds();
     await run(one.feedId);
-    // Re-point the mapping directly: an admin edit (S4.2) is not built yet.
+    // Re-point the record directly, with no admin save: this is the importer's rule alone.
+    // An admin's change moves the products in the same transaction (category-mapping-writer.test.ts).
     await getDb().execute(
       sql`update feed_category_mappings set category_id = ${catB.id} where feed_id = ${one.feedId}`,
     );
@@ -206,7 +211,7 @@ describe('first mapped wins and is never cleared (OD-F, D-3)', () => {
     expect((await allProducts())[0].categoryId).toBe(catA.id);
   });
 
-  it('never clears a category when a later import carries an empty category cell', async () => {
+  it('the importer never clears a category when a later import carries an empty category cell', async () => {
     const { one, two, catA } = await twoFeeds();
     await run(one.feedId);
     const emptyText = readFeedFixture('category-ean-two-empty.csv');
@@ -218,7 +223,7 @@ describe('first mapped wins and is never cleared (OD-F, D-3)', () => {
     expect(second?.feedCategory).toBeNull();
   });
 
-  it('never clears a category when the feed row\'s category string stops being mapped', async () => {
+  it('the importer never clears a category when the feed row\'s category string stops being mapped', async () => {
     const { one, catA } = await twoFeeds();
     await run(one.feedId);
     const renamed = 'id,title,brand,part_number,ean,price,currency,url,description,category\n' +
@@ -277,5 +282,128 @@ describe('a mapping never overrides the admin (guardrail 1)', () => {
     await run(feedId);
     expect((await allOffers())[0].isHidden).toBe(true);
     expect((await getPublicCategoryPage('uno', 1, null, 'price-asc'))?.productCount).toBe(0);
+  });
+});
+
+// S4.2, AC 36 and 37: a record with no target means "outside scope"; the importer reads it as an
+// unmapped row, and a string it sees for the first time is only a string on an offer.
+describe('a feed category marked outside scope is treated as unmapped (AC 36)', () => {
+  const markOutside = (feedId: number, feedCategory: string) =>
+    getDb().insert(feedCategoryMappings).values({ feedId, feedCategory, categoryId: null });
+
+  it('stores the product and the offer, leaves the category empty, rejects no row and exits 0', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+    const filtros = await insertCategory({ slug: 'filtros' });
+    await insertCategoryMapping(feedId, 'Filtros', filtros.id);
+    await markOutside(feedId, 'Categoria sin mapa');
+
+    const report = await run(feedId);
+
+    expect(report.feeds[0]).toMatchObject({ outcome: 'imported', rows: 5, productsCreated: 5, offersCreated: 5, rejected: [] });
+    expect(importExitCode(report)).toBe(0);
+    const products = await byTitle();
+    expect(products['Mixto Sin mapa']).toBeDefined();
+    expect(products['Mixto Sin mapa'].categoryId).toBeNull();
+    expect((await offerByExternalId())['M-2'].feedCategory).toBe('Categoria sin mapa');
+    // The mapped rows of the same feed still assign: an outside-scope record does not disturb the rest.
+    expect(products['Mixto Filtro mapeado'].categoryId).toBe(filtros.id);
+    expect(products['Mixto Espacios'].categoryId).toBe(filtros.id);
+  });
+
+  it('keeps the product off every public read, like any unmapped one', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+    await markOutside(feedId, 'Filtros');
+
+    await run(feedId);
+
+    expect((await allProducts()).every((row) => row.categoryId === null)).toBe(true);
+    expect(await getPublicProductBySlug('mixto-filtro-mapeado')).toBeNull();
+    expect(await getPublicProductBySlug('mixto-espacios')).toBeNull();
+  });
+
+  it('is exact like a mapping: outside scope for "Filtros" does not reach "filtros"', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+    const lower = await insertCategory({ slug: 'minusculas' });
+    await markOutside(feedId, 'Filtros');
+    await insertCategoryMapping(feedId, 'filtros', lower.id);
+
+    await run(feedId);
+
+    const products = await byTitle();
+    expect(products['Mixto Otra caja'].categoryId).toBe(lower.id);
+    expect(products['Mixto Filtro mapeado'].categoryId).toBeNull();
+  });
+
+  it('a second run changes nothing and still does not fail', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+    await markOutside(feedId, 'Filtros');
+    await run(feedId);
+    const before = await allProducts();
+
+    const report = await run(feedId);
+
+    expect(importExitCode(report)).toBe(0);
+    expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 0, rejected: [] });
+    expect(await allProducts()).toEqual(before);
+  });
+
+  it('never clears a category the product already has when its feed category becomes outside scope (AC 35)', async () => {
+    const { feedId } = await insertFixtureFeed('category-ean-one.csv');
+    const category = await insertCategory({ slug: 'uno' });
+    await insertCategoryMapping(feedId, 'Cat Uno', category.id);
+    await run(feedId);
+    await getDb().update(feedCategoryMappings).set({ categoryId: null }).where(eq(feedCategoryMappings.feedId, feedId));
+
+    await run(feedId);
+
+    expect((await allProducts())[0].categoryId).toBe(category.id);
+  });
+});
+
+describe('a category first seen at an import is not reviewed, and the import writes no record (AC 37)', () => {
+  it('appears as not reviewed in the admin read, with the count of its products, and no record exists for it', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+    const filtros = await insertCategory({ slug: 'filtros' });
+    await insertCategoryMapping(feedId, 'Filtros', filtros.id);
+    const recordsBefore = await getDb().select().from(feedCategoryMappings);
+
+    await run(feedId);
+
+    expect(await getDb().select().from(feedCategoryMappings)).toEqual(recordsBefore);
+    const feed = (await listCategoryMappingsForAdmin()).feeds.find((row) => row.id === feedId)!;
+    const states = Object.fromEntries(feed.rows.map((row) => [row.feedCategory, row.state.kind]));
+    expect(states).toEqual({ Filtros: 'mapped', 'Categoria sin mapa': 'not_reviewed', filtros: 'not_reviewed' });
+    expect(feed.rows.find((row) => row.feedCategory === 'Categoria sin mapa')?.productCount).toBe(1);
+    expect(feed.emptyCellProducts).toBe(1);
+  });
+
+  it('writes no record for any string when no record existed at all', async () => {
+    const { feedId } = await insertFixtureFeed('category-mixed.csv');
+
+    await run(feedId);
+    await run(feedId);
+
+    expect(await getDb().select().from(feedCategoryMappings)).toEqual([]);
+    const feed = (await listCategoryMappingsForAdmin()).feeds.find((row) => row.id === feedId)!;
+    expect(feed.rows.every((row) => row.state.kind === 'not_reviewed')).toBe(true);
+  });
+
+  it('a string that arrives on a later import is listed too, and the record for the other string is untouched', async () => {
+    const { feedId } = await insertFixtureFeed('category-ean-one.csv');
+    const category = await insertCategory({ slug: 'uno' });
+    await insertCategoryMapping(feedId, 'Cat Uno', category.id);
+    await run(feedId);
+    const changed =
+      'id,title,brand,part_number,ean,price,currency,url,description,category\n' +
+      'E-1,Fixture Alpha Filtro,MarcaUno,PN 100,2000000000046,10.00,EUR,https://shop-a.example/p/E-1,,Cat Nueva\n';
+
+    await importFeeds(getDb(), { feedId, deps: textDeps({ [feedId]: changed }) });
+
+    const feed = (await listCategoryMappingsForAdmin()).feeds.find((row) => row.id === feedId)!;
+    expect(Object.fromEntries(feed.rows.map((row) => [row.feedCategory, [row.productCount, row.state.kind]]))).toEqual({
+      'Cat Uno': [0, 'mapped'],
+      'Cat Nueva': [1, 'not_reviewed'],
+    });
+    expect((await getDb().select().from(feedCategoryMappings)).map((row) => row.feedCategory)).toEqual(['Cat Uno']);
   });
 });

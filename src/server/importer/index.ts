@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
@@ -28,7 +28,11 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // never writes an approval, hidden or review column on an existing row (TD-21).
 // Product text is written once (TD-23). `products.category_id` is the one
 // product column it may set later, and only from null: the first mapped feed
-// category wins and nothing is ever cleared or overwritten (D-3).
+// category wins and nothing is ever cleared or overwritten (D-3). The admin
+// mapping writer (src/server/admin/category-mappings.ts, S4.2) is the second
+// and only other writer of that column: it alone moves or clears a category,
+// when an admin saves a mapping. An outside-scope mapping (null target) is no
+// mapping here: the row is stored with no category.
 // The only writer of `fitments` (through ./fitments.ts); a feed replaces only
 // its own fitments for the products its accepted rows name; products it does
 // not name keep theirs.
@@ -157,6 +161,11 @@ async function importRecords(
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
+  // Shares the feed row until this transaction ends, so an admin mapping save
+  // (FOR NO KEY UPDATE on the same row) cannot run between loading the mappings
+  // and writing categories: an import never refills what a save just cleared
+  // (S4.2, D-16).
+  await tx.select({ id: feeds.id }).from(feeds).where(eq(feeds.id, feed.id)).for('share');
   const mappings = await loadMappings(tx, feed.id);
   const fitmentsOfFeed = new FeedFitments(await loadVehicleIds(tx));
 
@@ -208,7 +217,10 @@ async function importRecords(
   return report;
 }
 
-/** This feed's mappings: the feed's category string to our category id. */
+/**
+ * This feed's mappings: the feed's category string to our category id. A
+ * string marked outside scope (null target) is left out, so it maps to nothing.
+ */
 async function loadMappings(tx: Executor, feedId: number): Promise<Map<string, number>> {
   const rows = await tx
     .select({
@@ -216,8 +228,12 @@ async function loadMappings(tx: Executor, feedId: number): Promise<Map<string, n
       categoryId: feedCategoryMappings.categoryId,
     })
     .from(feedCategoryMappings)
-    .where(eq(feedCategoryMappings.feedId, feedId));
-  return new Map(rows.map((mapping) => [mapping.feedCategory, mapping.categoryId]));
+    .where(and(eq(feedCategoryMappings.feedId, feedId), isNotNull(feedCategoryMappings.categoryId)));
+  const mappings = new Map<string, number>();
+  for (const mapping of rows) {
+    if (mapping.categoryId !== null) mappings.set(mapping.feedCategory, mapping.categoryId);
+  }
+  return mappings;
 }
 
 /** The category the row's feed category maps to, or null (absent or unmapped). */

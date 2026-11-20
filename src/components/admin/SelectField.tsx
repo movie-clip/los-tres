@@ -17,6 +17,11 @@ export type SelectFieldProps = {
   /** The field message, already translated. Its presence marks the field invalid. */
   error?: string;
   hint?: string;
+  /**
+   * The id of an element that names what the field acts on (a row's category). The select is then named by its
+   * visible label followed by that element, so a list of identical labels still gives each select its own name.
+   */
+  labelledBy?: string;
 };
 
 /**
@@ -25,19 +30,32 @@ export type SelectFieldProps = {
  * there is no custom arrow. A long option is clipped with an ellipsis in the
  * closed control and read in full in the open list.
  */
-export function SelectField({ id, name, label, options, prompt, defaultValue, readOnly, error, hint }: SelectFieldProps) {
+export function SelectField({
+  id,
+  name,
+  label,
+  options,
+  prompt,
+  defaultValue,
+  readOnly,
+  error,
+  hint,
+  labelledBy,
+}: SelectFieldProps) {
+  const labelId = `${id}-label`;
   const messageId = `${id}-error`;
   const hintId = `${id}-hint`;
   const described = [error ? messageId : null, hint ? hintId : null].filter(Boolean).join(' ');
   const classes = [styles.select, error ? styles.invalid : '', readOnly ? styles.readOnly : ''].filter(Boolean).join(' ');
   return (
     <div className={styles.field}>
-      <label htmlFor={id} className={styles.label}>
+      <label id={labelledBy ? labelId : undefined} htmlFor={id} className={styles.label}>
         {label}
       </label>
       <select
         id={id}
         name={name}
+        aria-labelledby={labelledBy ? `${labelId} ${labelledBy}` : undefined}
         defaultValue={defaultValue}
         aria-invalid={error ? 'true' : undefined}
         aria-readonly={readOnly || undefined}

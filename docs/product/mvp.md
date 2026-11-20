@@ -57,7 +57,15 @@ the owner can change it without a code change.
   a code change, and there is no admin tree editor. Each feed category is
   mapped once by the admin to one of the five (S4.2). Products from an
   unmapped feed category are not public until the admin maps the category
-  (owner ruling, 2026-10-17).
+  (owner ruling, 2026-10-17). Since S4.2 (shipped 2026-11-19) the admin does
+  this at `/admin/categorias`: a save, change or removal re-applies to the
+  existing products at once, with no import; the admin can mark a feed
+  category outside scope so the list of categories still to review can reach
+  empty; removing a mapping or marking a category outside scope takes its
+  products off the public site at once. The importer is unchanged: it sets a
+  product's category only while it has none and never overwrites or clears it.
+  A mapping gives a category and nothing else; a product is public only while
+  its feed and shop are approved and it is not hidden.
 - **Vehicle fitment ("Mi coche")** (owner ruling, 2026-10-28, decision 0016):
   a visitor selects make, model and engine; listings and search show the
   parts that fit first, then parts with no fitment data, and the product page
@@ -176,7 +184,9 @@ and the backup passphrase are kept in a password manager plus an offline copy
 - The admin:
   - manages networks, shops and feeds (creates and edits them, S3.1), and
     approves or disables them;
-  - maps feed categories onto the five fixed categories;
+  - maps feed categories onto the five fixed categories, or marks one outside
+    scope, at `/admin/categorias` (S4.2); a save moves the existing products
+    at once;
   - hides any product or offer.
 
   Imports run from the `import-feeds` command; an import button with reports
@@ -185,8 +195,9 @@ and the backup passphrase are kept in a password manager plus an offline copy
 ## Visibility (guardrail 1)
 
 Only offers from an **admin-approved feed** are public. Products from an
-approved feed publish automatically once their feed category is mapped; until
-then they are not public. The admin can hide any product or offer,
+approved feed publish automatically once their feed category is mapped (by the
+admin at `/admin/categorias`, S4.2); until then, or once the admin removes the
+mapping or marks the category outside scope, they are not public. The admin can hide any product or offer,
 and a hidden item is never public.
 
 ## Outgoing clicks

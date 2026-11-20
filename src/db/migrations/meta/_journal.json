@@ -50,6 +50,13 @@
       "when": 1793288341223,
       "tag": "0006_vehicle_fitment",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795119430818,
+      "tag": "0007_category_mapping_outside_scope",
+      "breakpoints": true
     }
   ]
 }

@@ -162,6 +162,12 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin shops and feeds, longest content | create rows through the forms with a 120-character name, a 64-character slug and a feed URL with a 253-character host; open `/admin/tiendas` and the forms at 1280 only |
 | admin form, refused and failed | submit a form with a blank name, a bad slug, or an `http` URL (refused, field message); for failed use the `page.route` 500 as for the shop rows |
 | admin feed edit, confirm | edit an approved non-demo feed and press submit with an address typed: the inline confirm opens |
+| admin categories, populated (S4.2) | sign in as `e2e-categories-admin@example.test` (password in `tests/e2e/admin-categories.spec.ts`) with no `create-admin`, open `/admin/categorias` at 1280; demo feeds 1 to 4 (every category Asignada) plus the e2e feeds 650 and 651 render |
+| admin categories, not reviewed | press "Quitar asignación" and confirm on a demo category, then restore it with "Asignar" to the same target, which gives its products their category back (AC 26) |
+| admin categories, empty states | not producible on the shared database except a feed with no import; report not checked otherwise |
+| admin categories, saved, confirm, refused, failed, pending | on the e2e feed (host `e2e-categorias.example`, unapproved) use the data-testids `category-row`, `category-assign`, `category-change`, `category-mark-outside`, `category-remove`, `category-unmark`, `category-result`, `source-cancel`, `source-confirm-yes` |
+| admin categories, fixtures by psql | a second offer of one product in the same feed and category tests distinct counts; a mapping row with no offer gives the 0-product row; a feed whose offers have a null category gives "no category column"; a 253-character host gives the longest host |
+| admin categories, product page goes 404 at once | approve the e2e shop and feed 650 by psql for the check, assign, `curl /producto/e2e-cat-uno` (200), remove with confirm, curl again (404), then set both back to not approved |
 | car selected | `?coche=seat-leon-iii-2012-2020-1-6-tdi-115cv`, or localStorage key `mi-coche` set to that slug (an init script; not `lostres.coche`, renamed by D-21), which reloads the page once to `?coche=` |
 | car, longest label | `?coche=citroen-c3-aircross-i-2017-1-2-puretech-110cv` |
 | unknown car | `?coche=no-existe` (the page renders as without a car, plus the notice "No reconocemos ese coche") |

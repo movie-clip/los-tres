@@ -452,6 +452,19 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     }
   });
 
+  it('keeps the S4.2 screen copy in Admin.Categories, its title in Admin.Meta and the Nav keys as they were (AC 46)', () => {
+    expect(admin.Meta.categoriesTitle).toContain('{siteName}');
+    expect(Object.keys(admin.Categories)).toEqual(
+      expect.arrayContaining([
+        'heading', 'intro', 'rulePublic', 'ruleRemove', 'summary', 'feedsEmpty', 'feedHeading', 'emptyCellNote',
+        'tagPending', 'tagMapped', 'tagOutside', 'selectLabel', 'assign', 'change', 'markOutside', 'removeMapped',
+        'removeOutside', 'confirmBody', 'doneMapped', 'doneOutside', 'doneRemoved', 'doneUnchanged', 'productsMoved',
+        'productsCleared', 'errorTargetRequired', 'errorTargetInvalid', 'refusedGone',
+      ]),
+    );
+    expect(admin.Nav.categories).toBe('Categorías');
+  });
+
   it('pluralises the session lifetime for 1 and 8 hours', () => {
     const t = createTranslator({
       locale: 'es-ES',
@@ -476,7 +489,13 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
   it('uses no ICU placeholder the pages do not pass', () => {
     // Admin.Sources (US-2.3) passes the counts, the shop name and the feed id and network its page formats.
     // S3.1 adds `count` (Sources.networksCount) and `max` (the three Form.Errors length messages).
-    const allowed = new Set(['siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText', 'count', 'max']);
+    // S4.2 (Admin.Categories) adds the counts and their grouped text (`pending`, `pendingText`, `total`,
+    // `totalText`, `countText`: four digits keep their separator, so the page passes the text too), the
+    // target category's name (`target`), the feed category string (`category`) and the feed's heading (`feed`).
+    const allowed = new Set([
+      'siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText', 'count', 'max',
+      'pending', 'pendingText', 'total', 'totalText', 'countText', 'target', 'category', 'feed',
+    ]);
     for (const [key, value] of leaves(admin)) {
       for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {
         expect(allowed.has(match[1]), `Admin.${key} names {${match[1]}}`).toBe(true);
@@ -486,7 +505,7 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
 
   it('puts no recovery, sign-up or remember-me wording in any admin copy but Sources and Form (AC 1)', () => {
     // Sources and Form legitimately say "registrar" (a feed is registered); every other Admin leaf
-    // (SignIn, Chrome, Meta, Nav, Home, NotFound, ...) is scanned, so a new namespace is covered by default.
+    // (SignIn, Chrome, Meta, Nav, Home, NotFound, Categories, ...) is scanned, so a new namespace is covered by default.
     expect(signInWordingOffenders(admin)).toEqual([]);
     // The scan reads the sign-in screen itself, so it cannot go vacuous.
     expect(leaves(admin).filter(([key]) => key.startsWith('SignIn.')).length).toBeGreaterThan(5);
@@ -503,12 +522,37 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     expect(signInWordingOffenders(tree)).toEqual(['SignIn.hint', 'Chrome.remember', 'Home.cta']);
     expect(signInWordingOffenders({ Sources: tree.Sources, Form: tree.Form })).toEqual([]);
   });
+
+  // S4.2: Admin.Categories.feedsEmpty says "Registra uno en Tiendas y feeds": it sends the admin to
+  // register a feed, the same sense as Admin.Sources, and has nothing to do with sign-up. The exemption is
+  // that one key and not the whole namespace (50 other keys stay scanned), and it holds only while the
+  // sentence is about a feed.
+  it('exempts only the feed-registration sentence of Admin.Categories, and keeps the rest of that namespace scanned', () => {
+    expect(FEED_REGISTRATION_KEYS).toEqual(['Categories.feedsEmpty']);
+    expect(admin.Categories.feedsEmpty).toMatch(/\bRegistra uno en Tiendas y feeds\b/);
+    expect(leaves(admin).filter(([key]) => key.startsWith('Categories.')).length).toBeGreaterThan(40);
+
+    const tree = {
+      Categories: {
+        feedsEmpty: 'Todavía no hay feeds. Registra uno en Tiendas y feeds.',
+        heading: 'Categorías de los feeds',
+        hint: 'Registra tu cuenta para guardar los cambios',
+      },
+    };
+    expect(signInWordingOffenders(tree)).toEqual(['Categories.hint']);
+    // A feed-registration sentence under another key is not exempt.
+    expect(signInWordingOffenders({ Categories: { intro: 'Registra uno en Tiendas y feeds.' } })).toEqual(['Categories.intro']);
+  });
 });
+
+/** The keys whose "registr..." is about registering a feed, the sense Sources and Form already carry. */
+const FEED_REGISTRATION_KEYS = ['Categories.feedsEmpty'];
 
 /** The keys of every leaf outside Sources and Form whose text offers recovery, sign-up or remember-me. */
 function signInWordingOffenders(adminTree: Record<string, unknown>): string[] {
   const scanned = Object.fromEntries(Object.entries(adminTree).filter(([name]) => name !== 'Sources' && name !== 'Form'));
   return leaves(scanned)
+    .filter(([key]) => !FEED_REGISTRATION_KEYS.includes(key))
     .filter(([, value]) => /olvid|registr|recuérd|recuerd|restablec/i.test(value))
     .map(([key]) => key);
 }
