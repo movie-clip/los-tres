@@ -17,8 +17,12 @@ export const dynamic = 'force-dynamic';
 
 const SOURCES_PATH = '/admin/tiendas';
 
-// One lookup per request, shared by `generateMetadata` and the page.
-const load = cache((id: number) => getFeedForEdit(id));
+// One lookup per request, shared by `generateMetadata` and the page. A catalogue-file feed
+// is a 404 here until its own edit screen replaces this narrowing (S3.7).
+const load = cache(async (id: number) => {
+  const feed = await getFeedForEdit(id);
+  return feed?.source === 'affiliate_network' ? feed : null;
+});
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   // A server entry point of an admin route: the role check comes first (guardrail 3).
