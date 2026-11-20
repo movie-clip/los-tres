@@ -57,6 +57,13 @@
       "when": 1795119430818,
       "tag": "0007_category_mapping_outside_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795182933114,
+      "tag": "0008_catalogue_file_source",
+      "breakpoints": true
     }
   ]
 }

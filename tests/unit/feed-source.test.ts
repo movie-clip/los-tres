@@ -21,7 +21,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const feed = (url: string, isDemo = false) => ({ id: 1, url, isDemo });
+const feed = (url: string, isDemo = false) => ({
+  id: 1,
+  url,
+  isDemo,
+  sourceType: 'shop_upload' as const,
+});
 
 /** Reads the whole byte stream a source returns, as UTF-8 text. */
 async function readText(bytes: AsyncIterable<Uint8Array>): Promise<string> {

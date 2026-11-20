@@ -25,7 +25,7 @@ import {
 // below has a field for the address itself, and no error object, message or
 // form value leaves a writer: it returns fixed codes or throws.
 
-export type AdminFeedSource = 'affiliate_network' | 'shop_upload';
+export type AdminFeedSource = 'affiliate_network' | 'shop_upload' | 'catalogue_file';
 
 export type AdminFeed = {
   id: number;

@@ -734,3 +734,33 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     expect(code).not.toMatch(/\.(delete)\(/);
   });
 });
+
+// S3.7 (catalogue file source). The folder a catalogue-file feed reads is named
+// in one place, so no second reader can be pointed at it, and the file-name rule
+// stays pure so the admin and the importer share it without a disk read.
+describe('seams (guardrail 2, S3.7 catalogue folder)', () => {
+  const FOLDER = /catalogue-files/;
+
+  it('names the catalogue folder in src/ only in src/server/importer/source.ts', () => {
+    expect(offenders(FOLDER, (file) => file === 'src/server/importer/source.ts')).toEqual([]);
+  });
+
+  it('finds the folder name in source.ts, so the rule above is not vacuous', () => {
+    const code = sources().find(({ file }) => file === 'src/server/importer/source.ts')?.code ?? '';
+    expect(code).toMatch(FOLDER);
+  });
+
+  it('would flag a second file that names the folder', () => {
+    const planted = [{ file: 'src/server/other.ts', code: "const dir = 'catalogue-files';" }];
+    const found = planted.filter(({ code }) => FOLDER.test(code)).map(({ file }) => file);
+    expect(found).toEqual(['src/server/other.ts']);
+  });
+
+  it('keeps the file-name rule in src/server/catalogue-file-name.ts free of node:fs and server-only', () => {
+    const code = sources().find(({ file }) => file === 'src/server/catalogue-file-name.ts')?.code;
+    expect(code).toBeDefined();
+    expect(code).not.toMatch(/from\s+['"](node:)?fs(\/promises)?['"]/);
+    expect(code).not.toMatch(/server-only/);
+    expect(code).toMatch(/export function checkCatalogueFileName/);
+  });
+});

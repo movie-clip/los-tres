@@ -10,7 +10,7 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 
-export const feedSourceType = pgEnum('feed_source_type', ['affiliate_network', 'shop_upload']);
+export const feedSourceType = pgEnum('feed_source_type', ['affiliate_network', 'shop_upload', 'catalogue_file']);
 
 export const networks = pgTable('networks', {
   id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
@@ -49,6 +49,13 @@ export const feeds = pgTable(
     check(
       'feeds_affiliate_network_required',
       sql`${table.sourceType} <> 'affiliate_network' or ${table.networkId} is not null`,
+    ),
+    // S3.7: a catalogue-file feed names a file, never a network. The cast to
+    // text keeps this valid in the migration that adds the enum value: a new
+    // value cannot be compared in the transaction that adds it.
+    check(
+      'feeds_catalogue_file_no_network',
+      sql`${table.sourceType}::text <> 'catalogue_file' or ${table.networkId} is null`,
     ),
   ],
 );
