@@ -1,6 +1,6 @@
 # S2.4 Admin finds a product and hides or unhides it and its offers
 
-Status: **approved by the owner 2026-11-21** (D-3 of run `2026-11-21-s2-4-hide`, "yes"). OD-1 to OD-9 are ruled: OD-1 (a) by D-1 ("yes", AC 45 stands), OD-2 (a) by D-2 ("yes"), and OD-3 to OD-9 as recommended by D-4 to D-10 (the approval of the draft, whose ACs are written on those recommendations; the orchestrator's reading, not objected to). Board status follows the human's own move.
+Status: **approved by the owner 2026-11-21** (D-3 of run `2026-11-21-s2-4-hide`, "yes"). OD-1 to OD-9 are ruled: OD-1 (a) by D-1 ("yes", AC 45 stands), OD-2 (a) by D-2 ("yes"), and OD-3 to OD-9 as recommended by D-4 to D-10 (the approval of the draft, whose ACs are written on those recommendations; the orchestrator's reading, not objected to). Built and gated in run `2026-11-21-s2-4-hide` (integration, ux-review and review all PASS at commit fbabbd4). Board status follows the human's own move.
 Epic: E2 (#10) · Iteration 3 · Priority: P0 · Size: M (the issue sizes its tickets backend M, frontend M, test S)
 Issue: #25 · Tickets: #82-#84 (T2.4.1-T2.4.3)
 Depends on: S2.1 (admin sign-in, the shell and its guards), S3.1 (the admin source screens) and S4.2 (the admin writer and guard-test precedents), all shipped. No open dependency.

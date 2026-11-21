@@ -257,7 +257,7 @@ any real feed. The design reference for the catalogue is the **Sixt car-rental
 results page** (layout, hierarchy, big cards, the price as the boldest
 element); Autodoc stays the reference for auto-parts content. The work is epic
 E11 (S11.1–S11.6) plus search (S5.4). The admin area stays as it is until the
-real-data stories (S3.1, S3.3, S3.5, S4.2, S7.1, S2.4, S9.4) come up.
+real-data stories (S3.1, S3.3, S3.5, S4.2, S7.1, S9.4) come up; S2.4 (hide) is built.
 Infrastructure, hardening and the items listed below as deferred are closed on
 the board and will be recreated when needed.
 
