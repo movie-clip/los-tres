@@ -11,6 +11,22 @@ const baseURL =
   process.env.E2E_BASE_URL?.trim().replace(/\/$/, '') ||
   `http://127.0.0.1:${process.env.APP_PORT?.trim() || '3010'}`;
 
+// Playwright runs the projects another project depends on in full: the CLI
+// --grep-invert (test:e2e:ci) is not applied to them, so `chromium`, a
+// dependency of `catalogue-file`, would run every @layout test. The same
+// pattern is passed to that project here, read from the command line.
+function cliGrepInvert(): RegExp | undefined {
+  const args = process.argv;
+  const i = args.findIndex((a) => a === '--grep-invert' || a === '-gv');
+  const eq = args.find((a) => a.startsWith('--grep-invert='));
+  const value = eq
+    ? eq.slice('--grep-invert='.length)
+    : i >= 0
+      ? args[i + 1]
+      : undefined;
+  return value ? new RegExp(value) : undefined;
+}
+
 const CATALOGUE_FLOW = /catalogue-file-flow\.spec\.ts$/;
 
 // No webServer: the Compose stack is the server under test (npm run stack:up).
@@ -28,7 +44,12 @@ export default defineConfig({
   // `entrypoint.spec.ts`, or a spec that counts feeds or public products, would otherwise see
   // that approved feed. It leaves its feed and shop unapproved when it ends.
   projects: [
-    { name: 'chromium', testIgnore: CATALOGUE_FLOW, use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      testIgnore: CATALOGUE_FLOW,
+      grepInvert: cliGrepInvert(),
+      use: { ...devices['Desktop Chrome'] },
+    },
     {
       name: 'catalogue-file',
       testMatch: CATALOGUE_FLOW,
