@@ -192,6 +192,16 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 
+  it('scans the product hide actions (S2.4, AC 55) and finds them, guarded and only these two exports', () => {
+    const entry = filesWithServerActions(root, 'src').find(
+      ({ file }) => file === 'src/app/admin/(shell)/productos/actions.ts',
+    );
+    expect(entry).toBeDefined();
+    const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
+    expect(exported).toEqual(['setProductHiddenAction', 'setOfferHiddenAction']);
+    expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
+  });
+
   it('keeps server actions to the admin code: none sits in a public page or component', () => {
     const outside = filesWithServerActions(root, 'src')
       .map(({ file }) => file)
