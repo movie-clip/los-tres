@@ -51,6 +51,9 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
         'admin/(shell)/tiendas/feed/[id]/editar/page.tsx',
         // S4.2: the category mapping screen, guarded in the page and in generateMetadata.
         'admin/(shell)/categorias/page.tsx',
+        // S2.4: the product list and the product page, each guarded in the page and in generateMetadata.
+        'admin/(shell)/productos/page.tsx',
+        'admin/(shell)/productos/[id]/page.tsx',
       ]),
     );
   });
@@ -189,6 +192,16 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(entry).toBeDefined();
     const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
     expect(exported).toEqual(['assignCategoryAction', 'markOutsideScopeAction', 'removeCategoryMappingAction']);
+    expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
+  });
+
+  it('scans the product hide actions (S2.4, AC 55) and finds them, guarded and only these two exports', () => {
+    const entry = filesWithServerActions(root, 'src').find(
+      ({ file }) => file === 'src/app/admin/(shell)/productos/actions.ts',
+    );
+    expect(entry).toBeDefined();
+    const exported = [...(entry?.code ?? '').matchAll(/export\s+async\s+function\s+(\w+)/g)].map((m) => m[1]);
+    expect(exported).toEqual(['setProductHiddenAction', 'setOfferHiddenAction']);
     expect(unguardedActions(entry?.file ?? '', entry?.code ?? '')).toEqual([]);
   });
 

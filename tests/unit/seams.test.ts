@@ -54,19 +54,43 @@ describe('seams (guardrails 1, 2, 4)', () => {
     );
   });
 
-  it('names the approval, hidden and review flags only in the visibility scope, schema, seed and importer', () => {
-    const flags = /\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview)\b/;
-    const found = offenders(
-      flags,
-      (file) =>
-        file === 'src/server/visibility.ts' ||
-        file.startsWith('src/db/') ||
-        file.startsWith('src/server/seed/') ||
-        file.startsWith('src/server/importer/') ||
-        // Deliberate (issue #24, S2.3): the admin approval writer.
-        file === 'src/server/admin/sources.ts',
-    );
+  const flagNames = /\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview)\b/;
+  const mayNameFlags = (file: string): boolean =>
+    file === 'src/server/visibility.ts' ||
+    file.startsWith('src/db/') ||
+    file.startsWith('src/server/seed/') ||
+    file.startsWith('src/server/importer/') ||
+    // Deliberate (issue #24, S2.3): the admin approval writer.
+    file === 'src/server/admin/sources.ts' ||
+    // Deliberate (issue #25, S2.4): the admin hide writer and product read. Every
+    // screen file and the actions file name the state `hidden`, never the column.
+    file === 'src/server/admin/products.ts';
+
+  it('names the approval, hidden and review flags only in the visibility scope, schema, seed, importer and the two admin writers', () => {
+    const found = offenders(flagNames, mayNameFlags);
     expect(found).toEqual([]);
+  });
+
+  it('finds the admin hide writer naming the hidden flag, and reports a screen or actions file that names it (S2.4, AC 52)', () => {
+    const find = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+    expect(find('src/server/admin/products.ts')).toMatch(/\bisHidden\b/);
+    expect(find('src/app/admin/(shell)/productos/actions.ts').length).toBeGreaterThan(0);
+    const planted = [
+      { file: 'src/server/admin/products.ts', code: 'set({ isHidden: hidden })' },
+      { file: 'src/app/admin/(shell)/productos/actions.ts', code: 'set({ isHidden: hidden })' },
+      { file: 'src/app/admin/(shell)/productos/page.tsx', code: 'row.isHidden' },
+      { file: 'src/components/admin/ProductRow.tsx', code: 'product.is_hidden' },
+      { file: 'src/server/catalogue/product-page.ts', code: 'eq(products.isHidden, false)' },
+    ]
+      .filter(({ code }) => flagNames.test(code))
+      .map(({ file }) => file)
+      .filter((file) => !mayNameFlags(file));
+    expect(planted).toEqual([
+      'src/app/admin/(shell)/productos/actions.ts',
+      'src/app/admin/(shell)/productos/page.tsx',
+      'src/components/admin/ProductRow.tsx',
+      'src/server/catalogue/product-page.ts',
+    ]);
   });
 
   it('the visibility scope itself names every flag, so the scan above is not vacuous', () => {
@@ -206,13 +230,96 @@ describe('seams (guardrail 1, S5.1 mapped products)', () => {
     (code.match(updatesProductCategoryOnly) ?? []).length;
   const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
 
-  it('updates products only in the importer, the seed and the admin mapping writer (S4.2, AC 42)', () => {
+  // Deliberate (issue #25, S2.4): the admin hide writer joins the closed list as
+  // the fourth file group that updates products, and it may set the hidden flag
+  // and nothing else. The mapper rule below it is unchanged.
+  const HIDER = 'src/server/admin/products.ts';
+  const updatesProductHiddenOnly = /\.update\(\s*products\s*\)\s*\.set\(\s*\{\s*isHidden\s*:\s*[^,}]+\}\s*\)/g;
+  const updatesOffers = /\.update\(\s*offers\s*\)/;
+  const updatesOfferHiddenOnly = /\.update\(\s*offers\s*\)\s*\.set\(\s*\{\s*isHidden\s*:\s*[^,}]+\}\s*\)/g;
+  const countOf = (pattern: RegExp, code: string): number => (code.match(new RegExp(pattern, 'g')) ?? []).length;
+  const productUpdatesOutsideHidden = (code: string): boolean =>
+    countOf(updatesProducts, code) !== countOf(updatesProductHiddenOnly, code);
+  const offerUpdatesOutsideHidden = (code: string): boolean =>
+    countOf(updatesOffers, code) !== countOf(updatesOfferHiddenOnly, code);
+  const writesOffers = (code: string): boolean =>
+    /\.(insert|update|delete)\(\s*offers\s*\)/.test(code) ||
+    /\b(insert\s+into|update|delete\s+from)\s+"?offers\b/i.test(code);
+
+  it('updates products only in the importer, the seed, the admin mapping writer and the admin hide writer (S4.2, AC 42; S2.4, AC 53)', () => {
     const found = offenders(
       updatesProducts,
       (file) =>
-        file.startsWith('src/server/importer/') || file.startsWith('src/server/seed/') || file === MAPPER,
+        file.startsWith('src/server/importer/') ||
+        file.startsWith('src/server/seed/') ||
+        file === MAPPER ||
+        file === HIDER,
     );
     expect(found).toEqual([]);
+  });
+
+  it('finds the admin hide writer and sees it update products and offers, so the hide rules are not vacuous (S2.4, AC 53, 54)', () => {
+    expect(codeOf(HIDER)).toMatch(updatesProducts);
+    expect(codeOf(HIDER)).toMatch(updatesOffers);
+  });
+
+  it('lets the admin hide writer set the product hidden flag and no other product column (S2.4, AC 53)', () => {
+    expect(productUpdatesOutsideHidden(codeOf(HIDER))).toBe(false);
+  });
+
+  it('lets the admin hide writer set the offer hidden flag, with no insert, delete or other offer column (S2.4, AC 54)', () => {
+    const code = codeOf(HIDER);
+    expect(offerUpdatesOutsideHidden(code)).toBe(false);
+    expect(code).not.toMatch(/\.(insert|delete)\(\s*offers\s*\)/);
+    expect(code).not.toMatch(/\b(insert\s+into|delete\s+from)\s+"?offers\b/i);
+    expect(code).not.toMatch(/\.(insert|update|delete)\(\s*(shops|feeds|networks|clicks|fitments)\s*\)/);
+  });
+
+  it('writes offers only in the importer and the admin hide writer (S2.4, AC 54)', () => {
+    const found = sources()
+      .filter(({ code }) => writesOffers(code))
+      .map(({ file }) => file)
+      .sort();
+    expect(found).toEqual(['src/server/admin/products.ts', 'src/server/importer/index.ts']);
+  });
+
+  it('has the admin read go through the shared visibility scope and tests no mapped condition of its own (S2.4, AC 10)', () => {
+    const code = codeOf(HIDER);
+    expect(code).toContain('visibleProductWhere()');
+    expect(code).toContain('visibleOfferWhere()');
+    expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
+  });
+
+  it('keeps the hide writer rules able to fail (S2.4, AC 53, 54)', () => {
+    // The product writer setting a second column, in either order, or another column alone, is reported.
+    expect(productUpdatesOutsideHidden('tx.update(products).set({ isHidden: hidden })')).toBe(false);
+    expect(productUpdatesOutsideHidden('tx\n  .update(products)\n  .set({ isHidden: false })')).toBe(false);
+    expect(productUpdatesOutsideHidden('tx.update(products).set({ isHidden: x, categoryId: 1 })')).toBe(true);
+    expect(productUpdatesOutsideHidden('tx.update(products).set({ categoryId: 1, isHidden: x })')).toBe(true);
+    expect(productUpdatesOutsideHidden('tx.update(products).set({ title: x })')).toBe(true);
+    // The category mapper's own shape is not the hider's: the two rules do not borrow from each other.
+    expect(productUpdatesOutsideHidden('tx.update(products).set({ categoryId: 1 })')).toBe(true);
+    expect(productUpdatesOutsideCategory('tx.update(products).set({ isHidden: x })')).toBe(true);
+    // The offer writer likewise.
+    expect(offerUpdatesOutsideHidden('tx.update(offers).set({ isHidden: hidden })')).toBe(false);
+    expect(offerUpdatesOutsideHidden('tx.update(offers).set({ isHidden: x, inReview: false })')).toBe(true);
+    expect(offerUpdatesOutsideHidden('tx.update(offers).set({ priceCents: 1 })')).toBe(true);
+    // Any form of an offers write is reported, and a read is not.
+    expect(writesOffers('await tx.insert(offers).values(row)')).toBe(true);
+    expect(writesOffers('await tx.update( offers ).set({})')).toBe(true);
+    expect(writesOffers('await tx.delete(offers).where(x)')).toBe(true);
+    expect(writesOffers('DELETE FROM "offers" where 1=1')).toBe(true);
+    expect(writesOffers('update offers set is_hidden = true')).toBe(true);
+    expect(writesOffers('const rows = await tx.select().from(offers)')).toBe(false);
+    // A file outside the two writers is reported.
+    const found = [
+      { file: 'src/server/admin/category-mappings.ts', code: 'await tx.update(offers).set({ isHidden: true })' },
+      { file: HIDER, code: 'await tx.update(offers).set({ isHidden: true })' },
+    ]
+      .filter(({ code }) => writesOffers(code))
+      .map(({ file }) => file)
+      .filter((file) => ![HIDER, 'src/server/importer/index.ts'].includes(file));
+    expect(found).toEqual(['src/server/admin/category-mappings.ts']);
   });
 
   it('finds the admin mapping writer and sees it update products, so the rule above is not vacuous (S4.2, AC 42)', () => {
@@ -426,7 +533,10 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
       (file) =>
         file.startsWith('src/app/admin/') ||
         file.startsWith('src/components/admin/') ||
-        inAuth(file),
+        inAuth(file) ||
+        // Deliberate (issue #25, S2.4): the pure href builders of the admin product
+        // list and page (04-design.md § Contract); no other server file may name an admin path.
+        file === 'src/server/admin/product-rules.ts',
     );
     expect(found).toEqual([]);
   });
@@ -507,8 +617,12 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
   const clientNamesUrl = (code: string): boolean =>
     isClientFile(code) && /(feeds|offers)\.url|\burl\s*:|\.url\b/.test(code);
 
+  // Deliberate (issue #25, S2.4): the product screens and their actions are in this
+  // scope too, so an offer address cannot reach the admin product code. Tightening only.
   const inAdminUrlScope = (file: string): boolean =>
-    file.startsWith('src/server/admin/') || file.startsWith('src/app/admin/(shell)/tiendas/');
+    file.startsWith('src/server/admin/') ||
+    file.startsWith('src/app/admin/(shell)/tiendas/') ||
+    file.startsWith('src/app/admin/(shell)/productos/');
 
   it('writes networks, shops and feeds only in the admin writer and the seed, and the writer writes all three (S3.1, AC 30)', () => {
     const found = sources()
@@ -543,7 +657,13 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
   it('names a feed or offer address only in the admin writer and the masking function under the admin code (S3.1, AC 31)', () => {
     const files = sources().filter(({ file }) => inAdminUrlScope(file));
     expect(files.map(({ file }) => file)).toEqual(
-      expect.arrayContaining([WRITER, MASK, 'src/app/admin/(shell)/tiendas/actions.ts']),
+      expect.arrayContaining([
+        WRITER,
+        MASK,
+        'src/app/admin/(shell)/tiendas/actions.ts',
+        'src/server/admin/products.ts',
+        'src/app/admin/(shell)/productos/actions.ts',
+      ]),
     );
     const found = files
       .filter(({ code }) => namesFeedUrl(code))

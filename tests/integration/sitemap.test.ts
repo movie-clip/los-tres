@@ -5,6 +5,7 @@ import { GET as getIndex } from '@/app/(public)/sitemap.xml/route';
 import { GET as getFile } from '@/app/(public)/sitemaps/[file]/route';
 import { closeDb, getDb } from '@/db/client';
 import { products } from '@/db/schema';
+import { setOfferHidden } from '@/server/admin/products';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import {
   SITEMAP_CHUNK_SIZE,
@@ -102,6 +103,22 @@ describe('sitemap product set (guardrail 1)', () => {
     expect(page?.indexable).toBe(true);
     // The demo notice still shows: it depends on the visible offers only.
     expect(page?.demoOnly).toBe(true);
+  });
+
+  it('AC 45 (S2.4, OD-1 a): hiding the only real offer through the admin writer keeps a product with a visible demo offer listed and indexable', async () => {
+    const product = await insertProduct({ slug: 'demo-oculta-por-admin' });
+    const demoFeed = await insertFeed((await insertShop()).id, { isDemo: true });
+    const realFeed = await insertFeed((await insertShop()).id, { isDemo: false });
+    await insertOffer({ productId: product.id, feedId: demoFeed });
+    const realOffer = await insertOffer({ productId: product.id, feedId: realFeed });
+    expect(await listedSlugs()).toEqual(['demo-oculta-por-admin']);
+
+    await setOfferHidden(realOffer, true);
+
+    // As today: this story changes no sitemap or indexing rule. The sitemap lists product pages, never offers.
+    expect(await listedSlugs()).toEqual(['demo-oculta-por-admin']);
+    expect((await getPublicProductBySlug('demo-oculta-por-admin'))?.indexable).toBe(true);
+    expect((await getSitemapCategorySlugs()).length).toBeGreaterThan(0);
   });
 
   it('counts an offer from an unapproved real feed as a non-demo offer (the rule is any state, D-7)', async () => {

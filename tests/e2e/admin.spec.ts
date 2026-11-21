@@ -264,18 +264,19 @@ test.describe('signing in and out', () => {
     await expect(page.getByTestId('admin-sign-out')).toHaveText(admin.Chrome.signOut);
     await expect(page.getByRole('contentinfo')).toHaveCount(0);
 
-    // Nothing in the menu leads nowhere: the live links are the shell's own home, the shops page and,
-    // since S4.2 (AC 9), the category mapping screen; the two entries with no page are still placeholders.
+    // Nothing in the menu leads nowhere: the live links are the shell's own home, the shops page, since
+    // S4.2 (AC 9) the category mapping screen and since S2.4 (AC 7) the products screen; the review
+    // entry has no page and is still a placeholder.
     const nav = page.getByTestId('admin-nav');
     expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual([
       '/admin',
       '/admin/tiendas',
       '/admin/categorias',
+      '/admin/productos',
     ]);
-    for (const label of [admin.Nav.products, admin.Nav.review]) {
-      await expect(nav.getByText(label)).toBeVisible();
-      await expect(nav.getByRole('link', { name: label })).toHaveCount(0);
-    }
+    await expect(nav.getByRole('link', { name: admin.Nav.products })).toHaveAttribute('href', '/admin/productos');
+    await expect(nav.getByText(admin.Nav.review)).toBeVisible();
+    await expect(nav.getByRole('link', { name: admin.Nav.review })).toHaveCount(0);
 
     // The one cookie.
     const cookies = await context.cookies();

@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
-import { products } from '@/db/schema';
+import { offers, products } from '@/db/schema';
+import { setOfferHidden } from '@/server/admin/products';
 import { CATEGORY_PAGE_SIZE, getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 
@@ -68,6 +69,18 @@ describe('getPublicProductBySlug indexable (S6.2)', () => {
     const page = await getPublicProductBySlug('demo-y-real-oculta');
     expect(page?.indexable).toBe(true);
     expect(page?.demoOnly).toBe(true);
+  });
+
+  it('AC 45 (S2.4, OD-1 a): stays true when the admin hides the real offer through the writer, and the category stays indexable', async () => {
+    const category = await insertCategory({ slug: 'filtros' });
+    const product = await productWith('demo-y-real-oculta-admin', category.id, [{ isDemo: true }, { isDemo: false }]);
+    const [, real] = await getDb().select().from(offers).where(eq(offers.productId, product.id)).orderBy(offers.id);
+    await setOfferHidden(real.id, true);
+
+    const page = await getPublicProductBySlug('demo-y-real-oculta-admin');
+    expect(page?.indexable).toBe(true);
+    expect(page?.demoOnly).toBe(true);
+    expect((await getPublicCategoryPage('filtros', 1, null, 'price-asc'))?.indexable).toBe(true);
   });
 
   it('is a boolean, never null', async () => {

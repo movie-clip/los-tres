@@ -111,6 +111,6 @@ With the shop approved, the feed approved and the category mapped, open the prod
 
 - **No removal of dropped rows.** An offer or product you delete from the file stays until S3.3 (#28); the importer only adds and updates.
 - **No convergence without an EAN.** Brand and part number do not match two files (S7.1, #40).
-- **No hide or unhide** of a single product or offer yet (S2.4, #25); the two approvals are the whole of your control over a file feed's products.
+- **Hide or unhide** a single product or offer at `/admin/productos` (S2.4, #25), after the import. A hidden item stays hidden through every later import; unhiding publishes nothing by itself, since the two approvals and a mapped category are still needed.
 - **No upload, no preview, no "Import now" button, no row count and no file-exists check** in the admin; no images; no other column layouts (S3.5).
 - **No revenue or disclosure wording** is written anywhere while everything is local.

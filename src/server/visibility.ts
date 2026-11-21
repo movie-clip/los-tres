@@ -7,7 +7,9 @@ import { feeds, offers, products, shops, vehicles } from '../db/schema';
 
 // The one visibility scope (guardrail 1). Every public read applies these
 // conditions and none restates a flag. Outside this file only the schema, the
-// seed and the importer may name the approval, hidden and review columns.
+// seed, the importer and the two admin writers (src/server/admin/sources.ts for
+// approvals, src/server/admin/products.ts for the hidden flags) may name the
+// approval, hidden and review columns.
 //
 //   offer visible   = feed approved AND shop approved AND offer not hidden
 //                     AND offer not in the matching queue
