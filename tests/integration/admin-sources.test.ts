@@ -261,8 +261,8 @@ describe('listSourcesForAdmin', () => {
         demo: false,
         offerCount: 3,
         feeds: [
-          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: 'feeds.example' },
-          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkId: network.id, networkName: 'Red Prueba', offerCount: 3, host: 'api.example' },
+          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: 'feeds.example', fileName: null },
+          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkId: network.id, networkName: 'Red Prueba', offerCount: 3, host: 'api.example', fileName: null },
         ],
       },
       { id: empty.id, name: 'Beta', slug: empty.slug, approved: true, demo: false, offerCount: 0, feeds: [] },
@@ -273,7 +273,7 @@ describe('listSourcesForAdmin', () => {
         approved: true,
         demo: false,
         offerCount: 0,
-        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: null }],
+        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: null, fileName: null }],
       },
     ]);
     for (const shop of result) {
@@ -283,6 +283,7 @@ describe('listSourcesForAdmin', () => {
         expect(Object.keys(feed).sort()).toEqual([
           'approved',
           'demo',
+          'fileName',
           'host',
           'id',
           'networkId',

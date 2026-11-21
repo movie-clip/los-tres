@@ -1,14 +1,17 @@
 import 'server-only';
 
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { constants, createReadStream } from 'node:fs';
+import { lstat, open, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import { isCatalogueFileName } from '../catalogue-file-name';
 import type { FeedBytes, FeedFailure, FeedSourceRef } from './types';
 
 // The one place in src/ that may call `fetch` or read a file (guardrail 2).
 // It serves registered feed rows only: the caller passes a feed row, never a
-// free URL or path. A feed URL can hold a network API key, so no message here
+// free URL or path. It is also the only place that names the one catalogue
+// folder (S3.7): a catalogue-file feed holds a bare file name, never a path, and
+// no command argument or request can name another folder. A feed URL can hold a network API key, so no message here
 // carries it, and the underlying error is dropped on purpose (TD-36). The same
 // goes for a redirect target (`Location`): it is never logged or put in an error.
 
@@ -24,12 +27,20 @@ const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const DEMO_SCHEME = 'demo-feed:';
 const DEMO_FILE = /^[a-z0-9-]+\.(csv|xml)(\.gz)?$/;
+/** The one folder a catalogue-file feed reads, at the repo root (and in the container's /app). */
+const CATALOGUE_FOLDER = 'catalogue-files';
 
 /** A feed whose source cannot be read. `code` is the report's `failure`. */
 export class SourceError extends Error {
   readonly code: Extract<
     FeedFailure,
-    'fetch_failed' | 'unsupported_url' | 'too_large' | 'redirect_refused'
+    | 'fetch_failed'
+    | 'unsupported_url'
+    | 'too_large'
+    | 'redirect_refused'
+    | 'file_name_refused'
+    | 'file_not_found'
+    | 'file_refused'
   >;
 
   constructor(code: SourceError['code']) {
@@ -44,7 +55,13 @@ export class SourceError extends Error {
  * XML (decode.ts and records.ts tell). Allowed: an `https:` URL, fetched with
  * a timeout and a size cap, following at most 5 redirects and only to https on
  * the feed URL's own host; and `demo-feed:<name>.csv|xml[.gz]` for a feed marked
- * `is_demo`, read from demo/feeds. Anything else is `unsupported_url`.
+ * `is_demo`, read from demo/feeds; and, for a `catalogue_file` feed, the file
+ * its stored name gives in the catalogue folder (`readCatalogueFile`). Anything
+ * else is `unsupported_url`. A feed's kind picks its branch, so a file feed never
+ * reaches demo/feeds or the network, and the other kinds never reach the folder.
+ *
+ * `options.catalogueDir` replaces the folder, for tests only: the importer, the
+ * CLI and every command call this without it.
  *
  * Resolves once redirects are settled and a 2xx answer is in hand, so a refusal
  * (`unsupported_url`, `fetch_failed`, `redirect_refused`) is thrown here. The
@@ -52,7 +69,18 @@ export class SourceError extends Error {
  * `too_large` (over 50 MiB) or `fetch_failed` (idle or total timeout, dropped
  * connection).
  */
-export async function readFeedSource(feed: FeedSourceRef): Promise<FeedBytes> {
+export async function readFeedSource(
+  feed: FeedSourceRef,
+  options: { catalogueDir?: string } = {},
+): Promise<FeedBytes> {
+  if (feed.sourceType === 'catalogue_file') {
+    if (feed.isDemo) throw new SourceError('unsupported_url');
+    return readCatalogueFile(
+      feed.url,
+      options.catalogueDir ?? path.resolve(process.cwd(), CATALOGUE_FOLDER),
+    );
+  }
+
   if (feed.url.startsWith(DEMO_SCHEME)) {
     const name = feed.url.slice(DEMO_SCHEME.length);
     if (!feed.isDemo || !DEMO_FILE.test(name)) throw new SourceError('unsupported_url');
@@ -82,6 +110,55 @@ export async function readFeedSource(feed: FeedSourceRef): Promise<FeedBytes> {
   }
   // `followRedirects` only returns a response that has a body.
   return capWire(bodyChunks(response.body as ReadableStream<Uint8Array>, control, total));
+}
+
+/**
+ * One file of the catalogue folder, by the exact name a feed row stores. Every
+ * refusal is a `SourceError` with a fixed code and nothing else: no path, no
+ * name and no system error reaches a message or a log (guardrail 5).
+ *
+ * The name is checked by the shared rule first, so nothing is touched on disk
+ * for a bad name. The folder and the file are then looked up as exact entries
+ * (a case-insensitive host and the case-sensitive container agree), a link of
+ * any kind is refused, and the file is opened without following links and
+ * checked to be the very file that was inspected.
+ */
+async function readCatalogueFile(name: string, dir: string): Promise<FeedBytes> {
+  if (!isCatalogueFileName(name)) throw new SourceError('file_name_refused');
+
+  const folder = await lstat(dir).catch(() => null);
+  if (!folder) throw new SourceError('file_not_found');
+  if (folder.isSymbolicLink()) throw new SourceError('file_refused');
+  if (!folder.isDirectory()) throw new SourceError('file_not_found');
+
+  const entries = await readdir(dir).catch(() => null);
+  if (!entries?.includes(name)) throw new SourceError('file_not_found');
+
+  const file = path.join(dir, name);
+  const inspected = await lstat(file, { bigint: true }).catch(() => null);
+  if (!inspected) throw new SourceError('file_not_found');
+  if (inspected.isSymbolicLink() || !inspected.isFile()) throw new SourceError('file_refused');
+
+  // O_NOFOLLOW exists on POSIX only; on Windows the lstat above is the guard.
+  const handle = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)).catch(
+    (error: unknown) => {
+      const code = (error as { code?: unknown } | null)?.code;
+      throw new SourceError(
+        code === 'ENOENT' ? 'file_not_found' : code === 'ELOOP' ? 'file_refused' : 'fetch_failed',
+      );
+    },
+  );
+  try {
+    const opened = await handle.stat({ bigint: true });
+    if (!opened.isFile() || opened.dev !== inspected.dev || opened.ino !== inspected.ino) {
+      throw new SourceError('file_refused');
+    }
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    throw error instanceof SourceError ? error : new SourceError('fetch_failed');
+  }
+  // The stream owns the handle from here and closes it when it ends or is destroyed.
+  return capWire(handle.createReadStream());
 }
 
 /**

@@ -28,3 +28,8 @@ test-results/
 # Written at the repo root by next build and next dev; never commit it
 AGENTS.md
 agentic/runs/
+
+# Catalogue files (S3.7): a hand-placed feed file is never committed. Only the
+# placeholder is tracked, so the folder exists on every clone.
+/catalogue-files/*
+!/catalogue-files/.gitkeep

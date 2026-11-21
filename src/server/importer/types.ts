@@ -28,7 +28,10 @@ export type FeedFailure =
   | 'invalid_xml' // malformed XML, a DOCTYPE, or no record element found
   | 'invalid_gzip' // starts with 1f 8b but does not inflate
   | 'too_large' // wire bytes > 50 MiB or inflated bytes > 512 MiB
-  | 'redirect_refused'; // a hop to non-https, to another host, or a 6th hop
+  | 'redirect_refused' // a hop to non-https, to another host, or a 6th hop
+  | 'file_name_refused' // a catalogue-file feed whose stored value is not a bare file name
+  | 'file_not_found' // the catalogue folder or the exact file is not there
+  | 'file_refused'; // the folder or file is a link, not a regular file, or changed under us
 
 export type FeedImportReport = {
   feedId: number;
@@ -60,7 +63,13 @@ export class FeedNotRegisteredError extends Error {
 }
 
 /** The feed row a source reader receives. `url` can hold an API key: never print it. */
-export type FeedSourceRef = { id: number; url: string; isDemo: boolean };
+export type FeedSourceRef = {
+  id: number;
+  url: string;
+  isDemo: boolean;
+  /** `catalogue_file`: `url` is a file name in the catalogue folder, not an address. */
+  sourceType: 'affiliate_network' | 'shop_upload' | 'catalogue_file';
+};
 
 /** Raw feed bytes as served: maybe gzip, maybe CSV or XML. Consumed once. */
 export type FeedBytes = AsyncIterable<Uint8Array>;

@@ -75,6 +75,7 @@ describe('registered source (guardrail 2, 0007)', () => {
       id: feedId,
       url: 'https://feeds.example/f.csv',
       isDemo: false,
+      sourceType: 'shop_upload',
     });
     expect(report.feeds[0]).toMatchObject({ outcome: 'imported', offersCreated: 2 });
     expect(fetchStub).not.toHaveBeenCalled();

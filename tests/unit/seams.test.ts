@@ -488,6 +488,9 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
   // admin file next to the seed, the feed address is named in that writer and in
   // one masking function, and nothing deletes the three tables (D-7). Each rule
   // is a named predicate, proved below on inline offenders, so it can fail.
+  // S3.7 settles the same list: a catalogue-file feed is created and edited by
+  // the two shipped writers in sources.ts, so [WRITER, SEED] does not grow, and
+  // the file name, which lives in `feeds.url`, is confined by the rules below.
   const WRITER = 'src/server/admin/sources.ts';
   const MASK = 'src/server/admin/feed-host.ts';
   const SEED = 'src/server/seed/index.ts';
@@ -625,6 +628,64 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([WRITER]);
   });
 
+  // S3.7, AC 37: the file name of a catalogue-file feed is shown only through
+  // `displayableFileName` (the admin writer's reads) and checked at import only
+  // through `isCatalogueFileName` (the importer's reader); no page, action or
+  // client component decides for itself what a stored value may show.
+  const FILE_NAME_MODULE = 'src/server/catalogue-file-name.ts';
+  const IMPORT_READER = 'src/server/importer/source.ts';
+  const callsDisplayable = (code: string): boolean => /\bdisplayableFileName\b/.test(code);
+  const callsIsName = (code: string): boolean => /\bisCatalogueFileName\b/.test(code);
+
+  it('shows a stored file name only through displayableFileName, called in the admin writer alone (S3.7, AC 37)', () => {
+    const found = sources()
+      .filter(({ code }) => callsDisplayable(code))
+      .map(({ file }) => file)
+      .sort();
+    expect(found).toEqual([FILE_NAME_MODULE, WRITER].sort());
+    expect(offenders(/\bdisplayableFileName\b/, (file) => file === WRITER || file === FILE_NAME_MODULE)).toEqual([]);
+  });
+
+  it('checks a stored file name with isCatalogueFileName only in the importer reader, the admin writer and its own module (S3.7, AC 37)', () => {
+    const found = sources()
+      .filter(({ code }) => callsIsName(code))
+      .map(({ file }) => file);
+    expect(found).toEqual(expect.arrayContaining([FILE_NAME_MODULE, IMPORT_READER]));
+    expect(
+      offenders(/\bisCatalogueFileName\b/, (file) => [WRITER, IMPORT_READER, FILE_NAME_MODULE].includes(file)),
+    ).toEqual([]);
+  });
+
+  it('keeps the file-name rules able to fail (S3.7, AC 37)', () => {
+    expect(callsDisplayable('const name = displayableFileName(row.stored);')).toBe(true);
+    expect(callsIsName('if (!isCatalogueFileName(feed.url)) throw new SourceError();')).toBe(true);
+    expect(callsDisplayable('const host = feedHost(row.stored);')).toBe(false);
+    expect(callsIsName('checkCatalogueFileName(raw)')).toBe(false);
+    const displayOffender = [
+      { file: 'src/app/admin/(shell)/tiendas/page.tsx', code: 'displayableFileName(feed.stored)' },
+      { file: WRITER, code: 'displayableFileName(row.stored)' },
+    ]
+      .filter(({ code }) => callsDisplayable(code))
+      .map(({ file }) => file)
+      .filter((file) => ![WRITER, FILE_NAME_MODULE].includes(file));
+    expect(displayOffender).toEqual(['src/app/admin/(shell)/tiendas/page.tsx']);
+    const checkOffender = [
+      { file: 'src/server/catalogue/product-page.ts', code: 'isCatalogueFileName(x)' },
+      { file: IMPORT_READER, code: 'isCatalogueFileName(feed.url)' },
+    ]
+      .filter(({ code }) => callsIsName(code))
+      .map(({ file }) => file)
+      .filter((file) => ![WRITER, IMPORT_READER, FILE_NAME_MODULE].includes(file));
+    expect(checkOffender).toEqual(['src/server/catalogue/product-page.ts']);
+  });
+
+  it('keeps the admin writer from importing the importer, so registering a file feed reads no file (S3.7, AC 9)', () => {
+    const code = sources().find(({ file }) => file === WRITER)?.code ?? '';
+    expect(code).not.toMatch(/from\s+['"][^'"]*importer[^'"]*['"]/);
+    expect(code).not.toMatch(/from\s+['"](node:)?fs(\/promises)?['"]/);
+    expect('import { readFeedSource } from "../importer/source";').toMatch(/from\s+['"][^'"]*importer[^'"]*['"]/);
+  });
+
   it('writes admin accounts only in src/server/auth/accounts.ts', () => {
     const found = offenders(
       /\.(insert|update|delete)\(\s*admin(Users|Accounts)\s*\)/,
@@ -732,5 +793,35 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     const code = codeOf('src/db/vehicle-catalogue.ts');
     expect(code).not.toMatch(/server-only/);
     expect(code).not.toMatch(/\.(delete)\(/);
+  });
+});
+
+// S3.7 (catalogue file source). The folder a catalogue-file feed reads is named
+// in one place, so no second reader can be pointed at it, and the file-name rule
+// stays pure so the admin and the importer share it without a disk read.
+describe('seams (guardrail 2, S3.7 catalogue folder)', () => {
+  const FOLDER = /catalogue-files/;
+
+  it('names the catalogue folder in src/ only in src/server/importer/source.ts', () => {
+    expect(offenders(FOLDER, (file) => file === 'src/server/importer/source.ts')).toEqual([]);
+  });
+
+  it('finds the folder name in source.ts, so the rule above is not vacuous', () => {
+    const code = sources().find(({ file }) => file === 'src/server/importer/source.ts')?.code ?? '';
+    expect(code).toMatch(FOLDER);
+  });
+
+  it('would flag a second file that names the folder', () => {
+    const planted = [{ file: 'src/server/other.ts', code: "const dir = 'catalogue-files';" }];
+    const found = planted.filter(({ code }) => FOLDER.test(code)).map(({ file }) => file);
+    expect(found).toEqual(['src/server/other.ts']);
+  });
+
+  it('keeps the file-name rule in src/server/catalogue-file-name.ts free of node:fs and server-only', () => {
+    const code = sources().find(({ file }) => file === 'src/server/catalogue-file-name.ts')?.code;
+    expect(code).toBeDefined();
+    expect(code).not.toMatch(/from\s+['"](node:)?fs(\/promises)?['"]/);
+    expect(code).not.toMatch(/server-only/);
+    expect(code).toMatch(/export function checkCatalogueFileName/);
   });
 });

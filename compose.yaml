@@ -26,6 +26,12 @@ services:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production
+    volumes:
+      # Catalogue files (S3.7): read-only, never in the image (.dockerignore).
+      - type: bind
+        source: ./catalogue-files
+        target: /app/catalogue-files
+        read_only: true
     depends_on:
       db:
         condition: service_healthy

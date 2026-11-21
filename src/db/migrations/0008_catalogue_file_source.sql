@@ -1,0 +1,2 @@
+ALTER TYPE "public"."feed_source_type" ADD VALUE 'catalogue_file';--> statement-breakpoint
+ALTER TABLE "feeds" ADD CONSTRAINT "feeds_catalogue_file_no_network" CHECK ("feeds"."source_type"::text <> 'catalogue_file' or "feeds"."network_id" is null);

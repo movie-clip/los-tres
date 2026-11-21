@@ -505,9 +505,10 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     // S4.2 (Admin.Categories) adds the counts and their grouped text (`pending`, `pendingText`, `total`,
     // `totalText`, `countText`: four digits keep their separator, so the page passes the text too), the
     // target category's name (`target`), the feed category string (`category`) and the feed's heading (`feed`).
+    // S3.7 adds `kinds` (the accepted file endings of Form.Feed.fileHint* and Form.Errors.fileWrongKind).
     const allowed = new Set([
       'siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText', 'count', 'max',
-      'pending', 'pendingText', 'total', 'totalText', 'countText', 'target', 'category', 'feed',
+      'pending', 'pendingText', 'total', 'totalText', 'countText', 'target', 'category', 'feed', 'kinds',
     ]);
     for (const [key, value] of leaves(admin)) {
       for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {

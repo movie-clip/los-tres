@@ -141,6 +141,39 @@ until both are set. That e2e creates its admin, `e2e-admin@example.test`, in the
 development database through `create-admin`. **S2.1 is password-only: do not
 deploy the admin area before S2.2 adds a second factor** (0012).
 
+**Catalogue file (S3.7).** The owner can add real products from a CSV or XML
+file he writes (plain or gzip, the canonical layout `import-feeds` already
+reads). The full guide, with the columns, the file-name rule and the failure
+codes, is `docs/feeds/catalogue-file.md`. In short:
+
+- **Folder:** `catalogue-files/` at the repo root, the only folder a catalogue
+  file is read from. It holds `.gitkeep` and nothing else tracked: its other
+  contents are git-ignored (`.gitignore`) and excluded from the Docker build
+  context and image (`.dockerignore`). **Never commit a real catalogue file.**
+  **No file made by the collector goes in it before S12.2** (#306).
+- **Mount:** `compose.yaml` bind-mounts the folder read-only into `app` at
+  `/app/catalogue-files`, so `npm run import-feeds` and
+  `docker compose run --rm app import-feeds` read the same file with no step
+  beyond placing it. A clone or `.env` from before S3.7 needs
+  `docker compose up -d` once, so `app` is recreated with the mount.
+- **Steps:** write the file; place it in the folder; on `/admin/tiendas` create
+  the shop and a feed with the source "Archivo de catálogo" and the bare file
+  name (no network); approve the shop, then the feed (two separate approvals,
+  each starts unapproved); run `import-feeds [--feed <id>]`; map the file's
+  categories on `/admin/categorias`; check the product. Registering, approving,
+  importing or mapping alone publishes nothing: a product is public only with
+  both approvals and a mapped category.
+- **File name:** a bare name, at most 100 characters, only letters without
+  accents, digits, `.`, `-` and `_`, ending `.csv`, `.xml`, `.csv.gz` or
+  `.xml.gz`; matched exactly, upper and lower case included. Renaming the file
+  of an approved file feed returns it to unapproved.
+- **Failures:** a failed feed prints `failed <code>` with no path and the run
+  exits 1 (the others still run): `file_name_refused` (stored name not a bare
+  name), `file_not_found` (folder or exact file missing), `file_refused` (a
+  link, not a regular file, or changed while opened).
+- **Not done:** no removal of rows dropped from the file (S3.3), no convergence
+  of two shops without a shared valid `ean` (S7.1), no hide (S2.4).
+
 **Search engines (S6.2).** `SITE_URL` is also the public origin of canonical
 links, the sitemap and the `Sitemap:` line of `/robots.txt`; **before any public
 deploy it must be the public https origin**, or all of them point at
@@ -178,7 +211,7 @@ deploy it must be the public https origin**, or all of them point at
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts` and the vehicle list from `src/db/vehicle-catalogue.ts`; every migrate path does both, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
-| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; `npm run import-feeds -- --feed <id>` imports one) | `npm run db:up`, migrated and seeded database, `.env` |
+| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; `npm run import-feeds -- --feed <id>` imports one; a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |

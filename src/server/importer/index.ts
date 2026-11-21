@@ -44,6 +44,7 @@ type FeedRow = {
   id: number;
   url: string;
   isDemo: boolean;
+  sourceType: FeedSourceRef['sourceType'];
   isApproved: boolean;
   shopName: string;
 };
@@ -80,6 +81,7 @@ async function loadFeeds(db: Executor, feedId: number | undefined): Promise<Feed
       id: feeds.id,
       url: feeds.url,
       isDemo: feeds.isDemo,
+      sourceType: feeds.sourceType,
       isApproved: feeds.isApproved,
       shopName: shops.name,
     })
@@ -125,7 +127,12 @@ async function importOneFeed(
   // dropped: they may name the URL, which can hold an API key.
   let opened: FeedRecords;
   try {
-    const bytes = await readSource({ id: feed.id, url: feed.url, isDemo: feed.isDemo });
+    const bytes = await readSource({
+      id: feed.id,
+      url: feed.url,
+      isDemo: feed.isDemo,
+      sourceType: feed.sourceType,
+    });
     opened = await openRecords(bytes);
   } catch (error) {
     return failed(feed, failureOf(error, 'fetch_failed'));

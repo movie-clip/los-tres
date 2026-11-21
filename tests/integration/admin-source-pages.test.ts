@@ -212,25 +212,29 @@ describe('the feed create form (AC 15, 38, 41)', () => {
     return html(await Page({ searchParams: Promise.resolve(searchParams) }));
   }
 
-  it('with no shop and no network it says which are missing, links to create them and shows no select and no submit', async () => {
+  it('with no shop it says a shop is missing, links to create one and shows no select and no submit', async () => {
     const page = await newFeed();
-    expect(page).toContain('data-testid="missing-network"');
     expect(page).toContain('data-testid="missing-shop"');
-    expect(page).toContain(form.Feed.missingNetworkBody);
     expect(page).toContain(form.Feed.missingShopBody);
-    expect(page).toContain('href="/admin/tiendas/red/nueva"');
     expect(page).toContain('href="/admin/tiendas/tienda/nueva"');
+    // A missing network no longer blocks the screen (S3.7): it is told inside the form, for the https source only.
+    expect(page).not.toContain('data-testid="missing-network"');
     expect(page).not.toContain('<select');
     expect(page).not.toContain('data-testid="form-submit"');
     expect(page).toContain('data-testid="form-back-button"');
   });
 
-  it('with a shop and no network only the network is missing', async () => {
+  it('with a shop and no network the form opens on the file source, with no network field and a submit (S3.7)', async () => {
     await insertShop();
     const page = await newFeed();
-    expect(page).toContain('data-testid="missing-network"');
     expect(page).not.toContain('data-testid="missing-shop"');
-    expect(page).not.toContain('<select');
+    expect(page).not.toContain('data-testid="missing-network"');
+    expect(page).toContain('name="source"');
+    expect(page).toMatch(new RegExp(`<option value="catalogue_file" selected="">${form.Feed.sourceOptionFile}</option>`));
+    expect(page).toMatch(new RegExp(`<label for="source-file"[^>]*>${form.Feed.fileLabel}</label>`));
+    expect(page).not.toContain('name="networkId"');
+    expect(page).not.toContain('name="url"');
+    expect(page).toContain('data-testid="form-submit"');
   });
 
   it('with a network and no shop only the shop is missing', async () => {
@@ -240,7 +244,7 @@ describe('the feed create form (AC 15, 38, 41)', () => {
     expect(page).not.toContain('data-testid="missing-network"');
   });
 
-  it('with both, shows two labelled selects with their prompts and the empty address field', async () => {
+  it('with both, opens on the https source: the shop and network selects with their prompts and the empty address field', async () => {
     await insertShop({ name: 'Mi tienda' });
     await aNetwork('Mi red', 'mi-red');
     const page = await newFeed();

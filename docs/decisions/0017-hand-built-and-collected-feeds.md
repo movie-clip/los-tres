@@ -80,3 +80,6 @@ Status: accepted, 2026-11-19. Amends 0007.
   (0009).
 - Before any public deploy, collected data and its provenance marker need the
   new owner decision above.
+- Hand-written files are read from one fixed folder, `catalogue-files/`,
+  git-ignored and kept out of the image (S3.7). A file made by the collector
+  does not go in it before S12.2 adds the provenance marker.

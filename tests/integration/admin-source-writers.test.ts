@@ -1,8 +1,9 @@
 import { eq, sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
 import { feeds, networks, shops } from '@/db/schema';
+import { listCategoryMappingsForAdmin } from '@/server/admin/category-mappings';
 import {
   createFeed,
   createNetwork,
@@ -262,7 +263,7 @@ describe('feeds: create (AC 14, 15, 5, 4)', () => {
     ]);
     const [shop] = await listSourcesForAdmin();
     expect(shop.feeds).toEqual([
-      { id, approved: false, demo: false, source: 'affiliate_network', networkId, networkName: 'Red Uno', offerCount: 0, host: 'feeds.example' },
+      { id, approved: false, demo: false, source: 'affiliate_network', networkId, networkName: 'Red Uno', offerCount: 0, host: 'feeds.example', fileName: null },
     ]);
     expect(shop.demo).toBe(false);
   });
@@ -591,7 +592,7 @@ describe('feeds: edit (AC 18 to 22)', () => {
   it('reads a feed for its edit form with the host only, never the address', async () => {
     const { shopId, networkId, feedId } = await approvedFeed('https://user-less.example:8443/f.csv?apikey=KEY-SENTINEL-8');
     const edit = await getFeedForEdit(feedId);
-    expect(edit).toEqual({ id: feedId, shopId, shopName: 'Tienda Uno', networkId, approved: true, demo: false, host: 'user-less.example' });
+    expect(edit).toEqual({ source: 'affiliate_network', id: feedId, shopId, shopName: 'Tienda Uno', networkId, approved: true, demo: false, host: 'user-less.example' });
     expect(JSON.stringify(edit)).not.toMatch(/KEY-SENTINEL|apikey|https:|8443/);
   });
 });
@@ -678,5 +679,474 @@ describe('the derived demo marker (AC 35)', () => {
     expect(byId.get(mixed)).toBe(false);
     expect(byId.get(onlyDemo.id)).toBe(true);
     expect((await listNetworksForAdmin()).find((network) => network.id === networkId)?.demo).toBe(false);
+  });
+});
+
+// US-3.7 / T3.7.2: a catalogue-file feed through the same two writers. The source field
+// picks the kind on create; the stored source picks it on edit. Guardrail 1: a file feed is
+// created and edited unapproved, and a new name is one write that also unapproves it.
+// Guardrail 5: a refusal carries a code and never the name; nothing here logs.
+describe('feeds: create a catalogue file (S3.7, AC 1 to 4, 7, 9, 13)', () => {
+  const fileForm = (shopId: number, fileName: string, extra: Record<string, string> = {}) =>
+    form({ source: 'catalogue_file', shopId: String(shopId), fileName, ...extra });
+
+  it('creates an unapproved, non-demo feed with no network under an approved shop, stored trimmed', async () => {
+    const shopId = await aShop();
+    await setShopApproval(shopId, true);
+
+    const result = await createFeed(fileForm(shopId, '  mi-catalogo.csv \n'));
+
+    expect(result).toMatchObject({ status: 'written', unapproved: false });
+    const id = (result as { id: number }).id;
+    expect(await rows.feeds()).toEqual([
+      expect.objectContaining({
+        id,
+        shopId,
+        networkId: null,
+        sourceType: 'catalogue_file',
+        url: 'mi-catalogo.csv',
+        isApproved: false,
+        isDemo: false,
+      }),
+    ]);
+    const [shop] = await listSourcesForAdmin();
+    expect(shop.feeds).toEqual([
+      { id, approved: false, demo: false, source: 'catalogue_file', networkId: null, networkName: null, offerCount: 0, host: null, fileName: 'mi-catalogo.csv' },
+    ]);
+    expect(await getFeedForEdit(id)).toEqual({
+      source: 'catalogue_file',
+      id,
+      shopId,
+      shopName: 'Tienda Uno',
+      approved: false,
+      demo: false,
+      fileName: 'mi-catalogo.csv',
+    });
+  });
+
+  it.each(['mi-catalogo.csv', 'a.xml', 'A_b-1.CSV.GZ', 'x.xml.gz', `${'a'.repeat(96)}.csv`])('accepts the name %s', async (name) => {
+    const shopId = await aShop();
+    expect((await createFeed(fileForm(shopId, name))).status).toBe('written');
+    expect((await rows.feeds())[0].url).toBe(name);
+  });
+
+  it('accepts a name whose file does not exist, and reads no file (AC 9)', async () => {
+    const shopId = await aShop();
+    expect((await createFeed(fileForm(shopId, 'todavia-no-existe.csv'))).status).toBe('written');
+  });
+
+  it.each([
+    ['empty', '', 'required'],
+    ['blank only', ' \t\n ', 'required'],
+    ['101 characters', `${'a'.repeat(97)}.csv`, 'too_long'],
+    ['a parent step', '../x.csv', 'not_a_name'],
+    ['a parent step inside', 'a..b.csv', 'not_a_name'],
+    ['a posix path', 'carpeta/x.csv', 'not_a_name'],
+    ['an absolute posix path', '/etc/x.csv', 'not_a_name'],
+    ['a windows path', 'carpeta\\x.csv', 'not_a_name'],
+    ['a drive letter', 'C:\\x.csv', 'not_a_name'],
+    ['a share', '\\\\server\\x.csv', 'not_a_name'],
+    ['an https address', 'https://feeds.example/x.csv', 'not_a_name'],
+    ['a demo-feed: value', 'demo-feed:feed-uno.csv', 'not_a_name'],
+    ['a file: address', 'file:///etc/passwd', 'not_a_name'],
+    ['a stream', 'x.csv:stream', 'not_a_name'],
+    ['a hidden name', '.hidden.csv', 'not_a_name'],
+    ['only a kind', '.csv', 'not_a_name'],
+    ['a device name', 'con.csv', 'not_a_name'],
+    ['a device name in capitals', 'LPT1.xml', 'not_a_name'],
+    ['a space inside', 'mi catalogo.csv', 'unusable'],
+    ['a control character', 'a\u0000b.csv', 'unusable'],
+    ['an accent', 'catálogo.csv', 'unusable'],
+    ['a plus sign', 'a+b.csv', 'unusable'],
+    ['an unknown kind', 'x.txt', 'wrong_kind'],
+    ['no kind', 'catalogo', 'wrong_kind'],
+    ['a dash for a dot', 'x-csv', 'wrong_kind'],
+  ])('refuses %s with a fixed code on the file field and writes nothing', async (label, name, code) => {
+    const shopId = await aShop();
+    const result = await createFeed(fileForm(shopId, name));
+    expect(result, label).toEqual({ status: 'refused', errors: { fileName: code } });
+    expect(await rows.feeds()).toEqual([]);
+  });
+
+  it('reports the shop and the file name errors together, and a missing shop alone', async () => {
+    const shopId = await aShop();
+    expect(await createFeed(form({ source: 'catalogue_file', fileName: '' }))).toEqual({
+      status: 'refused',
+      errors: { shop: 'required', fileName: 'required' },
+    });
+    expect(await createFeed(form({ source: 'catalogue_file', shopId: '99999', fileName: 'x.csv' }))).toEqual({
+      status: 'refused',
+      errors: { shop: 'required' },
+    });
+    expect(await createFeed(fileForm(shopId, ''))).toEqual({ status: 'refused', errors: { fileName: 'required' } });
+    expect(await rows.feeds()).toEqual([]);
+  });
+
+  it('needs no network, and neither reads nor stores a crafted one, an address, an approval, a demo flag or a source type', async () => {
+    const shopId = await aShop();
+    const networkId = await aNetwork();
+    const result = await createFeed(
+      fileForm(shopId, 'crafted.csv', {
+        networkId: String(networkId),
+        url: 'https://evil.example/x.csv?apikey=KEY-SENTINEL-F1',
+        isApproved: 'true',
+        approved: 'true',
+        isDemo: 'true',
+        demo: 'true',
+        sourceType: 'shop_upload',
+        source_type: 'shop_upload',
+      }),
+    );
+    expect(result.status).toBe('written');
+    expect(await rows.feeds()).toEqual([
+      expect.objectContaining({ networkId: null, sourceType: 'catalogue_file', url: 'crafted.csv', isApproved: false, isDemo: false }),
+    ]);
+  });
+
+  it('refuses a source other than the two, writes nothing, and treats an absent or empty source as affiliate (AC 7, 8)', async () => {
+    const shopId = await aShop();
+    const networkId = await aNetwork();
+    for (const source of ['shop_upload', 'demo', 'catalogue-file', 'Catalogue_File', ' catalogue_file', 'x', 'null']) {
+      const result = await createFeed(
+        form({ source, shopId: String(shopId), networkId: String(networkId), url: 'https://feeds.example/x.csv', fileName: 'x.csv' }),
+      );
+      expect(result, source).toEqual({ status: 'refused', errors: { source: 'invalid' } });
+    }
+    expect(await rows.feeds()).toEqual([]);
+
+    const fields = { shopId: String(shopId), networkId: String(networkId) };
+    expect((await createFeed(form({ ...fields, url: 'https://feeds.example/a.csv' }))).status).toBe('written');
+    expect((await createFeed(form({ ...fields, source: '', url: 'https://feeds.example/b.csv' }))).status).toBe('written');
+    expect((await createFeed(form({ ...fields, source: 'affiliate_network', url: 'https://feeds.example/c.csv' }))).status).toBe('written');
+    expect((await rows.feeds()).map((row) => row.sourceType)).toEqual(['affiliate_network', 'affiliate_network', 'affiliate_network']);
+  });
+
+  it('keeps the affiliate refusals for a feed with no network, and reads no file name there (AC 2, 8)', async () => {
+    const shopId = await aShop();
+    expect(
+      await createFeed(form({ source: 'affiliate_network', shopId: String(shopId), url: 'https://feeds.example/x.csv', fileName: 'x.csv' })),
+    ).toEqual({ status: 'refused', errors: { network: 'required' } });
+    expect(await createFeed(form({ shopId: String(shopId), url: 'demo-feed:feed-uno.csv', fileName: 'x.csv' }))).toEqual({
+      status: 'refused',
+      errors: { network: 'required', url: 'invalid' },
+    });
+    expect(await rows.feeds()).toEqual([]);
+  });
+
+  it('refuses a second feed with the same shop and name, on the file field, without repeating the name (AC 4)', async () => {
+    const shopId = await aShop();
+    await createFeed(fileForm(shopId, 'repetido-SENTINEL.csv'));
+    const again = await createFeed(fileForm(shopId, ' repetido-SENTINEL.csv '));
+    expect(again).toEqual({ status: 'refused', errors: { fileName: 'duplicate' } });
+    expect(JSON.stringify(again)).not.toContain('SENTINEL');
+    expect(await rows.feeds()).toHaveLength(1);
+  });
+
+  it('accepts the same name under another shop, and a name that differs only by case', async () => {
+    const one = await aShop('tienda-uno');
+    const two = await aShop('tienda-dos');
+    await createFeed(fileForm(one, 'mismo.csv'));
+    expect((await createFeed(fileForm(two, 'mismo.csv'))).status).toBe('written');
+    expect((await createFeed(fileForm(one, 'MISMO.csv'))).status).toBe('written');
+    expect(await rows.feeds()).toHaveLength(3);
+  });
+
+  it('creates exactly one of two simultaneous submissions with the same shop and name (AC 4)', async () => {
+    const shopId = await aShop();
+    const results = await Promise.all([createFeed(fileForm(shopId, 'carrera.csv')), createFeed(fileForm(shopId, 'carrera.csv'))]);
+    expect(results.map((result) => result.status).sort()).toEqual(['refused', 'written']);
+    expect(results.find((result) => result.status === 'refused')).toEqual({ status: 'refused', errors: { fileName: 'duplicate' } });
+    expect(await rows.feeds()).toHaveLength(1);
+  });
+
+  it('writes no approval on the feed or its shop, leaves public readers as they were, and logs nothing (AC 7, 14, 42)', async () => {
+    const logged: unknown[][] = [];
+    for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void logged.push(args));
+    }
+    try {
+      const shop = await insertShop();
+      const liveFeed = await insertFeed(shop.id);
+      const product = await insertProduct({ slug: 'producto-publico-archivo' });
+      const offerId = await insertOffer({ productId: product.id, feedId: liveFeed, priceCents: 1500 });
+      const view = async () => ({
+        page: await getPublicProductBySlug('producto-publico-archivo'),
+        target: await getRedirectTarget(offerId),
+        sitemap: await getSitemapProductSlugs(1),
+      });
+      const before = await view();
+      const shopBefore = (await rows.shops()).find((row) => row.id === shop.id);
+
+      const shopId = await aShop('tienda-archivo');
+      const created = await createFeed(fileForm(shopId, 'log-SENTINEL.csv'));
+      await updateFeed(form({ id: String((created as { id: number }).id), fileName: 'log-SENTINEL-2.csv' }));
+      await createFeed(fileForm(shopId, '../log-SENTINEL-3.csv'));
+      await listSourcesForAdmin();
+
+      expect(await view()).toEqual(before);
+      expect((await rows.shops()).find((row) => row.id === shop.id)).toEqual(shopBefore);
+      expect((await rows.shops()).find((row) => row.id === shopId)?.isApproved).toBe(false);
+      expect((await rows.feeds()).find((row) => row.url === 'log-SENTINEL-2.csv')?.isApproved).toBe(false);
+      expect(JSON.stringify(logged)).not.toContain('SENTINEL');
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+});
+
+describe('feeds: edit a catalogue file (S3.7, AC 11, 12, 7)', () => {
+  async function fileFeed(name = 'viejo.csv', approved = false) {
+    const shopId = await aShop();
+    await setShopApproval(shopId, true);
+    const result = await createFeed(form({ source: 'catalogue_file', shopId: String(shopId), fileName: name }));
+    if (result.status !== 'written') throw new Error(`file feed not created: ${JSON.stringify(result)}`);
+    if (approved) await setFeedApproval(result.id, true);
+    return { shopId, feedId: result.id };
+  }
+  const feedRow = async (id: number) => (await rows.feeds()).find((row) => row.id === id)!;
+
+  async function withUpdateLog<T>(run: () => Promise<T>): Promise<{ value: T; log: unknown[] }> {
+    await assertTestDatabase();
+    const db = getDb();
+    await db.execute(sql.raw('create table feed_update_log (n serial primary key, url text, is_approved boolean)'));
+    await db.execute(
+      sql.raw(
+        'create function log_feed_update() returns trigger language plpgsql as $$ begin insert into feed_update_log (url, is_approved) values (new.url, new.is_approved); return new; end $$',
+      ),
+    );
+    await db.execute(sql.raw('create trigger log_feed_update after update on feeds for each row execute function log_feed_update()'));
+    try {
+      const value = await run();
+      const log = (await db.execute(sql.raw('select url, is_approved from feed_update_log order by n'))).rows;
+      return { value, log };
+    } finally {
+      await db.execute(sql.raw('drop trigger if exists log_feed_update on feeds'));
+      await db.execute(sql.raw('drop function if exists log_feed_update()'));
+      await db.execute(sql.raw('drop table if exists feed_update_log'));
+    }
+  }
+
+  it('changes the name of an unapproved feed, which stays unapproved, and reports nothing was unapproved', async () => {
+    const { shopId, feedId } = await fileFeed();
+    const result = await updateFeed(form({ id: String(feedId), fileName: ' nuevo.xml ' }));
+    expect(result).toEqual({ status: 'written', id: feedId, unapproved: false });
+    expect(await feedRow(feedId)).toMatchObject({ shopId, url: 'nuevo.xml', isApproved: false, networkId: null, sourceType: 'catalogue_file' });
+  });
+
+  it('a new name on an approved feed is one write that stores it and returns the feed to unapproved, and reports it (AC 12)', async () => {
+    const { feedId } = await fileFeed('viejo.csv', true);
+    const { value, log } = await withUpdateLog(() => updateFeed(form({ id: String(feedId), fileName: 'nuevo.csv' })));
+    expect(value).toEqual({ status: 'written', id: feedId, unapproved: true });
+    // One UPDATE touched the row, and it already carried the new name and the unapproved state.
+    expect(log).toEqual([{ url: 'nuevo.csv', is_approved: false }]);
+    expect(await feedRow(feedId)).toMatchObject({ url: 'nuevo.csv', isApproved: false });
+  });
+
+  it('the offers of an approved feed leave every public reader at once when its name changes', async () => {
+    const { feedId } = await fileFeed('viejo.csv', true);
+    const product = await insertProduct({ slug: 'producto-archivo-renombrado' });
+    const offerId = await insertOffer({ productId: product.id, feedId, priceCents: 1500 });
+    const view = async () => ({
+      page: (await getPublicProductBySlug('producto-archivo-renombrado'))?.offers.map((offer) => offer.offerId) ?? null,
+      target: (await getRedirectTarget(offerId)) !== null,
+      sitemap: ((await getSitemapProductSlugs(1)) ?? []).includes('producto-archivo-renombrado'),
+    });
+    expect(await view()).toEqual({ page: [offerId], target: true, sitemap: true });
+
+    await updateFeed(form({ id: String(feedId), fileName: 'nuevo.csv' }));
+
+    expect(await view()).toEqual({ page: null, target: false, sitemap: false });
+  });
+
+  it('saving the same name again writes nothing and leaves an approved feed approved (AC 12)', async () => {
+    const { feedId } = await fileFeed('igual.csv', true);
+    const before = await feedRow(feedId);
+    const { value, log } = await withUpdateLog(async () => [
+      await updateFeed(form({ id: String(feedId), fileName: 'igual.csv' })),
+      await updateFeed(form({ id: String(feedId), fileName: '  igual.csv\n' })),
+    ]);
+    expect(value).toEqual([
+      { status: 'written', id: feedId, unapproved: false },
+      { status: 'written', id: feedId, unapproved: false },
+    ]);
+    expect(log).toEqual([]);
+    expect(await feedRow(feedId)).toEqual(before);
+  });
+
+  it('counts a name that differs only by case as a new name (the form compares exactly)', async () => {
+    const { feedId } = await fileFeed('Igual.csv', true);
+    const result = await updateFeed(form({ id: String(feedId), fileName: 'igual.csv' }));
+    expect(result).toEqual({ status: 'written', id: feedId, unapproved: true });
+    expect(await feedRow(feedId)).toMatchObject({ url: 'igual.csv', isApproved: false });
+  });
+
+  it('refuses a stored value that is not a name typed back, and replaces it with a real name', async () => {
+    const shopId = await aShop();
+    const [planted] = await getDb()
+      .insert(feeds)
+      .values({ shopId, networkId: null, sourceType: 'catalogue_file', url: '../fuera.csv', isApproved: true, isDemo: false })
+      .returning({ id: feeds.id });
+    expect(await updateFeed(form({ id: String(planted.id), fileName: '../fuera.csv' }))).toEqual({
+      status: 'refused',
+      errors: { fileName: 'not_a_name' },
+    });
+    expect(await updateFeed(form({ id: String(planted.id), fileName: 'dentro.csv' }))).toEqual({
+      status: 'written',
+      id: planted.id,
+      unapproved: true,
+    });
+  });
+
+  it.each([
+    ['empty (no "keep" meaning)', '', 'required'],
+    ['absent', null, 'required'],
+    ['a path', '../x.csv', 'not_a_name'],
+    ['a space inside', 'a b.csv', 'unusable'],
+    ['a wrong kind', 'x.txt', 'wrong_kind'],
+    ['too long', `${'a'.repeat(97)}.csv`, 'too_long'],
+  ])('refuses %s on an approved feed and leaves the name and the approval as they were', async (_label, name, code) => {
+    const { feedId } = await fileFeed('viejo.csv', true);
+    const before = await feedRow(feedId);
+    const fields: Record<string, string> = { id: String(feedId) };
+    if (name !== null) fields.fileName = name;
+    expect(await updateFeed(form(fields))).toEqual({ status: 'refused', errors: { fileName: code } });
+    expect(await feedRow(feedId)).toEqual(before);
+  });
+
+  it('refuses a name another feed of the same shop has, on the file field, and changes nothing (AC 4)', async () => {
+    const { shopId, feedId } = await fileFeed('uno.csv', true);
+    await createFeed(form({ source: 'catalogue_file', shopId: String(shopId), fileName: 'ocupado-SENTINEL.csv' }));
+    const before = await feedRow(feedId);
+    const result = await updateFeed(form({ id: String(feedId), fileName: 'ocupado-SENTINEL.csv' }));
+    expect(result).toEqual({ status: 'refused', errors: { fileName: 'duplicate' } });
+    expect(JSON.stringify(result)).not.toContain('SENTINEL');
+    expect(await feedRow(feedId)).toEqual(before);
+  });
+
+  it('a crafted request cannot change the shop, the approval, the demo flag, the source, the network or the address', async () => {
+    const { shopId, feedId } = await fileFeed('viejo.csv', true);
+    const otherShop = await aShop('tienda-dos');
+    const networkId = await aNetwork();
+    await updateFeed(
+      form({
+        id: String(feedId),
+        fileName: 'viejo.csv',
+        source: 'affiliate_network',
+        shopId: String(otherShop),
+        networkId: String(networkId),
+        url: 'https://evil.example/x.csv',
+        isApproved: 'false',
+        isDemo: 'true',
+        sourceType: 'affiliate_network',
+      }),
+    );
+    expect(await feedRow(feedId)).toMatchObject({
+      shopId,
+      networkId: null,
+      sourceType: 'catalogue_file',
+      url: 'viejo.csv',
+      isApproved: true,
+      isDemo: false,
+    });
+    // A name change with the same crafted fields moves only the name and the approval.
+    await updateFeed(
+      form({ id: String(feedId), fileName: 'otro.csv', shopId: String(otherShop), networkId: String(networkId), url: 'https://evil.example/x.csv' }),
+    );
+    expect(await feedRow(feedId)).toMatchObject({ shopId, networkId: null, sourceType: 'catalogue_file', url: 'otro.csv', isApproved: false, isDemo: false });
+  });
+
+  it('an affiliate feed ignores a crafted file name, and a shop upload feed is still missing', async () => {
+    const shopId = await aShop();
+    const networkId = await aNetwork();
+    const affiliate = await aFeed(shopId, networkId, 'https://feeds.example/keep.csv');
+    expect(await updateFeed(form({ id: String(affiliate), networkId: String(networkId), fileName: 'x.csv', source: 'catalogue_file' }))).toEqual({
+      status: 'written',
+      id: affiliate,
+      unapproved: false,
+    });
+    expect(await rows.feeds()).toEqual([expect.objectContaining({ url: 'https://feeds.example/keep.csv', sourceType: 'affiliate_network' })]);
+
+    const shop = await insertShop();
+    const uploadId = await insertFeed(shop.id, { url: 'upload.csv' });
+    expect(await updateFeed(form({ id: String(uploadId), fileName: 'x.csv' }))).toEqual({ status: 'missing' });
+    expect(await getFeedForEdit(uploadId)).toBeNull();
+    expect(await updateFeed(form({ id: '4242', fileName: 'x.csv' }))).toEqual({ status: 'missing' });
+  });
+
+  it('an update that fails throws and leaves the name and the approval as they were', async () => {
+    const { feedId } = await fileFeed('viejo.csv', true);
+    const before = await feedRow(feedId);
+    await assertTestDatabase();
+    const db = getDb();
+    await db.execute(
+      sql.raw("create function fail_feed_write() returns trigger language plpgsql as $$ begin raise exception 'boom %', new.url using errcode = 'P0001'; end $$"),
+    );
+    await db.execute(sql.raw('create trigger fail_feed_write before update on feeds for each row execute function fail_feed_write()'));
+    try {
+      await expect(updateFeed(form({ id: String(feedId), fileName: 'nuevo.csv' }))).rejects.toThrow();
+    } finally {
+      await db.execute(sql.raw('drop trigger if exists fail_feed_write on feeds'));
+      await db.execute(sql.raw('drop function if exists fail_feed_write()'));
+    }
+    expect(await feedRow(feedId)).toEqual(before);
+  });
+});
+
+describe('the reads show a file feed by its file name and never by a stored address (S3.7, AC 10, 13)', () => {
+  it('a stored value that is not a name is never returned: the file name is null and the host is null', async () => {
+    const shopId = await aShop();
+    const planted = [
+      '../../etc/passwd-SENTINEL',
+      'C:\\secreto-SENTINEL\\x.csv',
+      ' relleno-SENTINEL.csv',
+      'https://u:KEY-SENTINEL@feeds.example/x.csv?apikey=KEY-SENTINEL',
+    ];
+    const ids: number[] = [];
+    for (const url of planted) {
+      const [row] = await getDb()
+        .insert(feeds)
+        .values({ shopId, networkId: null, sourceType: 'catalogue_file', url, isApproved: false, isDemo: false })
+        .returning({ id: feeds.id });
+      ids.push(row.id);
+    }
+    const [shop] = await listSourcesForAdmin();
+    expect(shop.feeds.map((feed) => [feed.id, feed.source, feed.host, feed.fileName])).toEqual(
+      ids.map((id) => [id, 'catalogue_file', null, null]),
+    );
+    const edits = await Promise.all(ids.map((id) => getFeedForEdit(id)));
+    expect(edits.map((edit) => (edit?.source === 'catalogue_file' ? [edit.source, edit.fileName] : null))).toEqual(
+      ids.map(() => ['catalogue_file', null]),
+    );
+    const categories = await listCategoryMappingsForAdmin();
+    expect(categories.feeds.map((feed) => [feed.source, feed.host, feed.fileName])).toEqual(
+      ids.map(() => ['catalogue_file', null, null]),
+    );
+    expect(JSON.stringify([shop, edits, categories])).not.toMatch(/SENTINEL|etc\/|passwd|feeds\.example|https?:|apikey/);
+  });
+
+  it('the category screen read carries the source and the file name of each feed, and null for the others', async () => {
+    const shopId = await aShop();
+    const networkId = await aNetwork();
+    const file = await createFeed(form({ source: 'catalogue_file', shopId: String(shopId), fileName: 'categorias.csv' }));
+    const affiliate = await aFeed(shopId, networkId, 'https://feeds.example/c.csv');
+    const upload = await insertFeed(shopId, { url: 'subida.csv' });
+
+    const page = await listCategoryMappingsForAdmin();
+
+    const fileId = (file as { id: number }).id;
+    expect(page.feeds.find((feed) => feed.id === fileId)).toMatchObject({
+      source: 'catalogue_file',
+      networkName: null,
+      host: null,
+      fileName: 'categorias.csv',
+    });
+    expect(page.feeds.find((feed) => feed.id === affiliate)).toMatchObject({
+      source: 'affiliate_network',
+      networkName: 'Red Uno',
+      host: 'feeds.example',
+      fileName: null,
+    });
+    expect(page.feeds.find((feed) => feed.id === upload)).toMatchObject({ source: 'shop_upload', networkName: null, fileName: null });
+    for (const feed of page.feeds) expect(Object.keys(feed)).not.toContain('url');
   });
 });

@@ -55,8 +55,20 @@ async function clientMessages() {
 function feedSection(feed: AdminCategoryFeed, targets: CategoryTarget[], t: Translate, sources: SourcesTranslate) {
   const paused = feed.approved && !feed.shopApproved;
   const title = t('feedHeading', { id: feed.id, shop: feed.shopName });
-  // The host or a fixed phrase: the stored address is never a fallback (AC 10).
-  const domain = feed.host ?? (feed.demo ? sources('domainNone') : sources('domainUnavailable'));
+  // The file name or a fixed phrase for a catalogue file; the host or a fixed phrase otherwise. The stored
+  // address is never a fallback (AC 10).
+  const isFile = feed.source === 'catalogue_file';
+  const identity = isFile
+    ? { label: sources('fileLabel'), value: feed.fileName ?? sources('fileUnavailable') }
+    : { label: sources('domainLabel'), value: feed.host ?? (feed.demo ? sources('domainNone') : sources('domainUnavailable')) };
+  // "Subido por la tienda" only for a stored shop upload; a feed with no network and no known source has no line.
+  const meta = isFile
+    ? sources('feedMetaFile')
+    : feed.source === 'shop_upload'
+      ? sources('feedMetaUpload')
+      : feed.networkName !== null
+        ? sources('feedMetaNetwork', { network: feed.networkName })
+        : null;
   const stateWord = !feed.approved ? sources('feedNotApproved') : paused ? sources('feedPaused') : sources('feedApproved');
   const notes = [
     !feed.approved ? t('feedNoteNotApproved') : null,
@@ -69,7 +81,13 @@ function feedSection(feed: AdminCategoryFeed, targets: CategoryTarget[], t: Tran
   // Screen states come from the data (04-ux section 4.4): no rows and no offers is never imported,
   // no rows with offers is a feed that brings no category.
   const statement =
-    total > 0 ? null : feed.hasOffers ? t('feedNoCategories') : t('feedNeverImported');
+    total > 0
+      ? null
+      : feed.hasOffers
+        ? t('feedNoCategories')
+        : isFile
+          ? t('feedNeverImportedFile')
+          : t('feedNeverImported');
   const emptyCells = feed.emptyCellProducts;
 
   return (
@@ -79,8 +97,8 @@ function feedSection(feed: AdminCategoryFeed, targets: CategoryTarget[], t: Tran
       title={title}
       demo={feed.demo}
       demoLabel={sources('demoMark')}
-      domain={{ label: sources('domainLabel'), value: domain }}
-      meta={feed.networkName !== null ? sources('feedMetaNetwork', { network: feed.networkName }) : sources('feedMetaUpload')}
+      domain={identity}
+      meta={meta}
       state={{ label: t('feedStateLabel'), value: stateWord }}
       notes={notes}
       statement={statement}

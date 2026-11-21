@@ -9,9 +9,9 @@ export type CategoryFeedSectionProps = {
   /** Draws the Demo mark beside the title. */
   demo: boolean;
   demoLabel: string;
-  /** "Dominio: ofertas.example.com". The value is the host alone, never the feed address. */
+  /** "Dominio: ofertas.example.com" or "Archivo: mi-catalogo.csv". The value is the host or the file name, never the feed address. */
   domain: { label: string; value: string };
-  /** The network line, "Red: Red uno" or "Subido por la tienda". */
+  /** The kind line: "Red: Red uno", "Archivo de catálogo" or "Subido por la tienda"; null draws none. */
   meta: string | null;
   /** "Estado del feed: Aprobado". A state word, not a control. */
   state: { label: string; value: string };

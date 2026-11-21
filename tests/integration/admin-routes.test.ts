@@ -161,7 +161,9 @@ describe('every admin server action starts with the role check (AC 18, AC 22)', 
     expect(unguarded).toEqual([]);
   });
 
-  it('scans the shops and feeds actions (S2.3, S3.1) and finds them, guarded and only these eight exports', () => {
+  // S3.7 (AC 37): registering and editing a catalogue-file feed branch inside createFeedAction and
+  // updateFeedAction, so this file's guarded set stays the same eight, each guarded first.
+  it('scans the shops and feeds actions (S2.3, S3.1, S3.7) and finds them, guarded and only these eight exports', () => {
     const entry = filesWithServerActions(root, 'src').find(
       ({ file }) => file === 'src/app/admin/(shell)/tiendas/actions.ts',
     );

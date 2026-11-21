@@ -6,7 +6,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { FIXED_CATEGORY_TREE } from '../../db/category-tree';
 import { getDb, type Executor } from '../../db/client';
 import { categories, feedCategoryMappings, feeds, offers, products } from '../../db/schema';
-import { listSourcesForAdmin } from './sources';
+import { listSourcesForAdmin, type AdminFeedSource } from './sources';
 import { parseId, textField } from './source-rules';
 
 // The admin's view of feed category mappings, and the only admin writer of
@@ -42,10 +42,14 @@ export type AdminCategoryFeed = {
   shopApproved: boolean;
   approved: boolean;
   demo: boolean;
-  /** null = a shop upload. */
+  /** Where the feed comes from, copied from `listSourcesForAdmin`. */
+  source: AdminFeedSource;
+  /** null when the feed has no network (a shop upload, a catalogue file). */
   networkName: string | null;
-  /** The host of the stored address, never the address. */
+  /** The host of the stored address, never the address; always null for a catalogue file. */
   host: string | null;
+  /** A catalogue file only: its file name when the stored value is one by the rule, else null. */
+  fileName: string | null;
   hasOffers: boolean;
   /** Distinct products of this feed with an empty category cell. */
   emptyCellProducts: number;
@@ -189,8 +193,10 @@ export async function listCategoryMappingsForAdmin(): Promise<AdminCategoryPage>
         shopApproved: shop.approved,
         approved: feed.approved,
         demo: feed.demo,
+        source: feed.source,
         networkName: feed.networkName,
         host: feed.host,
+        fileName: feed.fileName,
         hasOffers: feed.offerCount > 0,
         emptyCellProducts: emptyByFeed.get(feed.id) ?? 0,
         rows: [...(rowsByFeed.get(feed.id)?.values() ?? [])].sort(compareRows),
