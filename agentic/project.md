@@ -1,7 +1,7 @@
 # Project profile: `los-tres`
 
-Repo: `C:\projects\investments\los-tres` (Los Tres)
-Bound via `los-tres/.agentic.json`.
+Repo: `C:\projects\investments\los-tres\client` (Los Tres)
+Bound via `client/.agentic.json`.
 
 **`CLAUDE.md` is already in your context.** Claude Code loads the repo's
 `CLAUDE.md` into every dispatched lane at startup, so the product, the stack,
