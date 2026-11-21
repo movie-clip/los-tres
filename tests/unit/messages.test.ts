@@ -509,6 +509,9 @@ describe('messages/es-ES.json Admin namespace (US-2.1, D-8)', () => {
     const allowed = new Set([
       'siteName', 'hours', 'shops', 'feeds', 'shop', 'id', 'network', 'offers', 'offersText', 'count', 'max',
       'pending', 'pendingText', 'total', 'totalText', 'countText', 'target', 'category', 'feed', 'kinds',
+      // S2.4 (Admin.Products): the cleaned search term, the page and the page count, and the product
+      // title in the product page's tab title.
+      'term', 'page', 'pages', 'title',
     ]);
     for (const [key, value] of leaves(admin)) {
       for (const match of value.matchAll(/\{([A-Za-z]+)[,}]/g)) {

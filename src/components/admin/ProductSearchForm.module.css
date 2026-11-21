@@ -1,0 +1,52 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+}
+
+/* The field and the button on one line; the button drops below the field when the column is narrow. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.field {
+  flex: 1 1 16rem;
+  max-width: 24rem;
+  min-width: 0;
+}
+
+/* The filled button look, as a plain submit: a search is a full page load, so it has no pending state. */
+.submit {
+  composes: button filled from './PendingButton.module.css';
+}
+
+/* The whole label is the click target, at least a tap target tall. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.box {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-link);
+  cursor: pointer;
+}
+
+.box:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}

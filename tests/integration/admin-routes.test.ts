@@ -51,6 +51,9 @@ describe('every admin route refuses an anonymous request (AC 17, AC 18, AC 22)',
         'admin/(shell)/tiendas/feed/[id]/editar/page.tsx',
         // S4.2: the category mapping screen, guarded in the page and in generateMetadata.
         'admin/(shell)/categorias/page.tsx',
+        // S2.4: the product list and the product page, each guarded in the page and in generateMetadata.
+        'admin/(shell)/productos/page.tsx',
+        'admin/(shell)/productos/[id]/page.tsx',
       ]),
     );
   });

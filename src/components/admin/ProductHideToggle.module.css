@@ -1,0 +1,60 @@
+/* The product box: the two facts, the identifiers, the button, then the result, in a column. */
+.product {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+/* An offer row: the two facts on the left and the button on the right of one line; the rest below. */
+.offer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.state {
+  min-width: 0;
+}
+
+.extra {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.offer .extra,
+.offer .feedback,
+.offer .error {
+  grid-column: 1 / -1;
+}
+
+.form button {
+  min-width: 9rem;
+}
+
+.feedback {
+  font-size: var(--text-sm);
+}
+
+/* Empty until a result: the live region is always in the page so a result is announced, and while
+   empty it gives back the gap it would add. */
+.feedback:empty {
+  margin-top: calc(var(--space-1) * -1);
+}
+
+.done {
+  display: block;
+  color: var(--color-text);
+}
+
+.error {
+  width: 100%;
+}
+
+/* A narrow column: the button wraps below the facts. */
+@media (max-width: 40rem) {
+  .offer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

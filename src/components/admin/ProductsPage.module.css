@@ -1,0 +1,42 @@
+.heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* A muted paragraph in the page column, no box. The colour comes from the page. */
+.intro {
+  max-width: 48rem;
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+/* The count line: the count text, a dot, and the link back to the bare list, on one wrapping line. */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-1);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.summary a {
+  font-size: var(--text-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.emptyLink {
+  margin-top: var(--space-2);
+}

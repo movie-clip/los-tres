@@ -1,0 +1,17 @@
+/* The shop box look: one box per product, title first, then the two facts, then the identifiers. */
+.row {
+  composes: box from './ShopGroup.module.css';
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+/* The link inside is the title: it wraps anywhere, so a long title never scrolls the page sideways. */
+.title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-md);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}

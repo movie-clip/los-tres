@@ -1,0 +1,14 @@
+.heading {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* A muted paragraph in the page column, no box. The colour comes from the page. */
+.intro {
+  max-width: 48rem;
+  margin: 0;
+  font-size: var(--text-md);
+}
