@@ -113,6 +113,7 @@ export function ProductHideToggle({ kind, id, hidden, publicNow, labels, action,
           label={shownHidden ? labels.unhide : labels.hide}
           pendingLabel={labels.saving}
           ariaLabel={(shownHidden ? labels.unhideName : labels.hideName) ?? undefined}
+          keepNameWhilePending
           testId={`${kind}-toggle-button`}
         />
       </form>

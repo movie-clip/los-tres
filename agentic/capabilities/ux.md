@@ -83,7 +83,7 @@ human, and `research` needs the `Agent` tool.
 ## Running the app and taking screenshots
 
 The Compose stack serves the app on `http://127.0.0.1:<APP_PORT>`. `APP_PORT`
-is in the repo's `.env`, and is 3010 on the owner's machine. Check it before
+is in the repo's `.env`: read `APP_PORT` from the repo's `.env` (3010 when unset), because a checkout that sets it serves elsewhere. Check it before
 starting anything: `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:<APP_PORT>/api/health`.
 If it is not 200, run `npm run stack:up` and then
 `docker compose run --rm app import-feeds` for the demo data. Leave the stack

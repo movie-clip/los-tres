@@ -282,3 +282,67 @@ test.describe('hide and unhide from the admin screens (US-2.4)', () => {
     expect(offerHidden(DEARER.shopName)).toBe(false);
   });
 });
+
+// The file is serial, so a hard failure would skip the checks after it: the three parts below are
+// one test with soft assertions on the names, so a red run reports every one of them.
+test.describe('a toggle keeps its accessible name while it is saving', () => {
+  // The hide POST is held (never answered) so the button stays pending, then aborted at the end:
+  // nothing is written, so the database is as it was found.
+  async function holdPosts(page: Page) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/admin/productos/**', async (route) => {
+      if (route.request().method() === 'POST' && route.request().headers()['next-action']) {
+        await gate;
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+    return release;
+  }
+
+  const offerName = (shop: string): string =>
+    detail.hideOfferName.replace('{shop}', shop).replace('{id}', app.psqlScalar(`select o.feed_id ${offerWhere(shop)}`));
+
+  test('offer and product toggles held pending keep their accessible names, and the text says they are saving', async ({
+    browser,
+  }) => {
+    const page = await signedIn(browser);
+    await page.goto(`/admin/productos/${productId()}`);
+    await page.waitForLoadState('networkidle');
+    const cheaper = offerRow(page, CHEAPER.shopName).getByTestId('offer-toggle-button');
+    const dearer = offerRow(page, DEARER.shopName).getByTestId('offer-toggle-button');
+    const product = page.getByTestId('product-toggle-button');
+
+    // Idle names, so the pending checks below compare against something real.
+    await expect(cheaper).toHaveAccessibleName(offerName(CHEAPER.shopName));
+    await expect(dearer).toHaveAccessibleName(offerName(DEARER.shopName));
+    await expect(product).toHaveAccessibleName(detail.hideProduct);
+    expect(offerName(CHEAPER.shopName)).not.toBe(offerName(DEARER.shopName));
+
+    const release = await holdPosts(page);
+    try {
+      // Two offer toggles pending at once.
+      await cheaper.click();
+      await dearer.click();
+      await expect(cheaper).toHaveText(detail.saving);
+      await expect(dearer).toHaveText(detail.saving);
+      await expect.soft(cheaper, 'offer toggle, pending: name').toHaveAccessibleName(offerName(CHEAPER.shopName));
+      await expect.soft(dearer, 'second offer toggle, pending: name').toHaveAccessibleName(offerName(DEARER.shopName));
+      const [one, two] = await Promise.all([cheaper.getAttribute('aria-label'), dearer.getAttribute('aria-label')]);
+      expect.soft(one, 'two pending offer toggles have an aria-label').not.toBeNull();
+      expect.soft(one, 'two pending offer toggles do not share a name').not.toBe(two);
+
+      // The product toggle pending, on its own (its name is its idle visible label).
+      await product.click();
+      await expect(product).toHaveText(detail.saving);
+      await expect.soft(product, 'product toggle, pending: name').toHaveAccessibleName(detail.hideProduct);
+    } finally {
+      release();
+    }
+    expect(productHidden()).toBe(false);
+    expect(offerHidden(CHEAPER.shopName)).toBe(false);
+    expect(offerHidden(DEARER.shopName)).toBe(false);
+  });
+});
