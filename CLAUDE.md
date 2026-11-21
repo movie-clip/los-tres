@@ -180,7 +180,10 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   name), `file_not_found` (folder or exact file missing), `file_refused` (a
   link, not a regular file, or changed while opened).
 - **Not done:** no removal of rows dropped from the file (S3.3), no convergence
-  of two shops without a shared valid `ean` (S7.1), no hide (S2.4).
+  of two shops without a shared valid `ean` (S7.1). Hide and unhide of a
+  product or offer exist (S2.4): an admin finds a product at `/admin/productos`
+  and hides or unhides it and its offers; hidden items stay hidden through
+  every import, and an unhide publishes nothing by itself.
 
 **Search engines (S6.2).** `SITE_URL` is also the public origin of canonical
 links, the sitemap and the `Sitemap:` line of `/robots.txt`; **before any public

@@ -1,6 +1,6 @@
 # S2.4 Admin finds a product and hides or unhides it and its offers
 
-Status: **draft for the owner's approval** (run `2026-11-21-s2-4-hide`, story order 02). OD-1 to OD-9 are open and block ticketing; the ACs are drafted on each recommendation and say which ones move if the owner rules otherwise. Board status follows the human's own move.
+Status: **approved by the owner 2026-11-21** (D-3 of run `2026-11-21-s2-4-hide`, "yes"). OD-1 to OD-9 are ruled: OD-1 (a) by D-1 ("yes", AC 45 stands), OD-2 (a) by D-2 ("yes"), and OD-3 to OD-9 as recommended by D-4 to D-10 (the approval of the draft, whose ACs are written on those recommendations; the orchestrator's reading, not objected to). Board status follows the human's own move.
 Epic: E2 (#10) · Iteration 3 · Priority: P0 · Size: M (the issue sizes its tickets backend M, frontend M, test S)
 Issue: #25 · Tickets: #82-#84 (T2.4.1-T2.4.3)
 Depends on: S2.1 (admin sign-in, the shell and its guards), S3.1 (the admin source screens) and S4.2 (the admin writer and guard-test precedents), all shipped. No open dependency.
@@ -156,7 +156,7 @@ Guards in the test suite (deliberate changes, bounded)
 
 52. `tests/unit/seams.test.ts` changes its rule on where the hidden flags may be named so that the hide writer and the admin read are added by name; any other file that names a hidden flag fails, including every public-side file and every screen file; the test finds the writer and fails if it is gone (recon § Test seams a hide writer will trip; the S2.3 and S4.2 exceptions are the precedent).
 53. `tests/unit/seams.test.ts` changes its closed list of files that update products to include the hide writer by name, and shows that the writer sets the hidden flag and no other product column; its existing rule that the category mapping writer sets the category and nothing else stays as it is.
-54. `tests/unit/seams.test.ts` gains a closed list of files that write offers (the importer, the seed and the hide writer) and shows that the hide writer sets the hidden flag and no other offer column.
+54. `tests/unit/seams.test.ts` gains a closed list of files that write offers (the importer and the admin hide file; the seed writes no offer, D-15) and shows that the hide writer sets the hidden flag and no other offer column.
 55. `tests/integration/admin-routes.test.ts` names the full set of exports of the new actions file, and keeps asserting that every server action calls the role check first and acts on its refusal, and that every admin page and metadata function is guarded; an action added later and not named fails it.
 56. The existing seam that keeps offer and feed URLs out of the admin files stays and is not loosened (recon § Test seams a hide writer will trip).
 
@@ -197,7 +197,7 @@ Test files and names are the test lane's after the tech lead's design. Coverage 
 | ACs | Check |
 |---|---|
 | 1 to 6 | integration (database), in the pattern of `tests/integration/category-mapping-actions.test.ts` and the support in `tests/support/admin.ts`: every action refused for no, forged, expired and signed-out cookies and for a cross-origin submission, with no row changed; a hide repeated, an unhide of a not-hidden item; a missing and a malformed id; crafted extra fields; the anonymous redirect of both screens and of their metadata |
-| 7, 21, 60 | e2e for the navigation link and the placeholder; the keyboard and the labels; the empty state with no product |
+| 7, 21, 60 | e2e for the navigation link and the placeholder; the keyboard and the labels; the empty state with no product. The hide e2e (`tests/e2e/admin-products.spec.ts`) runs on an isolated app container and database, not on the Compose app, because a hide there flakes the parallel specs that read the demo rows |
 | 8 to 11, 22 to 25 | integration of the read and the pages: a product in each state of AC 8, the row's "public now" compared with the public product page for the same slug after each cause of non-publication (AC 10), an offer list with a hidden offer, an offer in review and an offer of an unapproved feed, no offer URL anywhere in the output |
 | 12 to 20 | integration of the read: title and brand words, an EAN with spaces and hyphens, a part number in two spellings, a slug in other case, a hidden product, an unmapped product and an offerless one found, control characters and a 100-code-point cut, an empty term, no match, the hidden-only filter alone and with a term, paging with ties in the order, a bad and an out-of-range page; the captured log holds no term (AC 18) |
 | 26 to 31 | integration of the writers and the actions (the two flags set and cleared, the other flags untouched, the independence of AC 30); e2e from sign-in to a hide and an unhide of a product and of an offer, with the search and page kept (AC 31) |

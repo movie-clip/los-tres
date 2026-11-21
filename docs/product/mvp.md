@@ -194,7 +194,7 @@ and the backup passphrase are kept in a password manager plus an offline copy
   - maps feed categories onto the five fixed categories, or marks one outside
     scope, at `/admin/categorias` (S4.2); a save moves the existing products
     at once;
-  - hides any product or offer.
+  - hides any product or offer, and unhides it, at `/admin/productos` (S2.4).
 
   Imports run from the `import-feeds` command; an import button with reports
   in the admin area is deferred.
