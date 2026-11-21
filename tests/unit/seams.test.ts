@@ -93,6 +93,24 @@ describe('seams (guardrails 1, 2, 4)', () => {
     ]);
   });
 
+  // CR-1 (S2.4): mayNameFlags admits products.ts for every flag word, but the
+  // hide writer may only name isHidden. Any other flag there would be a second
+  // copy of the visibility scope.
+  const namesOtherFlag = (code: string): boolean => flagNames.test(code.replace(/\bisHidden\b/g, ''));
+
+  it('the admin hide writer names no flag word other than isHidden (CR-1)', () => {
+    const code = sources().find(({ file }) => file === 'src/server/admin/products.ts')?.code ?? '';
+    expect(code).toMatch(/\bisHidden\b/);
+    expect(namesOtherFlag(code)).toBe(false);
+  });
+
+  it('reports a planted hide writer that names another flag, and passes one naming only isHidden (CR-1)', () => {
+    expect(namesOtherFlag('set({ isHidden: hidden })')).toBe(false);
+    for (const word of ['isApproved', 'is_approved', 'is_hidden', 'inReview', 'in_review']) {
+      expect(namesOtherFlag(`set({ isHidden: hidden }); where(eq(feeds.${word}, true))`)).toBe(true);
+    }
+  });
+
   it('the visibility scope itself names every flag, so the scan above is not vacuous', () => {
     const code = sources().find(({ file }) => file === 'src/server/visibility.ts')?.code ?? '';
     for (const flag of ['isApproved', 'isHidden', 'inReview']) {
