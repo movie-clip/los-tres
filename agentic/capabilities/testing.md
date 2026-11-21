@@ -30,6 +30,8 @@ Vitest 5 with two projects in `vitest.config.mts` (the package stays CommonJS; t
 
 `@layout` tag (D-6): a Playwright `describe` whose assertions depend on font metrics (heights, widths, tops, line counts, no-text-cut, same-row) is tagged `test.describe('name', { tag: '@layout' }, () => {...})`. CI runs `npm run gate:ci` (`test:e2e:ci`, `--grep-invert @layout`) on ubuntu-latest and skips them, because they are written against Windows system-ui metrics; the local `npm run gate` runs them. Functional specs stay untagged so CI still runs them.
 
+Playwright runs the projects another project depends on in full and ignores CLI filters for them, so `playwright.config.ts` reads the CLI `--grep-invert` (or `-gv`) itself (`cliGrepInvert()`) and passes it to project `chromium`, the dependency of `catalogue-file`; without it `test:e2e:ci` would run every `@layout` test there. A new dependency project needs the same line. Only `--grep-invert` is mirrored: a CLI `--grep` is still ignored by `chromium` when it runs as a dependency (run one spec as in the S3.7 paragraph below, with `--no-deps`). `catalogue-file` itself gets no `grepInvert`, so it must hold no `@layout` test.
+
 `vitest.config.mts` and `playwright.config.ts` must not import from `tests/`: tsconfig includes them, `next build` typechecks them in the image, and `.dockerignore` removes `tests/`. Put shared logic behind `setupFiles` or `globalSetup` instead (Playwright's takes a string path).
 
 E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), which runs `docker compose run --rm -T --no-deps app import-feeds` and throws a named message on `feeds=0` (quoted in `CLAUDE.md` § Commands). The e2e write rule is in § What must always be covered.
