@@ -190,11 +190,12 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
       await expect(page, path).toHaveTitle(new RegExp(title.split(' | ')[0]));
       const nav = page.getByTestId('admin-nav');
       await expect(nav.getByRole('link', { name: messages.Admin.Nav.feeds }), path).toHaveAttribute('aria-current', 'page');
-      // S4.2 (AC 9): the category screen is the one other live link; no form route adds one.
+      // S4.2 (AC 9) and S2.4 (AC 7): the category and product screens are the other live links; no form route adds one.
       expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href'))), path).toEqual([
         '/admin',
         '/admin/tiendas',
         '/admin/categorias',
+        '/admin/productos',
       ]);
       await expect(page.getByRole('heading', { level: 1 }), path).toHaveCount(1);
     }

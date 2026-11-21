@@ -165,9 +165,9 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
     expect(response?.headers()['cache-control']).toMatch(/no-store/);
     expect(response?.headers()['set-cookie']).toBeUndefined();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
-    // Only the entries with a page are links; no other entry gained one.
+    // Only the entries with a page are links; no other entry gained one (S2.4 gave the products entry its page).
     const nav = page.getByTestId('admin-nav');
-    expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual(['/admin', '/admin/tiendas', SCREEN]);
+    expect(await nav.locator('a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual(['/admin', '/admin/tiendas', SCREEN, '/admin/productos']);
   });
 
   test('says the three rules in order, and names no more of the feed address than its host (AC 10)', async ({ page }) => {

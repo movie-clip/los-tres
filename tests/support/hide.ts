@@ -1,6 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db/client';
+import { categories, clicks, feedCategoryMappings, feeds, fitments, offers, products, shops } from '@/db/schema';
 
 import { assertTestDatabase } from './db';
 
@@ -35,4 +36,32 @@ export async function withFailingHideWrites<T>(run: () => Promise<T>): Promise<T
     await db.execute(sql.raw('drop trigger if exists fail_hide_write on offers'));
     await db.execute(sql.raw('drop function if exists fail_hide_write()'));
   }
+}
+
+/**
+ * Every row of every table a hide or an unhide must not change, whole and in id order (AC 44).
+ * Compared before and after with the hidden flags set apart by `withoutHiddenFlags`.
+ */
+export async function allRows() {
+  await assertTestDatabase();
+  const db = getDb();
+  return {
+    products: await db.select().from(products).orderBy(asc(products.id)),
+    offers: await db.select().from(offers).orderBy(asc(offers.id)),
+    feeds: await db.select().from(feeds).orderBy(asc(feeds.id)),
+    shops: await db.select().from(shops).orderBy(asc(shops.id)),
+    categories: await db.select().from(categories).orderBy(asc(categories.id)),
+    mappings: await db.select().from(feedCategoryMappings).orderBy(asc(feedCategoryMappings.id)),
+    fitments: await db.select().from(fitments).orderBy(asc(fitments.id)),
+    clicks: await db.select().from(clicks).orderBy(asc(clicks.id)),
+  };
+}
+
+/** `allRows()` with the two hidden flags forced to false, so a hidden state compares to a clear one. */
+export function withoutHiddenFlags(rows: Awaited<ReturnType<typeof allRows>>) {
+  return {
+    ...rows,
+    products: rows.products.map((row) => ({ ...row, isHidden: false })),
+    offers: rows.offers.map((row) => ({ ...row, isHidden: false })),
+  };
 }
