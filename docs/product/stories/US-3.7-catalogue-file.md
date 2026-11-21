@@ -201,6 +201,7 @@ Test files and names are the test lane's after the tech lead's design. Coverage 
 | 38, 39 | `tests/unit/admin-copy.test.ts` and `tests/unit/messages.test.ts` for the new copy; a check that no new sentence promises publication; e2e for labels, keyboard and the success message |
 | 40, 41 | reviewer reads the guide against the steps; no test |
 | 42 | e2e and integration: the public pages, the sitemap and `/go` unchanged after each step until both approvals and the mapping; the S2.3, S3.1 and S4.2 tests unchanged and passing |
+| 1, 2 (CR-4) | e2e, `tests/e2e/catalogue-file-flow.spec.ts`, "typed text never crosses the Origen switch, either way, and the Red choice is kept (CR-4)": on the new-feed form, a URL typed and then the file source leaves the file-name field empty, and the reverse leaves the address field empty, with the Red choice kept and nothing submitted. Added with the CR-4 fix |
 
 Notes for the test lane:
 

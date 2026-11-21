@@ -137,11 +137,11 @@ Decision 0008 holds the detail.
 ## Shops and feeds are data
 
 Networks, shops, feeds and affiliate link patterns are **rows the admin
-manages**, never code. Adding a shop means entering its name, network and feed
-URL in the admin area. Since S3.1 the admin creates and edits networks,
-shops and feeds on the admin shops page, with no code change and no delete
-(disable is the only removal). A new shop and a new feed start unapproved, and
-a feed's approval is separate from its shop's. Replacing an approved feed's URL
+manages**, never code. Adding a shop means entering its name and a feed in the
+admin area. Since S3.1 the admin creates and edits networks, shops and feeds on
+the admin shops page, with no code change and no delete (disable is the only
+removal). A new shop and a new feed start unapproved, and a feed's approval is
+separate from its shop's. Replacing an approved feed's URL
 returns that feed to unapproved in the same write. Since S3.7 a feed is either
 an affiliate feed (network and https address) or a catalogue-file feed (a bare
 file name in a fixed local folder, no network). Changing the file name of an
