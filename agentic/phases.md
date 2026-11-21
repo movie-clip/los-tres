@@ -12,6 +12,8 @@ The phase→lane binding for this project. Read this at intake, alongside
   and the clause that decides whether it fires. Copied into the run ledger.
 - **When the brief is the specification** — when `story` fires here.
 - **What the gates run** — the command each `verify` row owes.
+- **Readiness** — the command that proves the environment is up before a
+  build (`protocol/orchestrator.md` § 3).
 - **Tracker** — the GitHub board and repo the orchestrator keeps in step with
   each run (`protocol/orchestrator.md` § 8).
 
@@ -65,6 +67,10 @@ spec says `direction: new` or `direction: changed` and `decisions.md` records
 the human's approval, the spec and `decisions.md` also go to the close-out
 `docs` order as `inputs`, so it can write `docs/design/system.md`. A `FAIL`
 from `ux-review` routes its findings to `frontend`, like any gate's.
+
+## Readiness
+
+`npm run db:up`: Docker is running and the Compose database answers.
 
 ## Tracker
 

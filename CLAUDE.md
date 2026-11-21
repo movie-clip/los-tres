@@ -37,6 +37,14 @@ Absolute, and unnumbered on purpose. The agentic network's profile
 (`agentic/project.md` § Hard guardrails) carries the same
 five, numbered, so a `REFUSED: guardrail 2` names exactly one thing.
 
+A request to build, fix or investigate something here goes to
+`agentic-core:orchestrate-feature` first, including "this price looks wrong".
+The `mattpocock-skills` plugin is enabled for the network's dispatched lanes,
+and their capability packs say when each skill fires. It is not an entry point
+for a request: `diagnosing-bugs` on a wrong price, run outside a lane, changes
+feed import or matching with no design pass and no integration gate, and
+leaves no ledger saying it happened.
+
 ## Stack
 
 Chosen by the owner, one decision per file in `docs/decisions/`. A change to a
