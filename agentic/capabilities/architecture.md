@@ -33,7 +33,7 @@ one lives in code:
 
 - **Public visibility** (`src/server/visibility.ts`; product read in
   `src/server/catalogue/product-page.ts`, category listing in `category-page.ts`, home tree in `category-tree.ts`; all call `visibleProductWhere()`). One shared query scope decides what is public: an
-  offer from an approved feed that is not hidden, and a product that is not
+  offer from an approved feed of an approved shop that is not hidden, not in the matching queue and not removed by import (`offers.is_removed`, S3.3), and a product that is not
   hidden and not in the matching queue. Every public read (catalogue, search,
   product page, sitemap, `/go/<offer>`) goes through it (guardrail 1).
 - **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of the catalogue folder `catalogue-files/` (S3.7)). One importer, `import-feeds`, is the only writer of

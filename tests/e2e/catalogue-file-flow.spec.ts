@@ -41,6 +41,8 @@ const SHOP = { slug: 'e2e-cf-tienda', name: 'Tienda e2e catalogo' };
 const FILE = 'e2e-catalogo-fixed.csv';
 const FILE_RENAMED = 'e2e-catalogo-fixed-b.csv';
 const PRODUCT = { title: 'Filtro e2e catalogo fijo', slug: 'filtro-e2e-catalogo-fijo', brand: 'Marca e2e' };
+// The second product of the removal test (S3.3): the one row a file lists when it drops the fixed row.
+const REPLACEMENT = { id: 'e2e-cf-2', title: 'Filtro e2e catalogo reemplazo', slug: 'filtro-e2e-catalogo-reemplazo' };
 const FEED_CATEGORY = 'Filtros e2e catalogo';
 const SHOP_LINK = 'https://e2e-catalogo.example/producto/fijo?ref=e2e&x=1';
 const PRICE_TEXT = '12,99';
@@ -73,6 +75,16 @@ function writeCatalogueFile(): void {
   writeFileSync(FILE_PATH, `${rows.join('\n')}\n`, 'utf8');
 }
 
+/** A file that lists only the replacement row, so the fixed row is missing from it (S3.3). */
+function writeReplacementFile(): void {
+  mkdirSync(FOLDER, { recursive: true });
+  const rows = [
+    'id,title,price,url,brand,category,currency',
+    `${REPLACEMENT.id},${REPLACEMENT.title},"5,00",https://e2e-catalogo.example/producto/reemplazo,${PRODUCT.brand},${FEED_CATEGORY},EUR`,
+  ];
+  writeFileSync(FILE_PATH, `${rows.join('\n')}\n`, 'utf8');
+}
+
 function removeCatalogueFile(): void {
   rmSync(FILE_PATH, { force: true });
 }
@@ -93,7 +105,9 @@ function cleanRows(): void {
   psql(`delete from fitments where feed_id in (${mine})`);
   psql(`delete from feed_category_mappings where feed_id in (${mine})`);
   psql(`delete from offers where feed_id in (${mine})`);
-  psql(`delete from products where slug = '${PRODUCT.slug}' and not exists (select 1 from offers o where o.product_id = products.id)`);
+  psql(
+    `delete from products where slug in ('${PRODUCT.slug}', '${REPLACEMENT.slug}') and not exists (select 1 from offers o where o.product_id = products.id)`,
+  );
 }
 
 /** The Compose import, on the one feed: the same command the e2e setup runs, with `--feed`. */
@@ -422,7 +436,7 @@ test.describe('from the file to a public product (AC 18, 19, 26 to 29, 42)', () 
 
     expect(result.status, result.out).toBe(0);
     expect(result.out).toContain(
-      `feed ${feedId} "${SHOP.name}": imported rows=1 products_created=1 offers_created=1 offers_updated=0 rejected=0`,
+      `feed ${feedId} "${SHOP.name}": imported rows=1 products_created=1 offers_created=1 offers_updated=0 offers_removed=0 rejected=0`,
     );
     for (const leak of [FILE, 'catalogue-files', '/app/', SHOP_LINK, 'e2e-catalogo.example']) expect(result.out).not.toContain(leak);
     offerId = sql.offerId(feedId);
@@ -495,6 +509,37 @@ test.describe('from the file to a public product (AC 18, 19, 26 to 29, 42)', () 
     expect(await context.cookies()).toEqual([]);
     expect(foreign).toEqual(['e2e-catalogo.example']);
     await context.close();
+  });
+
+  // S3.3: removal on the real stack. Run after the click test (the click count stays 1: a removed
+  // offer answers /go with 404 and records nothing) and before the unapproval, which needs the fixed
+  // file back in the folder. cleanRows() deletes the replacement product and every offer afterwards.
+  test('a file that drops the row removes its offer on the next import, and listing it again brings the same offer back (S3.3)', async ({ request }) => {
+    writeReplacementFile();
+    const dropped = composeImport(feedId);
+
+    expect(dropped.status, dropped.out).toBe(0);
+    expect(dropped.out).toContain(
+      `feed ${feedId} "${SHOP.name}": imported rows=1 products_created=1 offers_created=1 offers_updated=0 offers_removed=1 rejected=0`,
+    );
+    expect(dropped.out).not.toContain('removal:');
+    expect((await request.get(productPath)).status()).toBe(404);
+    expect((await request.get(`/go/${offerId}`, { maxRedirects: 0 })).status()).toBe(404);
+    expect(await (await request.get('/sitemaps/productos-1.xml')).text()).not.toContain(`/producto/${PRODUCT.slug}`);
+    expect((await request.get(`/producto/${REPLACEMENT.slug}`)).status()).toBe(200);
+    expect(sql.clicks(feedId)).toBe(1);
+
+    writeCatalogueFile();
+    const back = composeImport(feedId);
+
+    expect(back.status, back.out).toBe(0);
+    expect(back.out).toContain('products_created=0 offers_created=0 offers_updated=1 offers_removed=1 rejected=0');
+    const page = await request.get(productPath);
+    expect(page.status()).toBe(200);
+    expect(stripScripts(await page.text())).toContain(`/go/${offerId}`);
+    expect(await (await request.get('/sitemaps/productos-1.xml')).text()).toContain(`/producto/${PRODUCT.slug}`);
+    expect((await request.get(`/producto/${REPLACEMENT.slug}`)).status()).toBe(404);
+    expect(count(`select count(*) from offers where id = ${offerId} and not is_removed`)).toBe(1);
   });
 
   test('unapproving the feed takes the product off every public reader at once, and the import then skips it without a file (AC 15)', async ({ page, request }) => {

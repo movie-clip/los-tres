@@ -20,6 +20,7 @@ import {
   insertOffer,
   insertProduct,
   insertShop,
+  setOfferRemoved,
   vehicleIdBySlug,
 } from '../support/catalogue';
 import { sitemapProducts } from '../support/categories';
@@ -438,5 +439,122 @@ describe('a hide or an unhide changes no other column of any row (AC 44)', () =>
     await setProductHidden(w.a.id, false);
     await setOfferHidden(w.b.offerId, false);
     expect(await allRows()).toEqual(before);
+  });
+});
+
+// S3.3 (T3.3.2), AC 2: an offer the importer flagged removed leaves the same public surfaces a hidden
+// offer does, by the same shared scope and with no step of its own. The flag is set by hand here
+// (`setOfferRemoved`); importer-removal.test.ts proves the importer sets and clears it. A removed offer
+// is not hidden: the admin writers are never called below.
+describe('a removed offer is on no public surface (S3.3, AC 2)', () => {
+  it('lists the other offer only on the page, and the price, shop count and structured data follow', async () => {
+    const w = await world();
+    await setOfferRemoved(w.a.offerNear, true);
+    const page = await getPublicProductBySlug(w.a.slug);
+
+    expect(page?.offers.map((offer) => offer.offerId)).toEqual([w.a.offerFar]);
+    expect(page?.offers.map((offer) => offer.priceCents)).toEqual([2000]);
+    expect(page === null ? null : buildProductJsonLd(page)).toMatchObject({
+      offers: { lowPrice: '20.00', highPrice: '20.00', offerCount: 1 },
+    });
+  });
+
+  it('prices a category card and a search card from what remains, and still lists, counts and finds the product', async () => {
+    const w = await world();
+    await setOfferRemoved(w.a.offerNear, true);
+    const v = await view(w);
+
+    expect(v.card).toEqual({ lowestPriceCents: 2000, offerCount: 1 });
+    expect(v.searchCard).toEqual({ lowestPriceCents: 2000, offerCount: 1 });
+    expect(v).toMatchObject({ rootCount: 2, searchCount: 1, carSearchCount: 1, productPage: true, sitemapProduct: true });
+  });
+
+  it('answers /go for the removed offer as for a hidden one: 404 and no click, while the other offer redirects', async () => {
+    const w = await world();
+    await setOfferRemoved(w.a.offerNear, true);
+
+    expect((await callGo(w.a.offerNear)).status).toBe(404);
+    expect(await allClicks()).toHaveLength(0);
+    expect((await callGo(w.a.offerFar)).status).toBe(302);
+    expect(await allClicks()).toHaveLength(1);
+  });
+
+  it('takes the product off every surface when its last visible offer is removed, and /go answers 404 for both', async () => {
+    const w = await world();
+    await setOfferRemoved(w.a.offerNear, true);
+    expect(await view(w)).toMatchObject({ productPage: true, sitemapProduct: true });
+
+    await setOfferRemoved(w.a.offerFar, true);
+    expect(await view(w)).toMatchObject(ABSENT_A);
+    expect((await callGo(w.a.offerNear)).status).toBe(404);
+    expect((await callGo(w.a.offerFar)).status).toBe(404);
+    expect(await allClicks()).toHaveLength(0);
+  });
+
+  it('keeps the product public, priced from the remaining offer, while another offer is visible', async () => {
+    const w = await world();
+    await setOfferRemoved(w.a.offerFar, true);
+
+    expect(await view(w)).toMatchObject({
+      productPage: true,
+      pagePrices: [1000],
+      missingProduct: false,
+      rootCards: ['producto-a', 'producto-b'],
+      card: { lowestPriceCents: 1000, offerCount: 1 },
+      sitemapProduct: true,
+      sitemapCategories: ['cat-a', 'cat-b', 'raiz'],
+      homeChildren: ['cat-a', 'cat-b'],
+    });
+  });
+
+  it('returns the product to every surface, as before, when the flag is cleared', async () => {
+    const w = await world();
+    const before = await view(w);
+
+    await setOfferRemoved(w.a.offerNear, true);
+    await setOfferRemoved(w.a.offerFar, true);
+    expect(await view(w)).toMatchObject(ABSENT_A);
+    await setOfferRemoved(w.a.offerNear, false);
+    await setOfferRemoved(w.a.offerFar, false);
+
+    expect(await view(w)).toEqual(before);
+    expect((await callGo(w.a.offerNear)).status).toBe(302);
+  });
+
+  it('does not touch the product: a product left with no visible offer keeps its hidden flag and its category', async () => {
+    const w = await world();
+    const before = await allRows();
+    await setOfferRemoved(w.a.offerNear, true);
+    await setOfferRemoved(w.a.offerFar, true);
+    const after = await allRows();
+
+    expect(after.products).toEqual(before.products);
+    expect(after.products.find((row) => row.id === w.a.id)).toMatchObject({ isHidden: false });
+    expect(after.products.find((row) => row.id === w.a.id)?.categoryId).not.toBeNull();
+  });
+
+  it('is independent of the hide flag: unhiding a removed offer publishes nothing', async () => {
+    const w = await world();
+    await setOfferHidden(w.a.offerNear, true);
+    await setOfferRemoved(w.a.offerNear, true);
+    await setOfferHidden(w.a.offerNear, false);
+
+    expect((await callGo(w.a.offerNear)).status).toBe(404);
+    expect((await getPublicProductBySlug(w.a.slug))?.offers.map((offer) => offer.offerId)).toEqual([w.a.offerFar]);
+  });
+
+  it('D-9: a removed real offer still marks the product as not demo-only for the sitemap, as a hidden one does', async () => {
+    const root = await insertCategory({ slug: 'solo-demo' });
+    const demoFeed = await insertFeed((await insertShop()).id, { isDemo: true });
+    const realFeed = await insertFeed((await insertShop()).id);
+    const product = await insertProduct({ slug: 'demo-y-real', categoryId: root.id });
+    await insertOffer({ productId: product.id, feedId: demoFeed });
+    const real = await insertOffer({ productId: product.id, feedId: realFeed });
+    expect(await sitemapProducts()).toEqual(['demo-y-real']);
+
+    await setOfferRemoved(real, true);
+
+    expect(await getPublicProductBySlug('demo-y-real')).not.toBeNull();
+    expect(await sitemapProducts()).toEqual(['demo-y-real']);
   });
 });

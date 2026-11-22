@@ -47,8 +47,8 @@ function reportLines(ids: number[], run: 'first' | 'second'): string {
   const lines = FEEDS.map((feed, index) => {
     const counts =
       run === 'first'
-        ? `products_created=${feed.productsCreated} offers_created=${feed.rows} offers_updated=0`
-        : `products_created=0 offers_created=0 offers_updated=${feed.rows}`;
+        ? `products_created=${feed.productsCreated} offers_created=${feed.rows} offers_updated=0 offers_removed=0`
+        : `products_created=0 offers_created=0 offers_updated=${feed.rows} offers_removed=0`;
     return `feed ${ids[index]} "${feed.name}": imported rows=${feed.rows} ${counts} rejected=0 unknown_vehicles=0`;
   });
   return [...lines, `total: feeds=${FEEDS.length} imported=${FEEDS.length} skipped=0 failed=0`].join('\n');

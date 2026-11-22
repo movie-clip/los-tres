@@ -114,7 +114,11 @@ npm run import-feeds
 docker compose run --rm app import-feeds
 ```
 
-To import one feed only, add `--feed <id>` (after `--` for npm). An unapproved file feed is reported skipped and its file is not read. For an approved one you get the usual line `feed <id> "<shop name>": imported rows=... products_created=... offers_created=... offers_updated=... rejected=... unknown_vehicles=...`, then an indented line for each rejected row and for each row that became its own product (`record <n>: own_product <reason>`). Running it again on an unchanged file creates nothing new and changes only prices and dates.
+To import one feed only, add `--feed <id>` (after `--` for npm). An unapproved file feed is reported skipped and its file is not read. For an approved one you get the usual line `feed <id> "<shop name>": imported rows=... products_created=... offers_created=... offers_updated=... offers_removed=... rejected=... unknown_vehicles=...`, then an indented line for each rejected row and for each row that became its own product (`record <n>: own_product <reason>`). Running it again on an unchanged file creates nothing new and changes only prices and dates.
+
+**Rows you drop from the file.** An approved feed's offers that are not among the file's accepted rows are flagged removed and leave the site; `offers_removed` counts them. The row is not deleted, and a row rejected by validation counts as absent. If a later import has the row again, the offer is restored, with its clicks. An import never un-hides an offer you hid.
+
+**The removal guard.** Removal is skipped, and everything else in the import still applies, when the file has no accepted row (`empty_import`), or when it would remove 10 offers or more and more than 50% of the feed's current offers (`small_import`). Then the last indented line is `  removal: skipped <reason> missing=<n> current=<n>` and a skip does not change the exit code (exit 1 still means a feed failed). If you really did shrink the file that much, run `npm run import-feeds -- --feed <id> --allow-large-removal` (or `docker compose run --rm app import-feeds --feed <id> --allow-large-removal`); it lifts `small_import` only, never `empty_import`. To take a whole feed off the site, unapprove it. A feed that failed removes nothing.
 
 ### When a feed fails
 
@@ -140,7 +144,7 @@ With the shop approved, the feed approved and the category mapped, open the prod
 
 ## What S3.7 does not do
 
-- **No removal of dropped rows.** An offer or product you delete from the file stays until S3.3 (#28); the importer only adds and updates.
+- **No delete of dropped rows.** An offer you drop from the file is flagged removed, not deleted, and a product stays stored (S3.3, see section 5); the guard can skip removal.
 - **No brand alias and no re-matching.** `Bosch` and `Robert Bosch` stay two products (S7.3, deferred), and products already stored are never merged (see "When two files land on one product").
 - **Hide or unhide** a single product or offer at `/admin/productos` (S2.4, #25), after the import. A hidden item stays hidden through every later import; unhiding publishes nothing by itself, since the two approvals and a mapped category are still needed.
 - **No upload, no preview, no "Import now" button, no row count and no file-exists check** in the admin; no images; no other column layouts (S3.5).

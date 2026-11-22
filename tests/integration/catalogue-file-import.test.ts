@@ -65,7 +65,7 @@ describe('the report of a file feed (AC 18)', () => {
     const text = formatImportReport(report);
 
     expect(text).toContain(
-      `feed ${feedId} "Tienda Informe Uno": imported rows=2 products_created=2 offers_created=2 offers_updated=0 rejected=0`,
+      `feed ${feedId} "Tienda Informe Uno": imported rows=2 products_created=2 offers_created=2 offers_updated=0 offers_removed=0 rejected=0`,
     );
     expect(text).toContain('total: feeds=1 imported=1 skipped=0 failed=0');
     expect(importExitCode(report)).toBe(0);

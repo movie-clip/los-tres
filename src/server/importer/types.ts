@@ -36,6 +36,10 @@ export type FeedFailure =
   | 'file_not_found' // the catalogue folder or the exact file is not there
   | 'file_refused'; // the folder or file is a link, not a regular file, or changed under us
 
+export type RemovalSkipReason = 'empty_import' | 'small_import';
+/** Removal did not run for an imported feed (S3.3). `missing` offers would have been removed. */
+export type RemovalSkip = { reason: RemovalSkipReason; missing: number; current: number };
+
 export type FeedImportReport = {
   feedId: number;
   shopName: string;
@@ -46,6 +50,10 @@ export type FeedImportReport = {
   productsCreated: number;
   offersCreated: number;
   offersUpdated: number;
+  /** Offers flagged removed by this import; 0 when skipped, failed or nothing was missing. */
+  offersRemoved: number;
+  /** Present only on an imported feed whose removal was skipped. */
+  removalSkipped?: RemovalSkip;
   rejected: RejectedRow[];
   /** Counted in productsCreated and offersCreated, never in rejected. Record order. */
   ownProducts: OwnProductRow[];

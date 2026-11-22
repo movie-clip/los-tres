@@ -178,7 +178,14 @@ and the backup passphrase are kept in a password manager plus an offline copy
   reports in the admin area is deferred.
 - One broken feed never stops the others, and an import never takes the site
   down.
-- An offer missing from a feed's latest successful import is removed (S3.3, not built yet).
+- An offer missing from a feed's latest successful import is removed (S3.3,
+  decision 0018): it is flagged removed, not deleted, and leaves the public site.
+  Removal does not run when the import has no accepted row, or when it would
+  remove 10 offers or more and more than 50% of the feed's current offers; the
+  import prints a `removal: skipped` line; a skip does not change the exit code
+  (exit 1 still means a feed failed). `--feed <id>
+  --allow-large-removal` lifts the second guard only. An offer that returns in
+  a later import is restored; hide is never undone by an import.
 
 ## Admin area
 

@@ -54,7 +54,7 @@ describe('seams (guardrails 1, 2, 4)', () => {
     );
   });
 
-  const flagNames = /\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview)\b/;
+  const flagNames = /\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_removed|isRemoved)\b/;
   const mayNameFlags = (file: string): boolean =>
     file === 'src/server/visibility.ts' ||
     file.startsWith('src/db/') ||
@@ -106,16 +106,65 @@ describe('seams (guardrails 1, 2, 4)', () => {
 
   it('reports a planted hide writer that names another flag, and passes one naming only isHidden (CR-1)', () => {
     expect(namesOtherFlag('set({ isHidden: hidden })')).toBe(false);
-    for (const word of ['isApproved', 'is_approved', 'is_hidden', 'inReview', 'in_review']) {
+    for (const word of ['isApproved', 'is_approved', 'is_hidden', 'inReview', 'in_review', 'isRemoved', 'is_removed']) {
       expect(namesOtherFlag(`set({ isHidden: hidden }); where(eq(feeds.${word}, true))`)).toBe(true);
     }
   });
 
   it('the visibility scope itself names every flag, so the scan above is not vacuous', () => {
     const code = sources().find(({ file }) => file === 'src/server/visibility.ts')?.code ?? '';
-    for (const flag of ['isApproved', 'isHidden', 'inReview']) {
+    for (const flag of ['isApproved', 'isHidden', 'inReview', 'isRemoved']) {
       expect(code).toContain(flag);
     }
+  });
+
+  // S3.3 (AC 21): the removed flag is narrower than the other three. Only the visibility scope reads
+  // it, the schema and the seed know the column, and the importer is its one writer. The two admin
+  // writers that `mayNameFlags` lets name the other flags may not name this one.
+  const removedFlag = /\b(is_removed|isRemoved)\b/;
+  const mayNameRemoved = (file: string): boolean =>
+    file === 'src/server/visibility.ts' ||
+    file.startsWith('src/db/') ||
+    file.startsWith('src/server/seed/') ||
+    file.startsWith('src/server/importer/');
+
+  it('names the removed flag only in the visibility scope, schema, seed and importer (S3.3, AC 21)', () => {
+    expect(offenders(removedFlag, mayNameRemoved)).toEqual([]);
+  });
+
+  it('keeps the removed-flag rule able to fail and not vacuous (S3.3, AC 21)', () => {
+    const codeIn = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+    // The scan sees the flag where the design puts it.
+    expect(codeIn('src/server/visibility.ts')).toMatch(removedFlag);
+    expect(codeIn('src/server/importer/index.ts')).toMatch(removedFlag);
+    expect(codeIn('src/db/schema/catalogue.ts')).toMatch(removedFlag);
+    // Both spellings are caught, a screen or an admin writer naming it is reported, a longer word is not.
+    expect(removedFlag.test('where(eq(offers.isRemoved, false))')).toBe(true);
+    expect(removedFlag.test('offers.is_removed')).toBe(true);
+    expect(removedFlag.test('isRemovedAt')).toBe(false);
+    const planted = [
+      'src/server/admin/products.ts',
+      'src/server/admin/sources.ts',
+      'src/app/admin/(shell)/productos/page.tsx',
+      'src/server/catalogue/product-page.ts',
+      'src/server/visibility.ts',
+      'src/server/importer/index.ts',
+    ].filter((file) => !mayNameRemoved(file));
+    expect(planted).toEqual([
+      'src/server/admin/products.ts',
+      'src/server/admin/sources.ts',
+      'src/app/admin/(shell)/productos/page.tsx',
+      'src/server/catalogue/product-page.ts',
+    ]);
+  });
+
+  it('writes the removed flag on an offer only in the importer (S3.3, AC 21)', () => {
+    const writesRemoved = /isRemoved\s*:\s*(true|false)\b/;
+    const found = sources()
+      .filter(({ code }) => writesRemoved.test(code))
+      .map(({ file }) => file)
+      .filter((file) => !file.startsWith('src/db/'));
+    expect(found).toEqual(['src/server/importer/index.ts']);
   });
 
   it('calls fetch( only in src/server/importer/source.ts', () => {
@@ -217,7 +266,7 @@ describe('seams (guardrail 1, S5.1 mapped products)', () => {
       sources().find(({ file }) => file === 'src/server/catalogue/search-page.ts')?.code ?? '';
     expect(code).toContain('visibleProductWhere()');
     expect(code).toContain('visibleOfferWhere()');
-    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview)\b/);
+    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_removed|isRemoved)\b/);
     expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
   });
 
@@ -858,7 +907,7 @@ describe('seams (guardrail 1, S5.5 vehicle fitment)', () => {
     expect(code.length).toBeGreaterThan(0);
     expect(code).toContain('countedFitmentWhere()');
     expect(code).toContain('activeVehicleWhere()');
-    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_retired|isRetired)\b/);
+    expect(code).not.toMatch(/\b(is_approved|isApproved|is_hidden|isHidden|in_review|inReview|is_removed|isRemoved|is_retired|isRetired)\b/);
     expect(code).not.toMatch(/isNotNull\(\s*products\.categoryId\s*\)/);
   });
 
