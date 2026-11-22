@@ -91,6 +91,18 @@ The folder is `catalogue-files/` at the repository root. It is the only folder c
 
 **Once after pulling this change**, run `docker compose up -d` so the `app` service is recreated with the mount. Without it the Compose form cannot see the folder and reports `file_not_found`. A clone has the folder already (it holds only `.gitkeep`); the rest of its contents are ignored by git.
 
+## Before the first real import: check the demo and local data
+
+Do this once, on your local stack, before the first import of a real file (US-7.1 OD-3). Nothing here is a deploy step.
+
+**Check the local database.** Products and offers already stored are never re-matched, and the importer is the only writer of the normalised brand and part number that matching uses. Open `/admin/productos` and look for products you made with hand files before S7.1: the same part twice, or products with no brand or no part number. Those never converge with a new row and fail safe into a duplicate, never a wrong merge. The remedy is the one that exists: use a fresh local database, or hide the duplicates at `/admin/productos`.
+
+**Demo products can absorb a real row.** The demo shops and products are ordinary rows in the database. A real row whose normalised brand and part number equal those of a demo product attaches to that demo product and the product keeps its demo title, brand and text (the first file's text stays). Look through the demo products at `/admin/productos` and avoid, or hide, any whose brand and part number match a real row.
+
+**Disable the demo shops for the check.** On `/admin/tiendas`, press "Desactivar tienda" on each of the four demo shops and confirm. There is no bulk control. A product with only demo offers then leaves every public page, search, `/go` and the sitemap; the demo rows stay stored and an all-feeds import skips their feeds while they are off. The setting survives a restart.
+
+**Approve them again afterwards.** `npm run gate` runs an e2e setup that needs an approved demo feed and fails with "the import found no approved feed" otherwise, and its specs read the demo rows. When the check is over, press "Aprobar tienda" on each demo shop you disabled; if you disabled a feed instead of its shop, approve that feed again too.
+
 ## 3. Register the shop and the file feed
 
 In the admin, on `/admin/tiendas`, signed in at `127.0.0.1` (see CLAUDE.md for the admin sign-in):
@@ -101,9 +113,13 @@ In the admin, on `/admin/tiendas`, signed in at `127.0.0.1` (see CLAUDE.md for t
 
 Changing the file name of an **approved** file feed returns that feed to unapproved in the same save, and its offers leave the public site at once; the form warns before you submit. Saving the same name again changes nothing.
 
-## 4. Approve the shop, then the feed
+## 4. Approve the feed, not the shop yet
 
-Approval is two separate actions on `/admin/tiendas`: approve the shop, then approve the feed. Approving one does not approve the other, and neither shows any product by itself.
+Approval is two separate actions on `/admin/tiendas`, and approving one does not approve the other. Do them in this order:
+
+1. Press "Aprobar feed" on the new feed. **Leave the shop unapproved.** The import reads only approved feeds, so an unapproved feed cannot be imported and there would be no output to review. It checks the feed's approval only, never the shop's.
+2. The feed now reads "Aprobado, en pausa" and the form says "Feed aprobado, pero en pausa: la tienda no está aprobada". That is the review window: the import runs and stores rows, but nothing is public, because a product is public only when both the shop and the feed are approved.
+3. Approve the shop later, after the review (step 7).
 
 ## 5. Run the import
 
@@ -119,6 +135,8 @@ To import one feed only, add `--feed <id>` (after `--` for npm). An unapproved f
 **Rows you drop from the file.** An approved feed's offers that are not among the file's accepted rows are flagged removed and leave the site; `offers_removed` counts them. The row is not deleted, and a row rejected by validation counts as absent. If a later import has the row again, the offer is restored, with its clicks. An import never un-hides an offer you hid.
 
 **The removal guard.** Removal is skipped, and everything else in the import still applies, when the file has no accepted row (`empty_import`), or when it would remove 10 offers or more and more than 50% of the feed's current offers (`small_import`). Then the last indented line is `  removal: skipped <reason> missing=<n> current=<n>` and a skip does not change the exit code (exit 1 still means a feed failed). If you really did shrink the file that much, run `npm run import-feeds -- --feed <id> --allow-large-removal` (or `docker compose run --rm app import-feeds --feed <id> --allow-large-removal`); it lifts `small_import` only, never `empty_import`. To take a whole feed off the site, unapprove it. A feed that failed removes nothing.
+
+**Review while nothing is public.** With the feed approved and the shop still unapproved, read the import output (counts, rejected rows by record and field, `own_product` lines, any `removal: skipped` line, unknown-vehicle lines), then open `/admin/productos`, which lists these products although nothing is public, and `/admin/categorias` (step 6). Check the prices against the shop's own page by hand: the importer cannot tell whether a price includes IVA. Disable the feed again, or hide a product or offer, if something is wrong; approving after an import reads nothing again.
 
 ### When a feed fails
 
@@ -138,9 +156,9 @@ After the first import, open `/admin/categorias`. Each distinct `category` strin
 
 A feed that has never been imported shows a note that there are no categories to assign yet.
 
-## 7. Check the product
+## 7. Approve the shop, then check the product
 
-With the shop approved, the feed approved and the category mapped, open the product on its category page or by search. The page lists each shop's price in euros, cheapest first, with a link to the shop through `/go/<offer>`. If it is not there, check in order: the shop is approved, the feed is approved, the category is mapped, the row was not rejected in the import output.
+When the review is done, press "Aprobar tienda" on the shop. With the shop approved, the feed approved and the category mapped, open the product on its category page or by search. The page lists each shop's price in euros, cheapest first, with a link to the shop through `/go/<offer>`. If it is not there, check in order: the shop is approved, the feed is approved, the category is mapped, the row was not rejected in the import output, the product or the offer is not hidden at `/admin/productos`, and the offer was not removed by an import (it is absent from the file, see "Rows you drop from the file").
 
 ## What S3.7 does not do
 
