@@ -6,15 +6,25 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
-import { offers, products, shops } from '@/db/schema';
+import { feeds, offers, products, shops } from '@/db/schema';
+import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
 import { setOfferHidden, setProductHidden } from '@/server/admin/products';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
+import { readFitStates, readProductFitState, readProductVehicles } from '@/server/catalogue/fit-state';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { formatImportReport, importExitCode, importFeeds } from '@/server/importer';
 import { SourceError } from '@/server/importer/source';
 import type { FeedBytes, FeedFailure, ImportReport } from '@/server/importer/types';
 
-import { allOffers, allProducts, insertFeed, insertOffer, insertProduct, insertShop } from '../support/catalogue';
+import {
+  allOffers,
+  allProducts,
+  insertFeed,
+  insertOffer,
+  insertProduct,
+  insertShop,
+  vehicleIdBySlug,
+} from '../support/catalogue';
 import { aFileFeed, catalogueCsv, importFromFolder, tempCatalogueFolder } from '../support/catalogue-files';
 import { sitemapProducts } from '../support/categories';
 import { resetDatabase } from '../support/db';
@@ -923,5 +933,105 @@ describe('the printed lines (AC 19)', () => {
       `feed ${feed.feedId} "Tienda Linea": imported rows=6 products_created=0 offers_created=0 offers_updated=6 offers_removed=4 rejected=0 unknown_vehicles=0`,
       'total: feeds=1 imported=1 skipped=0 failed=0',
     ]);
+  });
+});
+
+// OD-3 (US-5.6 AC 14, docs/product/vehicle-fitment.md rule 2, decision 0018): a fitment belongs to
+// (product, vehicle, feed) and counts while that feed and its shop are approved. A removed offer does
+// not end it: the product keeps the "fits" claim a feed gave it after that feed dropped the offer.
+// Assertions go through the public fit readers and the category filter by car, never the fitments table.
+describe('fitments after a removal (OD-3)', () => {
+  const [CAR] = VEHICLE_CATALOGUE.map((vehicle) => vehicle.slug);
+
+  /** Shop A says its offer of the shared product fits CAR; shop B says nothing about fitment. */
+  async function fitmentWorld() {
+    const a = await aFeedOf('Tienda A');
+    const b = await aFeedOf('Tienda B');
+    const category = await mapFeed(a.feedId);
+    await mapFeed(b.feedId);
+    const carId = await vehicleIdBySlug(CAR);
+    const aRows = (withShared: boolean) => [
+      ...(withShared ? [keyRow('a-1', { category: MAPPED, ean: EAN.one, price: '10.00' })] : []),
+      keyRow('a-2', { category: MAPPED }),
+    ];
+    const withFitment = (rows: ReturnType<typeof aRows>) =>
+      rows.map((row) => (row.id === 'a-1' ? { ...row, fitment: CAR } : { ...row, fitment: '' }));
+    const bRows = [keyRow('b-1', { category: MAPPED, ean: EAN.one, price: '12.00' }), keyRow('b-2', { category: MAPPED })];
+    await importRows({ [a.feedId]: withFitment(aRows(true)), [b.feedId]: bRows });
+    const offerA = (await offersOf(a.feedId))['a-1'];
+    const offerB = (await offersOf(b.feedId))['b-1'];
+    expect(offerB.productId).toBe(offerA.productId);
+    const product = await productOfOffer(offerA.id);
+    return {
+      a,
+      b,
+      category,
+      carId,
+      product,
+      offerA,
+      offerB,
+      /** Feed A imports again without the shared row (its offer is removed); a-2 stays listed. */
+      dropSharedFromA: () => importRows({ [a.feedId]: withFitment(aRows(false)) }, { feedId: a.feedId }),
+    };
+  }
+  type World = Awaited<ReturnType<typeof fitmentWorld>>;
+
+  /** The fit claim of the shared product on every real reader. */
+  async function fitReaders(w: World) {
+    const [bySlug, byId, vehicles, listing] = await Promise.all([
+      readProductFitState(w.product.slug, w.carId),
+      readFitStates(CAR, [w.product.id]),
+      readProductVehicles(w.product.slug),
+      getPublicCategoryPage(w.category.slug, 1, null, 'price-asc', w.carId),
+    ]);
+    return {
+      banner: bySlug,
+      state: byId.status === 'ok' ? byId.states.get(w.product.id) : byId.status,
+      fittedVehicles: vehicles.map((vehicle) => vehicle.slug),
+      group: listing?.products.find((card) => card.slug === w.product.slug)?.fitGroup ?? null,
+      fitsCount: listing?.fit?.fitsCount ?? null,
+    };
+  }
+
+  const FITS = { banner: 'fits', state: 'fits', fittedVehicles: [CAR], group: 'fits', fitsCount: 1 };
+
+  it('keeps the product fitting the car after the feed that said so drops its offer, while the other shop keeps it public', async () => {
+    const w = await fitmentWorld();
+    expect(await fitReaders(w)).toEqual(FITS);
+
+    const report = await w.dropSharedFromA();
+
+    expect(report.feeds[0]).toMatchObject({ outcome: 'imported', offersRemoved: 1 });
+    expect((await offersOf(w.a.feedId))['a-1'].isRemoved).toBe(true);
+    expect((await offersOf(w.b.feedId))['b-1'].isRemoved).toBe(false);
+    // Still public, through shop B's offer only.
+    expect(await surface(w.product.slug, w.category.slug)).toMatchObject({ pageOffers: [w.offerB.id], inCategory: true });
+    // And the claim stands on the banner, the list of fitting cars, the fit state and the category filter.
+    expect(await fitReaders(w)).toEqual(FITS);
+  });
+
+  it('keeps the claim through a second import of the same shrunk file', async () => {
+    const w = await fitmentWorld();
+    await w.dropSharedFromA();
+
+    const again = await w.dropSharedFromA();
+
+    expect(again.feeds[0]).toMatchObject({ outcome: 'imported', offersRemoved: 0 });
+    expect(await fitReaders(w)).toEqual(FITS);
+  });
+
+  it('ends the claim with the approval of the feed that gave it, not with its removed offer', async () => {
+    const w = await fitmentWorld();
+    await w.dropSharedFromA();
+
+    await getDb().update(feeds).set({ isApproved: false }).where(eq(feeds.id, w.a.feedId));
+
+    expect(await fitReaders(w)).toEqual({
+      banner: 'unknown',
+      state: 'unknown',
+      fittedVehicles: [],
+      group: 'unknown',
+      fitsCount: 0,
+    });
   });
 });

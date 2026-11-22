@@ -16,20 +16,23 @@ import { assertTestDatabase } from './db';
 
 /** One catalogue row; every key is a canonical column the importer reads. */
 export type CatalogueRow = Partial<
-  Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'part_number' | 'ean' | 'currency' | 'category', string>
+  Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'part_number' | 'ean' | 'currency' | 'category' | 'fitment', string>
 >;
 
 const COLUMNS = ['id', 'title', 'price', 'url', 'brand', 'part_number', 'ean', 'currency', 'category'] as const;
+const COLUMNS_WITH_FITMENT = [...COLUMNS, 'fitment'] as const;
 
 /**
  * CSV text with the nine canonical columns, header first. Unlike `csvOf` it writes the
- * `category` and `part_number` columns. A value holding a comma or a quote is quoted, so a
- * decimal-comma price such as `12,99` stays one cell.
+ * `category` and `part_number` columns. The `fitment` column (`|`-separated vehicle slugs) is a tenth,
+ * written only when some row defines `fitment`, as `csvOf` does (pass '' for an empty cell). A value
+ * holding a comma or a quote is quoted, so a decimal-comma price such as `12,99` stays one cell.
  */
 export function catalogueCsv(rows: CatalogueRow[]): string {
   const cell = (value: string) => (/[",]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
-  const lines = rows.map((row) => COLUMNS.map((column) => cell(row[column] ?? '')).join(','));
-  return `${COLUMNS.join(',')}\n${lines.join('\n')}\n`;
+  const columns = rows.some((row) => row.fitment !== undefined) ? COLUMNS_WITH_FITMENT : COLUMNS;
+  const lines = rows.map((row) => columns.map((column) => cell(row[column] ?? '')).join(','));
+  return `${columns.join(',')}\n${lines.join('\n')}\n`;
 }
 
 /** A fresh temp folder, and the call that removes it. */
