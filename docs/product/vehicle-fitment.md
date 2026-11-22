@@ -67,7 +67,9 @@ that device until they change or remove it.
    - A fitment counts only while its feed and that feed's shop are both
      approved (guardrail 1); a feed an admin disables is an unapproved one, and
      there is no separate enabled flag. Whether the product's offers are hidden
-     or in review does not change it, and fitments to a retired vehicle do not
+     or in review does not change it, nor does an offer the import removed
+     because a feed dropped it (S3.3, decision 0018): the feed's fitments stay
+     on the product, as OD-3 settled. Fitments to a retired vehicle do not
      count. Hidden products stay hidden whatever their fit.
 3. **Filtering.** With a vehicle selected, a listing (category page, search
    results) shows:
