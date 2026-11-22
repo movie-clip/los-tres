@@ -18,3 +18,7 @@ Dockerfile
 compose.yaml
 .dockerignore
 catalogue-files
+agentic
+AGENTS.md
+CLAUDE.md
+README.md
