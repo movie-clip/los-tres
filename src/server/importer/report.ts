@@ -25,7 +25,12 @@ function feedLines(feed: FeedImportReport): string[] {
   ];
 }
 
-/** One line per feed (rejected rows indented under it), then a total line. */
+/**
+ * One line per feed, then a total line. Under an imported feed's line, indented
+ * and in this order: its rejected rows, its own-product rows (`own_product
+ * <reason>`), its unknown fitment vehicles, then the not-shown fitment count.
+ * A skipped or failed feed has its line only.
+ */
 export function formatImportReport(report: ImportReport): string {
   const count = (outcome: FeedImportReport['outcome']) =>
     report.feeds.filter((feed) => feed.outcome === outcome).length;
