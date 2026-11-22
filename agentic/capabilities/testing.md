@@ -40,7 +40,7 @@ E2E data comes from Playwright `globalSetup` (`tests/e2e/global-setup.ts`), whic
 
 An e2e that hides or changes public data cannot do it on the Compose app: every spec reads the demo rows in parallel (a hidden demo product flakes root counts) and a row added to the dev database changes `admin-categories.spec.ts`'s `demoFingerprint` (hit in gate run 1). Use `startIsolatedApp` (`tests/support/isolated-app.ts`): a one-off container on a throwaway database, dropped in `afterAll`.
 
-An e2e must never leave a feed approved: `import-feeds` reads every approved feed, so a transient approved e2e feed changes `entrypoint.spec.ts`'s `feeds=N` under `fullyParallel`. `admin-categories.spec.ts` keeps its fixed shop and feeds unapproved and proves the public side of guardrail 1 that way (a mapping on an unapproved feed publishes nothing); a removal taking an approved product off the public readers is integration only.
+An e2e must never leave a feed approved: `import-feeds` reads every approved feed, so a transient approved e2e feed changes `entrypoint.spec.ts`'s `feeds=N` under `fullyParallel`. `admin-categories.spec.ts` keeps its fixed shop and feeds unapproved and proves the public side of guardrail 1 that way (a mapping on an unapproved feed publishes nothing); removal of an approved product is proved off the public readers in integration (importer-removal.test.ts, hide-public-sweep.test.ts); the one e2e removal test lives in catalogue-file-flow.spec.ts, which owns an approved feed, and cleanRows() deletes its replacement product.
 
 S3.7 `catalogue-file-flow.spec.ts` is the one exception: it approves its own feed and runs in the Playwright project `catalogue-file`, which depends on `chromium`, so no other spec runs beside it; it unapproves in the spec and `cleanRows()` in `beforeAll` and `afterAll`. A spec in a project with dependencies cannot be run alone by name: use `npx playwright test <file> --project catalogue-file --no-deps`.
 
@@ -90,6 +90,7 @@ matching test, and it should be one that would fail if the rule broke:
 - **(1)** No public read (search, category, product page, sitemap,
   `/go/<offer>`) returns an offer from an unapproved or disabled feed, a hidden
   product or offer, or a product waiting in the matching queue.
+  - A removed offer (`offers.is_removed`) is on no public reader: `hide-public-sweep.test.ts` sets it with `setOfferRemoved` and asserts the same surfaces as a hidden offer; `seams.test.ts` fences the flag to `visibility.ts`, `src/db`, the seed and the importer.
   - A hidden product or offer is proved off every public reader by `tests/integration/hide-public-sweep.test.ts` through the real writer; its `view()` helper reads page, 404 rewrite, category, home tree, search, sitemap, `/go` and car filter in one call.
   - A product with `products.category_id` null is not public: assert it on the shared scope (`visibility.test.ts`), the product page, `/go` and the category page. `tests/unit/seams.test.ts` keeps the `isNotNull(products.categoryId)` condition in `src/server/visibility.ts` only.
 - **(2)** The importer refuses a source that is not a registered feed.
@@ -151,6 +152,9 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - `tests/support/feeds.ts`: `fixtureDeps`, where a feed row's `url` is the
   fixture file name, and `textDeps`. Local feed files live in
   `tests/fixtures/feeds/`; shipped-demo expectations in `tests/fixtures/demo.ts`.
+- S3.3 tests: unit `removal.test.ts` (`decideRemoval`), `import-feeds-cli.test.ts` (argv forms, importer and pool mocked, fresh module per case through `vi.resetModules`); integration `importer-removal.test.ts` (local helpers seeded, reimport, offersOf, removedOf, surface) and the removed describe in `hide-public-sweep.test.ts`; `tests/support/catalogue.ts` `setOfferRemoved` sets the flag by hand.
+- A failure after the removal pass is forced by a temporary trigger on `offers`: `before update ... when (new.is_removed and not old.is_removed)` raising P0001, dropped in `finally`; the whole import, prices included, must roll back (`importer-removal.test.ts`).
+- The Compose dev database can drift from the seeded demo state (seen: feed 4 "Filtro cabina" mapped to null and its product uncategorised, so 22 instead of 23 unknown-fit products); the symptom is 26 count failures in the home, category and search specs; repair with psql and re-run.
 - `tests/support/hide.ts`: `hideForm`, `withFailingHideWrites`, `allRows` (whole tables for a before/after diff) and `withoutHiddenFlags`. `tests/support/isolated-app.ts`: `startIsolatedApp(spec)` returns `origin`, `logs()`, `psql()`, `psqlScalar()`, `createAdmin()`, `stop()`; needs `DB_PASSWORD` in `.env` and a free loopback port.
 - S2.4 e2e testids: `product-row[-title|-tag|-public]`, `products-search[-submit]`, `products-hidden-only`, `products-empty`, `product-toggle-button`, `product-done`, `product-tag`, `product-public`, `product-back`, `offer-row` (filter by shop name), `offer-toggle-button`, `offer-done`, `offer-tag`, `admin-error`.
 - `tests/support/catalogue-files.ts`: `catalogueCsv(rows)` (nine columns incl. category, quotes cells with a comma), `tempCatalogueFolder()`, `insertFileFeed`, `aFileFeed`, `importFromFolder(dir, {feedId})`; catalogue tests pass `catalogueDir` through `readFeedSource` and never touch the repo `catalogue-files/`.
