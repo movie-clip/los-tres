@@ -30,7 +30,8 @@ Status: accepted, 2026-11-22. Builds on 0013 (a failed import rolls back).
   and never lifts `empty_import`.
 - **A skip is not a failure.** The import still commits its other writes,
   prints `  removal: skipped <reason> missing=<n> current=<n>` as the last line
-  under its feed, and exits 0. Exit 1 stays "a feed failed".
+  under its feed, and does not change the exit code. Exit 1 stays "a feed
+  failed".
 - **Return.** An offer whose row is accepted again gets `is_removed = false`
   in the same upsert, with the same id and clicks.
 - **Hide is never written.** The pass and the restore write `is_removed` only;
@@ -64,7 +65,9 @@ Status: accepted, 2026-11-22. Builds on 0013 (a failed import rolls back).
 - `visibleOfferWhere()` gains "not removed"; no other reader changes.
 - The importer is the only writer of `is_removed`.
 - The per-feed line gains `offers_removed=<n>` after `offers_updated`.
-- Fitments of a feed stay on a product after its offer is removed, and the
-  admin offer list shows a removed offer as not on the site with no reason.
-  Both are follow-up candidates, not part of this decision.
+- Fitments of a feed stay on a product after its offer is removed. This is
+  settled under OD-3 (US-5.6): a product dropped from a feed keeps that feed's
+  fitments, and a removed offer does not change it.
+- The admin offer list shows a removed offer as not on the site with no
+  reason. Showing why is tracked in issue #344, not part of this decision.
 - Changing the numbers or the override is an owner decision, not a code edit.
