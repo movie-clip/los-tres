@@ -4,16 +4,26 @@ import { ensureFixedCategoryTree } from '@/db/category-tree';
 import { getDb } from '@/db/client';
 import { ensureVehicleCatalogue } from '@/db/vehicle-catalogue';
 
+import { expectedWorkerDatabase } from './env';
+
 /**
  * Any helper that mutates the database calls this first. Fails unless the
- * connection is on a `_test` database, so a test can never write to the
- * development database.
+ * connection is on this worker's own database, `<db>_w<VITEST_POOL_ID>_test`,
+ * so a test can never write to the development database, to the template or to
+ * another worker's database. The expected name comes from `VITEST_POOL_ID`, not
+ * from the connection, so a worker that reaches another worker's database fails.
  */
 export async function assertTestDatabase(): Promise<void> {
   const result = await getDb().execute<{ name: string }>(sql`select current_database() as name`);
   const name = result.rows[0]?.name ?? '';
-  if (!name.endsWith('_test')) {
-    throw new Error('Refusing to run: the connected database is not a _test database');
+  let expected: string;
+  try {
+    expected = expectedWorkerDatabase(process.env.DATABASE_URL ?? '', process.env.VITEST_POOL_ID);
+  } catch {
+    throw new Error('Refusing to run: this process has no integration worker database');
+  }
+  if (name !== expected) {
+    throw new Error('Refusing to run: the connected database is not this worker\'s own test database');
   }
 }
 
