@@ -246,6 +246,12 @@ export async function allProducts() {
   return getDb().select().from(products).orderBy(products.id);
 }
 
+/** Sets the S3.3 removed flag by hand, the way a pass of the importer would (the importer is its only real writer). */
+export async function setOfferRemoved(offerId: number, isRemoved: boolean): Promise<void> {
+  await assertTestDatabase();
+  await getDb().update(offers).set({ isRemoved }).where(eq(offers.id, offerId));
+}
+
 export async function allOffers() {
   return getDb().select().from(offers).orderBy(offers.id);
 }

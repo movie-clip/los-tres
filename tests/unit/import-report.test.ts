@@ -12,6 +12,7 @@ function feed(overrides: Partial<FeedImportReport>): FeedImportReport {
     productsCreated: 0,
     offersCreated: 0,
     offersUpdated: 0,
+    offersRemoved: 0,
     rejected: [],
     ownProducts: [],
     unknownVehicles: 0,
@@ -41,8 +42,8 @@ describe('formatImportReport (C-16)', () => {
     };
     expect(formatImportReport(report)).toBe(
       [
-        'feed 1 "Tienda Demo Uno": imported rows=2 products_created=2 offers_created=2 offers_updated=0 rejected=0 unknown_vehicles=0',
-        'feed 2 "Tienda Demo Dos": imported rows=3 products_created=1 offers_created=2 offers_updated=0 rejected=1 unknown_vehicles=0',
+        'feed 1 "Tienda Demo Uno": imported rows=2 products_created=2 offers_created=2 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+        'feed 2 "Tienda Demo Dos": imported rows=3 products_created=1 offers_created=2 offers_updated=0 offers_removed=0 rejected=1 unknown_vehicles=0',
         '  record 5: invalid_price (price)',
         'total: feeds=2 imported=2 skipped=0 failed=0',
       ].join('\n'),
@@ -237,7 +238,7 @@ describe('formatImportReport, own-product rows (S7.1, AC 16, 17)', () => {
   it('leaves the feed head line without a new count and does not count own products as rejected', () => {
     const [head] = lines({ ownProducts: [{ record: 2, reason: 'ambiguous_ean' }] });
     expect(head).toBe(
-      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=3 offers_created=3 offers_updated=0 rejected=0 unknown_vehicles=0',
+      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=3 offers_created=3 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
     );
   });
 
@@ -256,5 +257,97 @@ describe('formatImportReport, own-product rows (S7.1, AC 16, 17)', () => {
     expect(
       importExitCode({ startedAt, feeds: [feed({ ownProducts: [{ record: 2, reason: 'ambiguous_ean' }] })] }),
     ).toBe(0);
+  });
+});
+
+describe('formatImportReport, offer removal (S3.3, AC 19)', () => {
+  const run = (overrides: Partial<FeedImportReport>): string[] =>
+    formatImportReport({ startedAt, feeds: [feed({ rows: 3, ...overrides })] }).split('\n');
+
+  it('states the removed count on the imported line, zero included, between offers_updated and rejected', () => {
+    expect(run({})[0]).toBe(
+      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=0 offers_created=0 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+    );
+    expect(run({ offersRemoved: 7 })[0]).toBe(
+      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=0 offers_created=0 offers_updated=0 offers_removed=7 rejected=0 unknown_vehicles=0',
+    );
+  });
+
+  it('prints no removal line for a feed that removed offers, or removed none and skipped nothing', () => {
+    expect(run({ offersRemoved: 7 }).filter((line) => line.includes('removal'))).toEqual([]);
+    expect(run({}).filter((line) => line.includes('removal'))).toEqual([]);
+  });
+
+  it.each(['empty_import', 'small_import'] as const)('prints the skipped %s line with its counts and a code only', (reason) => {
+    const lines = run({ removalSkipped: { reason, missing: 12, current: 20 } });
+    expect(lines).toEqual([
+      expect.stringMatching(/ offers_removed=0 rejected=0 unknown_vehicles=0$/),
+      `  removal: skipped ${reason} missing=12 current=20`,
+      'total: feeds=1 imported=1 skipped=0 failed=0',
+    ]);
+  });
+
+  it('prints the removal line last under its feed, after rejected, own-product and fitment lines', () => {
+    const lines = run({
+      rejected: [{ record: 4, code: 'invalid_price', field: 'price' }],
+      ownProducts: [{ record: 2, reason: 'ean_brand_conflict' }],
+      unknownVehicles: 5,
+      unknownVehicleSlugs: [{ slug: 'coche-x', rows: 2 }],
+      unknownVehiclesNotShown: 3,
+      removalSkipped: { reason: 'small_import', missing: 10, current: 19 },
+    });
+    expect(lines.slice(1)).toEqual([
+      '  record 4: invalid_price (price)',
+      '  record 2: own_product ean_brand_conflict',
+      '  fitment: unknown vehicle coche-x rows=2',
+      '  fitment: unknown vehicle values not shown rows=3',
+      '  removal: skipped small_import missing=10 current=19',
+      'total: feeds=1 imported=1 skipped=0 failed=0',
+    ]);
+  });
+
+  it('keeps a feed\'s removal line with its own feed when two feeds are printed', () => {
+    const text = formatImportReport({
+      startedAt,
+      feeds: [
+        feed({ rows: 1, removalSkipped: { reason: 'empty_import', missing: 3, current: 3 } }),
+        feed({ feedId: 2, shopName: 'Tienda Demo Dos', rows: 1 }),
+      ],
+    }).split('\n');
+    expect(text.indexOf('  removal: skipped empty_import missing=3 current=3')).toBe(1);
+    expect(text[2]).toMatch(/^feed 2 /);
+    expect(text.filter((line) => line.includes('removal'))).toHaveLength(1);
+  });
+
+  it('leaves a skipped and a failed feed line exactly as before, whatever the removal fields hold', () => {
+    const noisy = { offersRemoved: 4, removalSkipped: { reason: 'small_import', missing: 9, current: 10 } } as const;
+    const report: ImportReport = {
+      startedAt,
+      feeds: [
+        feed({ feedId: 3, shopName: 'Tres', outcome: 'skipped', skipReason: 'not_approved', ...noisy }),
+        feed({ feedId: 4, shopName: 'Cuatro', outcome: 'failed', failure: 'fetch_failed', ...noisy }),
+      ],
+    };
+    expect(formatImportReport(report)).toBe(
+      [
+        'feed 3 "Tres": skipped not_approved',
+        'feed 4 "Cuatro": failed fetch_failed',
+        'total: feeds=2 imported=0 skipped=1 failed=1',
+      ].join('\n'),
+    );
+  });
+
+  it('counts a guard skip as an imported feed in the total, and never as a failure', () => {
+    const report: ImportReport = {
+      startedAt,
+      feeds: [feed({ removalSkipped: { reason: 'empty_import', missing: 2, current: 2 } })],
+    };
+    expect(formatImportReport(report).split('\n').at(-1)).toBe('total: feeds=1 imported=1 skipped=0 failed=0');
+    expect(importExitCode(report)).toBe(0);
+  });
+
+  it('prints no URL and no row text with a removal line', () => {
+    const text = run({ removalSkipped: { reason: 'small_import', missing: 10, current: 19 } }).join('\n');
+    expect(text).not.toMatch(/https?:|demo-feed:|\.example/);
   });
 });

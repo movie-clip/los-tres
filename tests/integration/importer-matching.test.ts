@@ -334,7 +334,7 @@ describe.each(OWN_PRODUCT_CASES)('a row that becomes its own product: $reason (A
       ownProducts: [{ record: 2, reason }],
     });
     expect(text.split('\n')).toEqual([
-      `feed ${feed.feedId} "Tienda Conflicto": imported rows=1 products_created=1 offers_created=1 offers_updated=0 rejected=0 unknown_vehicles=0`,
+      `feed ${feed.feedId} "Tienda Conflicto": imported rows=1 products_created=1 offers_created=1 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0`,
       `  record 2: own_product ${reason}`,
       'total: feeds=1 imported=1 skipped=0 failed=0',
     ]);

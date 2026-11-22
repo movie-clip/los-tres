@@ -512,7 +512,7 @@ describe('unknown slugs (AC 5, 21 to 26)', () => {
 
     expect(formatImportReport(report)).toBe(
       [
-        `feed ${feedId} "Tienda Unica": imported rows=2 products_created=2 offers_created=2 offers_updated=0 rejected=0 unknown_vehicles=3`,
+        `feed ${feedId} "Tienda Unica": imported rows=2 products_created=2 offers_created=2 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=3`,
         '  fitment: unknown vehicle raro-uno rows=2',
         '  fitment: unknown vehicle raro-dos rows=1',
         'total: feeds=1 imported=1 skipped=0 failed=0',

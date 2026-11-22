@@ -54,10 +54,13 @@ test.describe('app image entrypoint', () => {
     for (const line of feedLines) {
       expect(line).toContain('products_created=0');
       expect(line).toContain('offers_created=0');
+      // S3.3: the demo files are unchanged between runs, so nothing is missing and nothing is removed.
+      expect(line).toContain('offers_removed=0');
       // S5.6, AC 29: the demo feeds name only vehicles of the list.
       expect(line).toMatch(/ unknown_vehicles=0$/);
     }
     expect(second.stdout).not.toContain('fitment: unknown vehicle');
+    expect(second.stdout).not.toContain('removal:');
   });
 
   test('import-feeds prints no feed URL', () => {
@@ -75,6 +78,23 @@ test.describe('app image entrypoint', () => {
     const result = composeRun('import-feeds', '--feed', 'abc');
     expect(result.status).toBe(2);
   });
+
+  // S3.3, AC 12: the override is accepted only as the third argument, after `--feed <id>`.
+  test('import-feeds --feed <id> --allow-large-removal reaches the importer: an unregistered id still exits 1', () => {
+    const result = composeRun('import-feeds', '--feed', '999999', '--allow-large-removal');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('not registered');
+    expect(result.stderr).not.toContain('usage:');
+  });
+
+  for (const args of [['--allow-large-removal'], ['--allow-large-removal', '--feed', '1'], ['--feed', '1', '--allow-large-removal', 'x']]) {
+    test(`import-feeds ${args.join(' ')} prints the usage line and exits 2`, () => {
+      const result = composeRun('import-feeds', ...args);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('usage: import-feeds [--feed <id> [--allow-large-removal]]');
+      expect(result.stdout).not.toContain('feed ');
+    });
+  }
 
   test('seed --if-enabled exits 0 and prints no secret', () => {
     const result = composeRun('seed', '--if-enabled');
