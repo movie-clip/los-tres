@@ -16,7 +16,7 @@ import { readFeedSource } from '@/server/importer/source';
 import { updateFeed } from '@/server/admin/sources';
 
 import { allOffers, allProducts, insertCategoryMapping, insertFeed, insertShop } from '../support/catalogue';
-import { aFileFeed, catalogueCsv, importFromFolder, insertFileFeed, tempCatalogueFolder } from '../support/catalogue-files';
+import { aFileFeed, catalogueCsv, importFromFolder, insertFileFeed, tempCatalogueFolder, type CatalogueRow } from '../support/catalogue-files';
 import { ABSENT_VIEW, PUBLIC_VIEW, categoryForm, fiveTargets, publicView } from '../support/categories';
 import { resetDatabase } from '../support/db';
 import { allClicks, callGo } from '../support/go';
@@ -454,15 +454,24 @@ describe('two shops, one product, through a shared EAN (AC 30)', () => {
     expect((await allClicks()).map((click) => click.offerId).sort()).toEqual(page!.offers.map((offer) => offer.offerId).sort());
   });
 
-  it('does not converge two files that share only a brand and part number (S7.1 is not built)', async () => {
-    await write('sin-a.csv', catalogueCsv([{ ...ROW_A, ean: '', part_number: 'PN-777', url: 'https://tienda-a.example/p/1' }]));
-    await write('sin-b.csv', catalogueCsv([{ ...ROW_A, id: 'b-9', ean: '', part_number: 'PN-777', url: 'https://tienda-b.example/p/9' }]));
-    await aFileFeed('sin-a.csv');
-    await aFileFeed('sin-b.csv');
+  it('converges two files that share only a brand and part number: one product, both shops cheapest first', async () => {
+    await write('sin-a.csv', catalogueCsv([{ ...ROW_A, ean: '', part_number: 'PN-777', price: '10,50', url: 'https://tienda-a.example/p/1' }]));
+    await write('sin-b.csv', catalogueCsv([{ ...ROW_A, id: 'b-9', ean: '', part_number: 'PN-777', price: '9,20', url: 'https://tienda-b.example/p/9' }]));
+    const a = await aFileFeed('sin-a.csv', { shopName: 'Tienda Alfa' });
+    const b = await aFileFeed('sin-b.csv', { shopName: 'Tienda Beta' });
+    const [target] = await fiveTargets();
+    await insertCategoryMapping(a.feedId, ROW_A.category, target.id);
+    await insertCategoryMapping(b.feedId, ROW_A.category, target.id);
 
     await importFromFolder(dir);
 
-    expect(await allProducts()).toHaveLength(2);
+    expect(await allProducts()).toHaveLength(1);
+    expect(await allOffers()).toHaveLength(2);
+    const page = await getPublicProductBySlug((await productSlugs())[0]);
+    expect(page?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual([
+      ['Tienda Beta', 920],
+      ['Tienda Alfa', 1050],
+    ]);
   });
 });
 
@@ -502,5 +511,67 @@ describe('demo feeds and file feeds do not read each other\'s folders (AC 35)', 
 
     expect(report.feeds[0]).toMatchObject({ outcome: 'failed', failure: 'unsupported_url' });
     expect(await allOffers()).toEqual([]);
+  });
+});
+
+// S7.1 (T7.1.2): the convergence rule through the catalogue-file reader. Two hand files converge on
+// brand and part number, in the spellings a hand-written file really has; the near misses and the
+// rows with no part number (ROW_A and ROW_B carry none) stay separate products.
+describe('two catalogue files, brand and part number, no EAN (S7.1, AC 1, 3, 4, 8, 17)', () => {
+  async function twoFiles(first: CatalogueRow, second: CatalogueRow) {
+    await write('archivo-a.csv', catalogueCsv([{ ...ROW_A, ean: '', price: '10,50', url: 'https://tienda-a.example/p/1', ...first }]));
+    await write('archivo-b.csv', catalogueCsv([{ ...ROW_A, id: 'b-9', ean: '', price: '9,20', url: 'https://tienda-b.example/p/9', ...second }]));
+    const a = await aFileFeed('archivo-a.csv', { shopName: 'Tienda Alfa' });
+    const b = await aFileFeed('archivo-b.csv', { shopName: 'Tienda Beta' });
+    const [target] = await fiveTargets();
+    await insertCategoryMapping(a.feedId, ROW_A.category, target.id);
+    await insertCategoryMapping(b.feedId, ROW_A.category, target.id);
+    return importFromFolder(dir);
+  }
+
+  it('AC 3: converges files whose brand and part number differ only in case, spaces, dashes and dots', async () => {
+    const report = await twoFiles({ brand: 'Marca Cf', part_number: 'OC 12.34' }, { brand: 'MARCA  CF', part_number: 'oc-1234' });
+
+    expect(report.feeds.map((feed) => [feed.productsCreated, feed.offersCreated, feed.ownProducts])).toEqual([
+      [1, 1, []],
+      [0, 1, []],
+    ]);
+    expect(await allProducts()).toHaveLength(1);
+    const page = await getPublicProductBySlug((await productSlugs())[0]);
+    expect(page?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual([
+      ['Tienda Beta', 920],
+      ['Tienda Alfa', 1050],
+    ]);
+  });
+
+  it('AC 4: does not converge Bosch and Robert Bosch, whatever the part number says', async () => {
+    await twoFiles({ brand: 'Bosch', part_number: 'F 026 407' }, { brand: 'Robert Bosch', part_number: 'F 026 407' });
+
+    expect(await allProducts()).toHaveLength(2);
+    expect(await allOffers()).toHaveLength(2);
+  });
+
+  it('AC 8: does not converge two files that share a brand and have no part number (ROW_A and ROW_B shape)', async () => {
+    const report = await twoFiles({ brand: 'MarcaCf', part_number: '' }, { brand: 'MarcaCf', part_number: '' });
+
+    expect(report.feeds.map((feed) => [feed.productsCreated, feed.offersCreated, feed.ownProducts])).toEqual([
+      [1, 1, []],
+      [1, 1, []],
+    ]);
+    expect(await allProducts()).toHaveLength(2);
+  });
+
+  it('AC 17: a file row that meets two different EANs on one key is reported by record number and reason only, exit 0', async () => {
+    const report = await twoFiles(
+      { brand: 'MarcaCf', part_number: 'PN-777', ean: '4006381333931' },
+      { brand: 'MarcaCf', part_number: 'PN-777', ean: '4006381333948' },
+    );
+    const text = formatImportReport(report);
+
+    expect(report.feeds[1]).toMatchObject({ productsCreated: 1, offersCreated: 1, rejected: [], ownProducts: [{ record: 2, reason: 'brand_part_number_ean_conflict' }] });
+    expect(await allProducts()).toHaveLength(2);
+    expect(text).toContain('  record 2: own_product brand_part_number_ean_conflict');
+    for (const needle of ['MarcaCf', 'PN-777', '4006381333948', 'archivo-b.csv', dir]) expect(text).not.toContain(needle);
+    expect(importExitCode(report)).toBe(0);
   });
 });

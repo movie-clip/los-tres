@@ -179,8 +179,10 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   exits 1 (the others still run): `file_name_refused` (stored name not a bare
   name), `file_not_found` (folder or exact file missing), `file_refused` (a
   link, not a regular file, or changed while opened).
-- **Not done:** no removal of rows dropped from the file (S3.3), no convergence
-  of two shops without a shared valid `ean` (S7.1). Hide and unhide of a
+- **Not done:** no removal of rows dropped from the file (S3.3), no brand alias
+  (`Bosch` and `Robert Bosch` stay two products, S7.3) and no re-matching of
+  rows already stored. Two shops converge on a shared valid `ean`, or on the
+  same normalised brand and part number (S7.1). Hide and unhide of a
   product or offer exist (S2.4): an admin finds a product at `/admin/productos`
   and hides or unhides it and its offers; hidden items stay hidden through
   every import, and an unhide publishes nothing by itself.
@@ -222,7 +224,7 @@ deploy it must be the public https origin**, or all of them point at
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts` and the vehicle list from `src/db/vehicle-catalogue.ts`; every migrate path does both, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
-| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; `npm run import-feeds -- --feed <id>` imports one; a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
+| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; a row that became its own product because of an EAN or brand + part number conflict or ambiguity prints `  record <n>: own_product <reason>` (S7.1; one of `ean_brand_conflict`, `ambiguous_ean`, `brand_part_number_ean_conflict`, `ambiguous_brand_part_number`; after the rejected lines, no row text, never fails the run); `npm run import-feeds -- --feed <id>` imports one; a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |

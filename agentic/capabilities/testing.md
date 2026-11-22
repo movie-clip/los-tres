@@ -104,9 +104,9 @@ matching test, and it should be one that would fail if the rule broke:
   - Admin cookie rules: only `signInAction` writes a cookie (`nextRequest.cookieWrites` is empty for every refusal, guard call and expired cookie); `admin_sessions` `ip_address` and `user_agent` are null (`admin-storage.test.ts`); sentinel logs in `admin-logs.test.ts`; the public no-cookie e2e stays on public routes and `admin.spec.ts` asserts the one `admin.session_token` cookie.
 - **Search (S5.4).** `seams.test.ts` pins that `search-page.ts` names no flag and has one `console.error`.
 - **Matching (0008), slice B cut:** EAN attach, EAN with a different brand
-  rejected into the report (`ean_brand_conflict`), null brand on either side
-  attaches, no EAN creates a product, invalid EAN rejected. Brand + part-number
-  matching and the queue are tested when they ship.
+  becomes its own product with reason `ean_brand_conflict` in `report.ownProducts`
+  (since S7.1; not a reject), null brand on either side
+  attaches, no EAN creates a product, invalid EAN rejected. Brand + part-number matching (S7.1) is covered by importer-brand-part-number.test.ts, matching-index.test.ts and the own-product describe.each in importer-matching.test.ts (AC map in the S7.1 run, 05-test.md); a conflict or ambiguity is an own product with a reason in report.ownProducts, never a reject; the queue is not built.
 - **es-ES prices and seams.** Assertions on es-ES prices normalise U+00A0
   (`normaliseSpaces`, `tests/support/messages.ts`). `tests/unit/seams.test.ts`
   scans the source so the visibility flags, `fetch(`, `node:fs`, `@/db` in
@@ -153,6 +153,8 @@ Every public response is asserted to have no `Set-Cookie`; a browser visit also 
 - S2.4 e2e testids: `product-row[-title|-tag|-public]`, `products-search[-submit]`, `products-hidden-only`, `products-empty`, `product-toggle-button`, `product-done`, `product-tag`, `product-public`, `product-back`, `offer-row` (filter by shop name), `offer-toggle-button`, `offer-done`, `offer-tag`, `admin-error`.
 - `tests/support/catalogue-files.ts`: `catalogueCsv(rows)` (nine columns incl. category, quotes cells with a comma), `tempCatalogueFolder()`, `insertFileFeed`, `aFileFeed`, `importFromFolder(dir, {feedId})`; catalogue tests pass `catalogueDir` through `readFeedSource` and never touch the repo `catalogue-files/`.
 - `csvOf` and `xmlOf` have no category or part_number column; an unquoted decimal-comma price (12,99) splits the CSV cell and the row is rejected as `invalid_currency`. Use `catalogueCsv`.
+- `tests/support/matching.ts` is the S7.1 scaffolding: `keyRow(id, {brand, part, ean, price, title, url, category})`, `aFeedOf(shopName?)`, `mapFeed(feedId)` (maps `MAPPED` to the first fixed category), `importRows({[feedId]: rows}, {feedId?})` and `importText` for a column `catalogueCsv` does not write, `storedProduct({slug, brand, part, ean, extra})` (normalised columns from the real normalisers, `extra` to make them stale), `EAN` (five valid EAN-13), `PLANTED` (text no output line may repeat) and `OWN_PRODUCT_CASES` (one seed and one row per own-product reason). `catalogueCsv` is the only generator with `part_number`, it has no `description` column, and `Partial<typeof ROW_A>` lacks `part_number`: type a row as `CatalogueRow`.
+- An EXPLAIN test embeds the un-awaited drizzle builder in sql (`sql\`explain (format json) ${builder}\``) inside `db.transaction` with `set local enable_seqscan = off`, throws a sentinel to roll back, and proves non-vacuity by dropping the index in the same transaction (DDL rolls back); `matching-index.test.ts`.
 - A Python read/replace/write of a test file that holds a `\n` or `\r\n` escape expands it into a real newline and breaks the file (hit three times in S3.7, as for regexes above): use Edit.
 - `tests/support/network-off.ts`: `stubNetworkOff`; every importer test stubs
   fetch to throw.

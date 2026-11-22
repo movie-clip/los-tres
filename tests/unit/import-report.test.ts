@@ -13,6 +13,7 @@ function feed(overrides: Partial<FeedImportReport>): FeedImportReport {
     offersCreated: 0,
     offersUpdated: 0,
     rejected: [],
+    ownProducts: [],
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
@@ -207,5 +208,53 @@ describe('formatImportReport, unknown vehicle slugs (S5.6, AC 22 to 25, 27)', ()
       feeds: [feed({ unknownVehicles: 50, unknownVehiclesNotShown: 50 })],
     };
     expect(importExitCode(report)).toBe(0);
+  });
+});
+
+describe('formatImportReport, own-product rows (S7.1, AC 16, 17)', () => {
+  const lines = (overrides: Partial<FeedImportReport>) =>
+    formatImportReport({ startedAt, feeds: [feed({ rows: 3, productsCreated: 3, offersCreated: 3, ...overrides })] }).split('\n');
+
+  it('prints one indented line per own-product row, in record order, after the rejected lines and before the fitment lines', () => {
+    const out = lines({
+      rejected: [{ record: 4, code: 'invalid_price', field: 'price' }],
+      ownProducts: [
+        { record: 2, reason: 'ean_brand_conflict' },
+        { record: 3, reason: 'ambiguous_brand_part_number' },
+      ],
+      unknownVehicles: 1,
+      unknownVehicleSlugs: [{ slug: 'coche-x', rows: 1 }],
+    });
+    expect(out.slice(1)).toEqual([
+      '  record 4: invalid_price (price)',
+      '  record 2: own_product ean_brand_conflict',
+      '  record 3: own_product ambiguous_brand_part_number',
+      '  fitment: unknown vehicle coche-x rows=1',
+      'total: feeds=1 imported=1 skipped=0 failed=0',
+    ]);
+  });
+
+  it('leaves the feed head line without a new count and does not count own products as rejected', () => {
+    const [head] = lines({ ownProducts: [{ record: 2, reason: 'ambiguous_ean' }] });
+    expect(head).toBe(
+      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=3 offers_created=3 offers_updated=0 rejected=0 unknown_vehicles=0',
+    );
+  });
+
+  it('prints the four reasons verbatim and nothing else on the line', () => {
+    const reasons = [
+      'ean_brand_conflict',
+      'ambiguous_ean',
+      'brand_part_number_ean_conflict',
+      'ambiguous_brand_part_number',
+    ] as const;
+    const out = lines({ ownProducts: reasons.map((reason, i) => ({ record: i + 2, reason })) });
+    expect(out.slice(1, 5)).toEqual(reasons.map((reason, i) => `  record ${i + 2}: own_product ${reason}`));
+  });
+
+  it('does not change the exit code: own-product rows never fail a run', () => {
+    expect(
+      importExitCode({ startedAt, feeds: [feed({ ownProducts: [{ record: 2, reason: 'ambiguous_ean' }] })] }),
+    ).toBe(0);
   });
 });

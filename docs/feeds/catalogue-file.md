@@ -23,8 +23,8 @@ A CSV or XML file, plain or gzip, in the same layout `import-feeds` already read
 | `price` | yes | The **final price with IVA included**, as decimal text with at most two decimals, dot or comma: `12.99` or `12,99`. The page shows `12,99 €`. A price with more than two decimals, a thousands separator, a sign, an exponent or zero is rejected, never rounded. |
 | `url` | yes | The shop link. The visitor's "Ir a la tienda" button goes to exactly this address through `/go/<offer>`, with nothing appended. It must start with `http://` or `https://`. |
 | `ean` | no, but write it | The product's EAN (8 or 13 digits with a correct check digit; spaces and hyphens are ignored). **It is what makes two shops converge**: two files that carry the same valid EAN land on one product page that lists both shops, cheapest first. An invalid EAN rejects the row. |
-| `brand` | no | The brand. |
-| `part_number` | no | The part number. Stored and shown, but it does not make two files converge yet: matching by brand and part number is S7.1 (#40, not built). |
+| `brand` | no | The brand. With `part_number` it makes two files converge when they carry no EAN, see "When two files land on one product" below. Compared after trimming, collapsing inner spaces and upper-casing only: `Bosch` and `Robert Bosch` stay two products, and `Mann-Filter` and `Mann Filter` stay two (the hyphen counts). |
+| `part_number` | no | The part number. Spaces, dots and hyphens are ignored and case does not matter (`OC 12.34` equals `oc-1234`). With `brand` it makes two files converge, see "When two files land on one product" below. |
 | `description` | no | Product description text. |
 | `currency` | no | Empty or `EUR`. Any other currency rejects the row. |
 | `category` | no | A category word of your own, for example `Filtros de aceite`. It is mapped to one of the five categories in step 6. A row with no category, or one you have not mapped, is stored but not public. |
@@ -40,6 +40,37 @@ a-001,Filtro de aceite de ejemplo,Marca Ejemplo,OC-0001,4006381333931,12.99,http
 ```
 
 Rows are checked one by one. A rejected row is listed by record number and field while the other rows import; rejected rows alone do not make the command exit 1.
+
+### When two files land on one product
+
+A new offer is matched to a product in this order (decision 0008, S7.1):
+
+1. **EAN.** If the row has a valid EAN and exactly one product holds it, the offer attaches there, unless both the row and the product name a brand and the brands differ.
+2. **Brand and part number.** Only if no product holds the EAN (or the row has none), and the row has both a brand and a part number: the offer attaches to the one product with the same normalised brand and part number. Two rows of the same file with the same brand and part number also land on one product.
+
+Limits:
+
+- A row with no brand, or no part number, never converges by this step and becomes its own product.
+- A row with an EAN does not join a product with the same brand and part number that carries a different EAN; it becomes its own product.
+- A row with an EAN can join a product with the same brand and part number that has no EAN, and a row without an EAN can join one that has. The product keeps the text of the first file, so in the first case it still has no EAN, and a later row with that EAN and a different brand and part number does not reach it by EAN.
+- Convergence never changes a product's title, brand, part number, EAN or description: the first file's text stays.
+- A product hidden by the admin still receives the offer and stays hidden. Convergence publishes nothing: the usual approvals and a mapped category still decide what is public.
+- Products and offers already stored are never re-matched or merged. A hand file imported before S7.1 keeps its separate products, and a product whose stored brand or part number is empty is never found by step 2. For a clean result, use a fresh local database or hide the duplicates.
+
+**A conflict is not a rejection.** When the EAN and the brand disagree, when two or more products hold the EAN, when two or more products hold the brand and part number, or when two different EANs sit on one brand and part number, the row is stored as its own product and its offer is counted in `products_created` and `offers_created`, not in `rejected`. The import prints one line per such row, with the record number and a fixed reason and nothing else from the file:
+
+```
+  record 2: own_product ean_brand_conflict
+```
+
+| Reason | What happened |
+|---|---|
+| `ean_brand_conflict` | One product holds the EAN and its brand differs from the row's. |
+| `ambiguous_ean` | Two or more products hold the EAN. |
+| `brand_part_number_ean_conflict` | No product holds the EAN, and the one product with this brand and part number carries a different EAN. |
+| `ambiguous_brand_part_number` | Two or more products hold this brand and part number. |
+
+Such a row does not fail the run (exit 0). It is an ordinary product, public only under the usual approvals and category mapping. A second import does not list it again. There is no review queue and no merge or split, so a duplicate product page is fixed by hiding the product at `/admin/productos`.
 
 ## 2. Name the file and place it in the folder
 
@@ -83,7 +114,7 @@ npm run import-feeds
 docker compose run --rm app import-feeds
 ```
 
-To import one feed only, add `--feed <id>` (after `--` for npm). An unapproved file feed is reported skipped and its file is not read. For an approved one you get the usual line `feed <id> "<shop name>": imported rows=... products_created=... offers_created=... offers_updated=... rejected=...`. Running it again on an unchanged file creates nothing new and changes only prices and dates.
+To import one feed only, add `--feed <id>` (after `--` for npm). An unapproved file feed is reported skipped and its file is not read. For an approved one you get the usual line `feed <id> "<shop name>": imported rows=... products_created=... offers_created=... offers_updated=... rejected=... unknown_vehicles=...`, then an indented line for each rejected row and for each row that became its own product (`record <n>: own_product <reason>`). Running it again on an unchanged file creates nothing new and changes only prices and dates.
 
 ### When a feed fails
 
@@ -110,7 +141,7 @@ With the shop approved, the feed approved and the category mapped, open the prod
 ## What S3.7 does not do
 
 - **No removal of dropped rows.** An offer or product you delete from the file stays until S3.3 (#28); the importer only adds and updates.
-- **No convergence without an EAN.** Brand and part number do not match two files (S7.1, #40).
+- **No brand alias and no re-matching.** `Bosch` and `Robert Bosch` stay two products (S7.3, deferred), and products already stored are never merged (see "When two files land on one product").
 - **Hide or unhide** a single product or offer at `/admin/productos` (S2.4, #25), after the import. A hidden item stays hidden through every later import; unhiding publishes nothing by itself, since the two approvals and a mapped category are still needed.
 - **No upload, no preview, no "Import now" button, no row count and no file-exists check** in the admin; no images; no other column layouts (S3.5).
 - **No revenue or disclosure wording** is written anywhere while everything is local.

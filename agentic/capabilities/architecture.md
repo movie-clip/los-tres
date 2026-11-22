@@ -39,8 +39,7 @@ one lives in code:
 - **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of the catalogue folder `catalogue-files/` (S3.7)). One importer, `import-feeds`, is the only writer of
   products and offers from outside data. It reads only feeds registered in the
   database and has no code path that fetches a shop's web pages (guardrail 2).
-- **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The
-  importer and the admin merge and split tools both call it.
+- **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The importer is its only caller; there is no merge or split in the MVP (mvp.md § Matching).
 - **Role check.** Every server entry point declares whether it is public or
   admin, and admin entry points check the session on the server (guardrail 3). Role check (`src/server/auth/guard.ts`): `requireAdminPage`, `requireAdminAction`, `checkAdminSession`; the only reader of the session cookie.
 - **Money** (`src/server/money.ts`). One money helper, in integer cents, which

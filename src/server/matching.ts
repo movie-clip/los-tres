@@ -1,13 +1,14 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import type { Executor } from '../db/client';
 import { products } from '../db/schema';
 
-// The one matcher (0008). Slice B implements step 1 (EAN) and step 3 (new
-// product). Step 2, brand + normalised part number, has no code path yet: it
-// goes in `matchProduct`, between the EAN lookup and the "none" result.
+// The one matcher (0008, S7.1). Step 1 matches by EAN, step 2 by brand +
+// normalised part number; anything else is a new product. A conflict or an
+// ambiguity is not a rejection: the offer becomes its own product (D-5) and the
+// matcher says why. The matcher reads `products` only and sets no flag.
 
 export type ParsedEan =
   | { kind: 'absent' }
@@ -49,37 +50,83 @@ export function normalizeBrand(raw: string | null | undefined): string | null {
   return value === '' ? null : value;
 }
 
+export type MatchCandidate = {
+  eanNormalised: string | null;
+  brandNormalised: string | null;
+  partNumberNormalised: string | null;
+};
+
+export type OwnProductReason =
+  | 'ean_brand_conflict' // one product holds the EAN, both brands known and different
+  | 'ambiguous_ean' // two or more products hold the EAN
+  | 'brand_part_number_ean_conflict' // no product holds the EAN; the one key holder carries another EAN
+  | 'ambiguous_brand_part_number'; // two or more products hold the key
+
 export type MatchResult =
   | { kind: 'attach'; productId: number }
   | { kind: 'none' }
-  | { kind: 'reject'; code: 'ean_brand_conflict' | 'ambiguous_ean' };
+  | { kind: 'own_product'; reason: OwnProductReason };
+
+/** Step 2's lookup, exported so a plan test explains this exact query. At most 2 rows. */
+export function selectByBrandPartNumber(
+  db: Executor,
+  key: { brandNormalised: string; partNumberNormalised: string },
+) {
+  return db
+    .select({ id: products.id, eanNormalised: products.eanNormalised })
+    .from(products)
+    .where(
+      and(
+        eq(products.partNumberNormalised, key.partNumberNormalised),
+        eq(products.brandNormalised, key.brandNormalised),
+      ),
+    )
+    .limit(2);
+}
 
 /**
- * Finds the product a new offer belongs to. EAN: exactly one product with the
- * same normalised EAN attaches, unless both brands are known and differ
- * (rejected, D-1 Q5). More than one product with that EAN is ambiguous. A null
- * brand on either side is not a disagreement (TD-27). A hidden product still
- * matches: the offer attaches and stays invisible with it.
+ * Finds the product a new offer belongs to. Step 1, EAN: two products with it
+ * is ambiguous; one attaches unless both brands are known and differ (a
+ * conflict); a null brand on either side is not a disagreement (TD-27). With no
+ * product holding the EAN, step 2, brand + part number (both required): two
+ * holders is ambiguous; one holder carrying an EAN while the candidate carries
+ * another is a conflict; otherwise it attaches. A hidden product still matches:
+ * the offer attaches and stays invisible with it. Conflicts and ambiguities
+ * make the offer its own product (D-5).
  */
-export async function matchProduct(
-  db: Executor,
-  candidate: { eanNormalised: string | null; brandNormalised: string | null },
-): Promise<MatchResult> {
-  if (candidate.eanNormalised === null) return { kind: 'none' };
-  const found = await db
-    .select({ id: products.id, brandNormalised: products.brandNormalised })
-    .from(products)
-    .where(eq(products.eanNormalised, candidate.eanNormalised))
-    .limit(2);
-  if (found.length === 0) return { kind: 'none' };
-  if (found.length > 1) return { kind: 'reject', code: 'ambiguous_ean' };
-  const [product] = found;
-  if (
-    product.brandNormalised !== null &&
-    candidate.brandNormalised !== null &&
-    product.brandNormalised !== candidate.brandNormalised
-  ) {
-    return { kind: 'reject', code: 'ean_brand_conflict' };
+export async function matchProduct(db: Executor, candidate: MatchCandidate): Promise<MatchResult> {
+  if (candidate.eanNormalised !== null) {
+    const found = await db
+      .select({ id: products.id, brandNormalised: products.brandNormalised })
+      .from(products)
+      .where(eq(products.eanNormalised, candidate.eanNormalised))
+      .limit(2);
+    if (found.length > 1) return { kind: 'own_product', reason: 'ambiguous_ean' };
+    if (found.length === 1) {
+      const [product] = found;
+      if (
+        product.brandNormalised !== null &&
+        candidate.brandNormalised !== null &&
+        product.brandNormalised !== candidate.brandNormalised
+      ) {
+        return { kind: 'own_product', reason: 'ean_brand_conflict' };
+      }
+      return { kind: 'attach', productId: product.id };
+    }
   }
-  return { kind: 'attach', productId: product.id };
+
+  if (candidate.brandNormalised === null || candidate.partNumberNormalised === null) {
+    return { kind: 'none' };
+  }
+  const holders = await selectByBrandPartNumber(db, {
+    brandNormalised: candidate.brandNormalised,
+    partNumberNormalised: candidate.partNumberNormalised,
+  });
+  if (holders.length === 0) return { kind: 'none' };
+  if (holders.length > 1) return { kind: 'own_product', reason: 'ambiguous_brand_part_number' };
+  const [holder] = holders;
+  if (candidate.eanNormalised !== null && holder.eanNormalised !== null) {
+    return { kind: 'own_product', reason: 'brand_part_number_ean_conflict' };
+  }
+  return { kind: 'attach', productId: holder.id };
 }
