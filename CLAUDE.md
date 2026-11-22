@@ -245,7 +245,8 @@ The template and the clones stay in PostgreSQL after a run; the next run drops
 them (and any old `<DB_NAME>_test`), so a failed run can be inspected. Test
 files run in parallel, one per worker. The default worker count is
 `min(8, CPUs - 1)`, at least 1; the optional `INTEGRATION_WORKERS=<n>` set in
-the shell (`INTEGRATION_WORKERS=2 npm run test:integration`) sets it; `.env` is
+the shell (Bash: `INTEGRATION_WORKERS=2 npm run test:integration`; PowerShell:
+`$env:INTEGRATION_WORKERS=2; npm run test:integration`) sets it; `.env` is
 not read for it. A value that is not a positive whole number fails the run.
 
 **CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate:ci` on every
