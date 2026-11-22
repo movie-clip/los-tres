@@ -143,9 +143,12 @@ project tool server, read `protocol/authoring.md` § "The project tool server".
 
 ## Why `quant` is not bound
 
-Nothing here needs the mathematics gate. The site sorts prices, takes daily
-minimums for price history and counts clicks, and those are arithmetic covered
-by guardrail 4 and by tests. They are not a methodology anyone has to re-derive. Gates that apply:
+Nothing here needs the mathematics gate. The site sorts offers by price and
+logs clicks; price history and click counts are deferred (`docs/product/mvp.md`).
+That is arithmetic covered by guardrail 4 and by tests, not a methodology
+anyone has to re-derive. If price history (S8.3) is revived, revisit whether
+`quant` is bound: a daily minimum needs a rule for hidden, removed and
+unapproved offers. Gates that apply:
 `integration`, `ux-review` when a screen changed, and `review` when a story
 exists. `phases.md`'s `verify` rows are what `check_report.py` reads.
 
