@@ -11,7 +11,7 @@ function feedLines(feed: FeedImportReport): string[] {
   return [
     `${head} imported rows=${feed.rows} products_created=${feed.productsCreated} ` +
       `offers_created=${feed.offersCreated} offers_updated=${feed.offersUpdated} ` +
-      `rejected=${feed.rejected.length} unknown_vehicles=${feed.unknownVehicles}`,
+      `offers_removed=${feed.offersRemoved} rejected=${feed.rejected.length} unknown_vehicles=${feed.unknownVehicles}`,
     ...feed.rejected.map(
       (row) => `  record ${row.record}: ${row.code}${row.field ? ` (${row.field})` : ''}`,
     ),
@@ -22,14 +22,22 @@ function feedLines(feed: FeedImportReport): string[] {
     ...(feed.unknownVehiclesNotShown > 0
       ? [`  fitment: unknown vehicle values not shown rows=${feed.unknownVehiclesNotShown}`]
       : []),
+    ...(feed.removalSkipped
+      ? [
+          `  removal: skipped ${feed.removalSkipped.reason} ` +
+            `missing=${feed.removalSkipped.missing} current=${feed.removalSkipped.current}`,
+        ]
+      : []),
   ];
 }
 
 /**
  * One line per feed, then a total line. Under an imported feed's line, indented
  * and in this order: its rejected rows, its own-product rows (`own_product
- * <reason>`), its unknown fitment vehicles, then the not-shown fitment count.
- * A skipped or failed feed has its line only.
+ * <reason>`), its unknown fitment vehicles, the not-shown fitment count, then
+ * last the skipped removal (`removal: skipped <reason> missing=<n>
+ * current=<n>`, S3.3), only when the guard skipped it. A skipped or failed
+ * feed has its line only: a failed feed rolled back, removal included.
  */
 export function formatImportReport(report: ImportReport): string {
   const count = (outcome: FeedImportReport['outcome']) =>

@@ -12,7 +12,8 @@ import { feeds, offers, products, shops, vehicles } from '../db/schema';
 // approval, hidden and review columns.
 //
 //   offer visible   = feed approved AND shop approved AND offer not hidden
-//                     AND offer not in the matching queue
+//                     AND offer not in the matching queue AND offer not
+//                     removed by import (S3.3)
 //   product public = product not hidden AND product mapped to a category
 //                     (products.category_id is not null) AND it has at least
 //                     one visible offer
@@ -30,6 +31,7 @@ export function visibleOfferWhere(): SQL {
     eq(shops.isApproved, true),
     eq(offers.isHidden, false),
     eq(offers.inReview, false),
+    eq(offers.isRemoved, false),
   ) as SQL;
 }
 

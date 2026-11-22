@@ -64,6 +64,13 @@
       "when": 1795182933114,
       "tag": "0008_catalogue_file_source",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795360608791,
+      "tag": "0009_offer_removed",
+      "breakpoints": true
     }
   ]
 }

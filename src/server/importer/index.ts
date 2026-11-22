@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
@@ -8,6 +8,7 @@ import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
 import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
+import { decideRemoval, REMOVAL_CHUNK } from './removal';
 import { formatImportReport, importExitCode } from './report';
 import { readFeedSource, SourceError } from './source';
 import {
@@ -26,6 +27,9 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // The only writer of `products` and `offers` from outside data (guardrail 1).
 // It reads feeds registered as rows, never a URL or a path (guardrail 2), and
 // never writes an approval, hidden or review column on an existing row (TD-21).
+// The only writer of `offers.is_removed` (S3.3): set on this feed's offers that
+// are absent from an import that passed the removal guard (./removal.ts), and
+// cleared on every accepted row.
 // Product text is written once (TD-23). `products.category_id` is the one
 // product column it may set later, and only from null: the first mapped feed
 // category wins and nothing is ever cleared or overwritten (D-3). The admin
@@ -54,10 +58,12 @@ type FeedRow = {
  * (throws `FeedNotRegisteredError` when no such row exists; a row that exists
  * but is not approved is reported `skipped` and its source is not read).
  * One transaction per feed; a failing feed never stops the others.
+ * `allowLargeRemoval` lifts the small-import removal guard for the feed
+ * `options.feedId` only; with no `feedId` it has no effect (S3.3, D-3).
  */
 export async function importFeeds(
   db: Database,
-  options: { feedId?: number; deps?: ImportDeps } = {},
+  options: { feedId?: number; allowLargeRemoval?: boolean; deps?: ImportDeps } = {},
 ): Promise<ImportReport> {
   const deps = options.deps ?? {};
   const readSource = deps.readSource ?? readFeedSource;
@@ -70,7 +76,9 @@ export async function importFeeds(
 
   const reports: FeedImportReport[] = [];
   for (const feed of registered) {
-    reports.push(await importOneFeed(db, feed, readSource, startedAt));
+    const allowLargeRemoval =
+      options.allowLargeRemoval === true && options.feedId !== undefined && feed.id === options.feedId;
+    reports.push(await importOneFeed(db, feed, readSource, startedAt, allowLargeRemoval));
   }
   return { startedAt, feeds: reports };
 }
@@ -101,6 +109,7 @@ function emptyReport(feed: FeedRow): FeedImportReport {
     productsCreated: 0,
     offersCreated: 0,
     offersUpdated: 0,
+    offersRemoved: 0,
     rejected: [],
     ownProducts: [],
     unknownVehicles: 0,
@@ -118,6 +127,7 @@ async function importOneFeed(
   feed: FeedRow,
   readSource: (feed: FeedSourceRef) => Promise<FeedBytes>,
   startedAt: Date,
+  allowLargeRemoval: boolean,
 ): Promise<FeedImportReport> {
   if (!feed.isApproved) {
     return { ...emptyReport(feed), outcome: 'skipped', skipReason: 'not_approved' };
@@ -143,7 +153,9 @@ async function importOneFeed(
     const columns = opened.header ? readHeader(opened.header) : null;
     if (!columns) return failed(feed, 'invalid_header');
     try {
-      return await db.transaction((tx) => importRecords(tx, feed, columns, opened.records, startedAt));
+      return await db.transaction((tx) =>
+        importRecords(tx, feed, columns, opened.records, startedAt, allowLargeRemoval),
+      );
     } catch (error) {
       // Rolled back, whatever was written. The error is dropped: a driver
       // message can carry row values. A read failure part-way (bad gzip or XML,
@@ -166,6 +178,7 @@ async function importRecords(
   columns: ColumnIndex,
   records: FeedRecords['records'],
   startedAt: Date,
+  allowLargeRemoval: boolean,
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
@@ -175,6 +188,8 @@ async function importRecords(
   // (S4.2, D-16).
   await tx.select({ id: feeds.id }).from(feeds).where(eq(feeds.id, feed.id)).for('share');
   const mappings = await loadMappings(tx, feed.id);
+  // Read before the row loop, so offers created or restored by it are not in it.
+  const liveOffers = await loadLiveOffers(tx, feed.id);
   const fitmentsOfFeed = new FeedFitments(await loadVehicleIds(tx));
 
   for await (const { record, cells } of records) {
@@ -222,6 +237,7 @@ async function importRecords(
     fitmentsOfFeed.add(productId, row.fitment);
     report.offersCreated += 1;
   }
+  await removeMissingOffers(tx, feed.id, liveOffers, seenIds, allowLargeRemoval, report);
   await replaceFeedFitments(tx, feed.id, fitmentsOfFeed.wanted);
   fitmentsOfFeed.fillReport(report);
   return report;
@@ -267,6 +283,59 @@ async function assignCategory(
     .where(and(eq(products.id, productId), isNull(products.categoryId)));
 }
 
+/** This feed's offers not flagged removed (hidden and in-review included): external id to offer id. */
+async function loadLiveOffers(tx: Executor, feedId: number): Promise<Map<string, number>> {
+  const rows = await tx
+    .select({ id: offers.id, externalId: offers.externalId })
+    .from(offers)
+    .where(and(eq(offers.feedId, feedId), eq(offers.isRemoved, false)));
+  return new Map(rows.map((row) => [row.externalId, row.id]));
+}
+
+/**
+ * The removal pass (S3.3): flags this feed's live offers that no accepted row
+ * named, unless the guard skips it. Writes `is_removed` only, never a hidden or
+ * review flag, and never an offer of another feed. Runs in the feed's
+ * transaction, so a later failure rolls it back with the import.
+ */
+async function removeMissingOffers(
+  tx: Executor,
+  feedId: number,
+  liveOffers: Map<string, number>,
+  seenIds: Set<string>,
+  allowLargeRemoval: boolean,
+  report: FeedImportReport,
+): Promise<void> {
+  const missingIds: number[] = [];
+  for (const [externalId, offerId] of liveOffers) {
+    if (!seenIds.has(externalId)) missingIds.push(offerId);
+  }
+  const decision = decideRemoval({
+    current: liveOffers.size,
+    missing: missingIds.length,
+    accepted: seenIds.size,
+    allowLargeRemoval,
+  });
+  if (decision.kind === 'skip') {
+    report.removalSkipped = {
+      reason: decision.reason,
+      missing: missingIds.length,
+      current: liveOffers.size,
+    };
+    return;
+  }
+  if (decision.kind === 'none') return;
+  for (let start = 0; start < missingIds.length; start += REMOVAL_CHUNK) {
+    const chunk = missingIds.slice(start, start + REMOVAL_CHUNK);
+    const flagged = await tx
+      .update(offers)
+      .set({ isRemoved: true })
+      .where(and(eq(offers.feedId, feedId), inArray(offers.id, chunk)))
+      .returning({ id: offers.id });
+    report.offersRemoved += flagged.length;
+  }
+}
+
 async function findOffer(tx: Executor, feedId: number, externalId: string) {
   const [found] = await tx
     .select({ productId: offers.productId })
@@ -309,9 +378,10 @@ async function createProduct(
 }
 
 /**
- * Upserts on (feed_id, external_id). The update lists exactly price, url, date
- * and feed_category (all feed data): never product_id, is_hidden or in_review
- * (TD-21, TD-24).
+ * Upserts on (feed_id, external_id). The update lists exactly price, url, date,
+ * feed_category (all feed data) and the removed flag, cleared because the row
+ * is in this import (S3.3): never product_id, is_hidden or in_review (TD-21,
+ * TD-24). An insert takes the removed flag's default, false.
  */
 async function writeOffer(
   tx: Executor,
@@ -338,6 +408,7 @@ async function writeOffer(
         url: row.url,
         feedCategory: row.feedCategory,
         priceUpdatedAt: startedAt,
+        isRemoved: false,
       },
     });
 }

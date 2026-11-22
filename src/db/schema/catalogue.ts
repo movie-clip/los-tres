@@ -96,6 +96,9 @@ export const offers = pgTable(
     isHidden: boolean('is_hidden').notNull().default(false),
     // Waiting in the matching queue; nothing writes it until that slice.
     inReview: boolean('in_review').notNull().default(false),
+    // Absent from this feed's latest import that passed the removal guard
+    // (S3.3). Written by the importer only.
+    isRemoved: boolean('is_removed').notNull().default(false),
     priceUpdatedAt: timestamp('price_updated_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
