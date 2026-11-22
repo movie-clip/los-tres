@@ -102,6 +102,7 @@ function emptyReport(feed: FeedRow): FeedImportReport {
     offersCreated: 0,
     offersUpdated: 0,
     rejected: [],
+    ownProducts: [],
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
@@ -201,18 +202,20 @@ async function importRecords(
     }
 
     const brandNormalised = normalizeBrand(row.brand);
-    const match = await matchProduct(tx, { eanNormalised: row.eanNormalised, brandNormalised });
-    if (match.kind === 'reject') {
-      report.rejected.push({ record, code: match.code, field: 'ean' });
-      continue;
-    }
+    const partNumberNormalised = normalizePartNumber(row.partNumber);
+    const match = await matchProduct(tx, {
+      eanNormalised: row.eanNormalised,
+      brandNormalised,
+      partNumberNormalised,
+    });
 
     let productId: number;
     if (match.kind === 'attach') {
       productId = match.productId;
     } else {
-      productId = await createProduct(tx, row, brandNormalised);
+      productId = await createProduct(tx, row, brandNormalised, partNumberNormalised);
       report.productsCreated += 1;
+      if (match.kind === 'own_product') report.ownProducts.push({ record, reason: match.reason });
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
     await assignCategory(tx, productId, mappedCategory(mappings, row));
@@ -278,6 +281,7 @@ async function createProduct(
   tx: Executor,
   row: ValidRow,
   brandNormalised: string | null,
+  partNumberNormalised: string | null,
 ): Promise<number> {
   const slug = await uniqueSlug(slugify(row.title), async (candidate) => {
     const taken = await tx
@@ -295,7 +299,7 @@ async function createProduct(
       brand: row.brand,
       brandNormalised,
       partNumber: row.partNumber,
-      partNumberNormalised: normalizePartNumber(row.partNumber),
+      partNumberNormalised,
       ean: row.ean,
       eanNormalised: row.eanNormalised,
       description: row.description,

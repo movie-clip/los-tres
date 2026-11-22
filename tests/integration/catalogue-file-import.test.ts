@@ -454,15 +454,24 @@ describe('two shops, one product, through a shared EAN (AC 30)', () => {
     expect((await allClicks()).map((click) => click.offerId).sort()).toEqual(page!.offers.map((offer) => offer.offerId).sort());
   });
 
-  it('does not converge two files that share only a brand and part number (S7.1 is not built)', async () => {
-    await write('sin-a.csv', catalogueCsv([{ ...ROW_A, ean: '', part_number: 'PN-777', url: 'https://tienda-a.example/p/1' }]));
-    await write('sin-b.csv', catalogueCsv([{ ...ROW_A, id: 'b-9', ean: '', part_number: 'PN-777', url: 'https://tienda-b.example/p/9' }]));
-    await aFileFeed('sin-a.csv');
-    await aFileFeed('sin-b.csv');
+  it('converges two files that share only a brand and part number: one product, both shops cheapest first', async () => {
+    await write('sin-a.csv', catalogueCsv([{ ...ROW_A, ean: '', part_number: 'PN-777', price: '10,50', url: 'https://tienda-a.example/p/1' }]));
+    await write('sin-b.csv', catalogueCsv([{ ...ROW_A, id: 'b-9', ean: '', part_number: 'PN-777', price: '9,20', url: 'https://tienda-b.example/p/9' }]));
+    const a = await aFileFeed('sin-a.csv', { shopName: 'Tienda Alfa' });
+    const b = await aFileFeed('sin-b.csv', { shopName: 'Tienda Beta' });
+    const [target] = await fiveTargets();
+    await insertCategoryMapping(a.feedId, ROW_A.category, target.id);
+    await insertCategoryMapping(b.feedId, ROW_A.category, target.id);
 
     await importFromFolder(dir);
 
-    expect(await allProducts()).toHaveLength(2);
+    expect(await allProducts()).toHaveLength(1);
+    expect(await allOffers()).toHaveLength(2);
+    const page = await getPublicProductBySlug((await productSlugs())[0]);
+    expect(page?.offers.map((offer) => [offer.shopName, offer.priceCents])).toEqual([
+      ['Tienda Beta', 920],
+      ['Tienda Alfa', 1050],
+    ]);
   });
 });
 

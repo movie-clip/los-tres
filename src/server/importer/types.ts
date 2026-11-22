@@ -1,5 +1,7 @@
 // Import report and dependency types (C-16). Pure.
 
+import type { OwnProductReason } from '../matching';
+
 export type RejectCode =
   | 'missing_id'
   | 'missing_title'
@@ -7,9 +9,10 @@ export type RejectCode =
   | 'invalid_currency'
   | 'invalid_ean'
   | 'invalid_url'
-  | 'duplicate_id'
-  | 'ean_brand_conflict'
-  | 'ambiguous_ean';
+  | 'duplicate_id';
+
+/** A row that became its own product because of a conflict or an ambiguity (S7.1, AC 17). */
+export type OwnProductRow = { record: number; reason: OwnProductReason };
 
 /**
  * `record` numbers the first data row 2 in every format. CSV counts the header
@@ -44,6 +47,8 @@ export type FeedImportReport = {
   offersCreated: number;
   offersUpdated: number;
   rejected: RejectedRow[];
+  /** Counted in productsCreated and offersCreated, never in rejected. Record order. */
+  ownProducts: OwnProductRow[];
   /** Every unknown vehicle slug occurrence: one per accepted row per distinct slug. */
   unknownVehicles: number;
   /** Printable unknown slugs only, first-seen order, at most 20. */

@@ -30,8 +30,8 @@ afterAll(async () => {
 
 const run = (feedId?: number) => importFeeds(getDb(), { feedId, deps: fixtureDeps });
 
-// 0008 step 1 (EAN), step 3 (new product), conflicts rejected into the report.
-describe('EAN matching (0008, slice B cut)', () => {
+// 0008 step 1 (EAN), step 2 (brand + part number), new product; a conflict or ambiguity becomes an own product with a reason in the report (S7.1).
+describe('EAN matching (0008, S7.1)', () => {
   it('attaches a second feed\'s row with the same EAN: one product, two offers, text unchanged', async () => {
     const first = await insertFixtureFeed('ean-first.csv', { shopName: 'Tienda A' });
     await run(first.feedId);
@@ -81,7 +81,7 @@ describe('EAN matching (0008, slice B cut)', () => {
     expect(report.feeds[0].rejected).toEqual([]);
   });
 
-  it('rejects the same EAN with a different brand as ean_brand_conflict and creates nothing', async () => {
+  it('makes the same EAN with a different brand its own product, reported as ean_brand_conflict', async () => {
     const first = await insertFixtureFeed('ean-first.csv');
     await run(first.feedId);
     const productsBefore = await allProducts();
@@ -93,12 +93,17 @@ describe('EAN matching (0008, slice B cut)', () => {
     expect(report.feeds[0]).toMatchObject({
       outcome: 'imported',
       rows: 1,
-      productsCreated: 0,
-      offersCreated: 0,
-      rejected: [{ record: 2, code: 'ean_brand_conflict', field: 'ean' }],
+      productsCreated: 1,
+      offersCreated: 1,
+      rejected: [],
+      ownProducts: [{ record: 2, reason: 'ean_brand_conflict' }],
     });
-    expect(await allProducts()).toEqual(productsBefore);
-    expect(await allOffers()).toEqual(offersBefore);
+    const productsAfter = await allProducts();
+    expect(productsAfter).toHaveLength(productsBefore.length + 1);
+    expect(productsAfter.slice(0, productsBefore.length)).toEqual(productsBefore);
+    const offersAfter = await allOffers();
+    expect(offersAfter).toHaveLength(offersBefore.length + 1);
+    expect(offersAfter.slice(0, offersBefore.length)).toEqual(offersBefore);
   });
 
   it('attaches when the incoming row has no brand', async () => {
@@ -136,19 +141,36 @@ describe('EAN matching (0008, slice B cut)', () => {
     expect(await allProducts()).toHaveLength(2);
   });
 
-  it('rejects ambiguous_ean when two products already share the EAN, and creates nothing', async () => {
+  it('makes a row its own product, reported as ambiguous_ean, when two products already share the EAN', async () => {
     await insertProduct({ slug: 'gemelo-1', ean: '2000000000046', eanNormalised: '2000000000046' });
     await insertProduct({ slug: 'gemelo-2', ean: '2000000000046', eanNormalised: '2000000000046' });
     const feed = await insertFixtureFeed('ean-null-brand.csv');
     const report = await run(feed.feedId);
 
-    expect(report.feeds[0].rejected).toEqual([{ record: 2, code: 'ambiguous_ean', field: 'ean' }]);
-    expect(await allProducts()).toHaveLength(3); // the two twins plus D-2's new product
-    expect((await allOffers()).map((offer) => offer.externalId)).toEqual(['D-2']);
+    expect(report.feeds[0].rejected).toEqual([]);
+    expect(report.feeds[0].ownProducts).toEqual([{ record: 2, reason: 'ambiguous_ean' }]);
+    expect(await allProducts()).toHaveLength(4); // the two twins plus one product each for D-1 and D-2
+    expect((await allOffers()).map((offer) => offer.externalId).sort()).toEqual(['D-1', 'D-2']);
+  });
+
+  it('converges two rows without an EAN that share brand and part number: one product, two offers', async () => {
+    const feed = await insertFixtureFeed('no-ean.csv');
+    const report = await run(feed.feedId);
+
+    expect(report.feeds[0]).toMatchObject({
+      productsCreated: 1,
+      offersCreated: 2,
+      rejected: [],
+      ownProducts: [],
+    });
+    const rows = await allProducts();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].ean).toBeNull();
+    expect(await allOffers()).toHaveLength(2);
   });
 
   it('gives each row without an EAN its own product, with numbered slugs on a title clash', async () => {
-    const feed = await insertFixtureFeed('no-ean.csv');
+    const feed = await insertFixtureFeed('no-ean-title-clash.csv');
     const report = await run(feed.feedId);
 
     expect(report.feeds[0]).toMatchObject({ productsCreated: 2, offersCreated: 2, rejected: [] });

@@ -15,6 +15,7 @@ function feedLines(feed: FeedImportReport): string[] {
     ...feed.rejected.map(
       (row) => `  record ${row.record}: ${row.code}${row.field ? ` (${row.field})` : ''}`,
     ),
+    ...feed.ownProducts.map((row) => `  record ${row.record}: own_product ${row.reason}`),
     ...feed.unknownVehicleSlugs.map(
       (unknown) => `  fitment: unknown vehicle ${unknown.slug} rows=${unknown.rows}`,
     ),
