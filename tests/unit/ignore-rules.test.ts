@@ -41,3 +41,30 @@ describe('catalogue folder ignore rules (AC 31)', () => {
     expect(read('catalogue-files/.gitkeep')).toBe('');
   });
 });
+
+// Test-speed plan, S1 (decision D-13): the Dockerfile runs `COPY . .`, so any
+// file in the build context that changes invalidates that layer and with it
+// `next build` and `cli:build`. Run artifacts under `agentic/` change on every
+// lane, and the root docs on most pull requests, yet no build step reads them.
+// Neither may invalidate the image build, and a scratch `.ts` in a run folder
+// must not be type-checked by `tsc` or by `next build`. Removing a line fails.
+
+describe('agentic folder and root docs stay out of the image build', () => {
+  it('.dockerignore leaves the agentic folder out of the build context', () => {
+    expect(lines('.dockerignore')).toContain('agentic');
+  });
+
+  it('.dockerignore leaves the root docs out of the build context', () => {
+    const rules = lines('.dockerignore');
+    expect(rules).toContain('AGENTS.md');
+    expect(rules).toContain('CLAUDE.md');
+    expect(rules).toContain('README.md');
+  });
+
+  it('tsconfig.json excludes the agentic folder from type-checking', () => {
+    // tsconfig.json is plain JSON here (no comments, no trailing commas); if
+    // that changes this parse throws, which is the right signal to update it.
+    const config = JSON.parse(read('tsconfig.json')) as { exclude?: string[] };
+    expect(config.exclude).toContain('agentic');
+  });
+});
