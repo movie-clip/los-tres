@@ -104,7 +104,8 @@ matching test, and it should be one that would fail if the rule broke:
   - Admin cookie rules: only `signInAction` writes a cookie (`nextRequest.cookieWrites` is empty for every refusal, guard call and expired cookie); `admin_sessions` `ip_address` and `user_agent` are null (`admin-storage.test.ts`); sentinel logs in `admin-logs.test.ts`; the public no-cookie e2e stays on public routes and `admin.spec.ts` asserts the one `admin.session_token` cookie.
 - **Search (S5.4).** `seams.test.ts` pins that `search-page.ts` names no flag and has one `console.error`.
 - **Matching (0008), slice B cut:** EAN attach, EAN with a different brand
-  rejected into the report (`ean_brand_conflict`), null brand on either side
+  becomes its own product with reason `ean_brand_conflict` in `report.ownProducts`
+  (since S7.1; not a reject), null brand on either side
   attaches, no EAN creates a product, invalid EAN rejected. Brand + part-number matching (S7.1) is covered by importer-brand-part-number.test.ts, matching-index.test.ts and the own-product describe.each in importer-matching.test.ts (AC map in the S7.1 run, 05-test.md); a conflict or ambiguity is an own product with a reason in report.ownProducts, never a reject; the queue is not built.
 - **es-ES prices and seams.** Assertions on es-ES prices normalise U+00A0
   (`normaliseSpaces`, `tests/support/messages.ts`). `tests/unit/seams.test.ts`
