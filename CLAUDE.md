@@ -237,8 +237,16 @@ deploy it must be the public https origin**, or all of them point at
 in that order. It rebuilds the app image and runs the e2e against the Compose
 stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. The gate has no
-migrate step: the test database is dropped, recreated and migrated on every
-integration run, and the app container migrates on start.
+migrate step, and the app container migrates on start. The integration tests
+use their own databases on the same `db` service (0010): each run drops and
+migrates a template, `<DB_NAME>_tpl_test`, from nothing and clones it into one
+database per Vitest worker, `<DB_NAME>_w<n>_test` (n = 1 to the worker count).
+The template and the clones stay in PostgreSQL after a run; the next run drops
+them (and any old `<DB_NAME>_test`), so a failed run can be inspected. Test
+files run in parallel, one per worker. The default worker count is
+`min(8, CPUs - 1)`, at least 1; the optional `INTEGRATION_WORKERS=<n>` in the
+environment or `.env` sets it, and a value that is not a positive whole number
+fails the run.
 
 **CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate:ci` on every
 pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
