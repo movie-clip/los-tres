@@ -135,11 +135,25 @@ export function feedFormLabels(
       label: t('Feed.sourceLabel'),
       optionNetwork: t('Feed.sourceOptionNetwork'),
       optionFile: t('Feed.sourceOptionFile'),
+      optionCollected: t('Feed.sourceOptionCollected'),
       hintNetwork: t('Feed.sourceHintNetwork'),
       hintFile: t('Feed.sourceHintFile'),
+      hintCollected: t('Feed.sourceHintCollected'),
       fixedLabel: t('Feed.sourceFixedLabel'),
       fixedNetwork: t('Feed.sourceFixedNetwork'),
       fixedFile: t('Feed.sourceFixedFile'),
+      fixedCollected: t('Feed.sourceFixedCollected'),
+    },
+    // A collected file is a file source with its own label, hint and warning body (S12.2); the edit hint,
+    // the refills and the confirm title are the catalogue file's.
+    collected: {
+      label: t('Feed.fileLabelCollected'),
+      hint: creating
+        ? t('Feed.fileHintNewCollected', { kinds: limits.fileKinds })
+        : t('Feed.fileHintEdit', { kinds: limits.fileKinds }),
+      warningBody: t('Feed.fileWarningBodyCollected'),
+      infoTitle: t('Feed.collectedInfoTitle'),
+      infoBody: t('Feed.collectedInfoBody'),
     },
     file: {
       label: t('Feed.fileLabel'),

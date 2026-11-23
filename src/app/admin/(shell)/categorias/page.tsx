@@ -55,25 +55,30 @@ async function clientMessages() {
 function feedSection(feed: AdminCategoryFeed, targets: CategoryTarget[], t: Translate, sources: SourcesTranslate) {
   const paused = feed.approved && !feed.shopApproved;
   const title = t('feedHeading', { id: feed.id, shop: feed.shopName });
-  // The file name or a fixed phrase for a catalogue file; the host or a fixed phrase otherwise. The stored
+  // The file name or a fixed phrase for either file kind; the host or a fixed phrase otherwise. The stored
   // address is never a fallback (AC 10).
-  const isFile = feed.source === 'catalogue_file';
+  const collected = feed.source === 'collected_file';
+  const isFile = feed.source === 'catalogue_file' || collected;
   const identity = isFile
     ? { label: sources('fileLabel'), value: feed.fileName ?? sources('fileUnavailable') }
     : { label: sources('domainLabel'), value: feed.host ?? (feed.demo ? sources('domainNone') : sources('domainUnavailable')) };
   // "Subido por la tienda" only for a stored shop upload; a feed with no network and no known source has no line.
-  const meta = isFile
-    ? sources('feedMetaFile')
-    : feed.source === 'shop_upload'
-      ? sources('feedMetaUpload')
-      : feed.networkName !== null
-        ? sources('feedMetaNetwork', { network: feed.networkName })
-        : null;
+  const meta = collected
+    ? sources('feedMetaCollected')
+    : isFile
+      ? sources('feedMetaFile')
+      : feed.source === 'shop_upload'
+        ? sources('feedMetaUpload')
+        : feed.networkName !== null
+          ? sources('feedMetaNetwork', { network: feed.networkName })
+          : null;
   const stateWord = !feed.approved ? sources('feedNotApproved') : paused ? sources('feedPaused') : sources('feedApproved');
   const notes = [
     !feed.approved ? t('feedNoteNotApproved') : null,
     paused ? sources('feedNotePaused') : null,
     feed.demo ? t('demoNote') : null,
+    // Last before the summary (04-ux W4); a collected feed is never demo.
+    collected ? t('collectedNote') : null,
   ].filter((note): note is string => note !== null);
 
   const total = feed.rows.length;

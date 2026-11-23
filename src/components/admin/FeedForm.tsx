@@ -45,11 +45,25 @@ export type FeedFormLabels = {
     label: string;
     optionNetwork: string;
     optionFile: string;
+    optionCollected: string;
     hintNetwork: string;
     hintFile: string;
+    hintCollected: string;
     fixedLabel: string;
     fixedNetwork: string;
     fixedFile: string;
+    fixedCollected: string;
+  };
+  /**
+   * What a collected file shows where a catalogue file shows its own (S12.2): the field label and hint, the
+   * approved warning body, and the static "Solo para uso local" block. Every other file string is `file`'s.
+   */
+  collected: {
+    label: string;
+    hint: string;
+    warningBody: string;
+    infoTitle: string;
+    infoBody: string;
   };
   /** The catalogue-file name field, its warning and its confirmation (S3.7). */
   file: {
@@ -76,7 +90,13 @@ export type FeedFormLabels = {
   errors: Pick<SourceErrorLabels, 'shop' | 'network' | 'url' | 'source' | 'fileName'>;
 };
 
-type Source = 'affiliate_network' | 'catalogue_file';
+type FileSource = 'catalogue_file' | 'collected_file';
+type Source = 'affiliate_network' | FileSource;
+
+/** The select's value as a source; anything else is the https source, the select's first option. */
+function toSource(value: string): Source {
+  return value === 'catalogue_file' || value === 'collected_file' ? value : 'affiliate_network';
+}
 
 type Common = {
   action: SourceFormAction;
@@ -110,7 +130,8 @@ export type FeedFormProps =
     })
   | (Common & {
       mode: 'edit';
-      source: 'catalogue_file';
+      /** The stored file kind; the edit form never posts it (AC 5). */
+      source: FileSource;
       id: number;
       shopName: string;
       approved: boolean;
@@ -126,8 +147,9 @@ const FILE_FIELD = 'fileName';
 const WARNING_ID = 'feed-warning';
 
 /**
- * The feed form (S4, S3.7). A create form chooses the source first, an affiliate network or a catalogue
- * file, and shows only the fields of that source: the other block is not rendered, so it submits nothing.
+ * The feed form (S4, S3.7, S12.2). A create form chooses the source first, an affiliate network, a catalogue
+ * file or a collected file, and shows only the fields of that source: the other blocks are not rendered, so
+ * they submit nothing. The collected option is never the default.
  * On an edit the source is fixed text. The address input is uncontrolled and has no default value, on a
  * create form, on an edit form and after every refusal: a stored address never reaches this component, only
  * its host (D-T10). The file name input starts empty on a create and holds the stored name on an edit (a bare
@@ -139,10 +161,10 @@ export function FeedForm(props: FeedFormProps) {
   const { action, labels, cancelHref } = props;
   const { state, formAction, pending, formRef, errors, values } = useSourceForm(action);
   const editing = props.mode === 'edit';
-  const fileEdit = props.mode === 'edit' && props.source === 'catalogue_file';
+  const fileEdit = props.mode === 'edit' && props.source !== 'affiliate_network';
   const networks = 'networks' in props ? props.networks : [];
-  const storedFileName = props.mode === 'edit' && props.source === 'catalogue_file' ? props.fileName : null;
-  const asks = props.mode === 'edit' && props.approved && (props.source === 'catalogue_file' || !props.demo);
+  const storedFileName = props.mode === 'edit' && props.source !== 'affiliate_network' ? props.fileName : null;
+  const asks = props.mode === 'edit' && props.approved && (props.source !== 'affiliate_network' || !props.demo);
 
   // The source is the admin's choice on a create form (the https source is the default, the file source when
   // no network exists) and the stored one on an edit. The server echoes neither the source nor, when the file
@@ -216,6 +238,12 @@ export function FeedForm(props: FeedFormProps) {
 
   const confirmTitle = fileEdit ? labels.file.confirmTitle : labels.confirmTitle;
   const noNetwork = props.mode === 'create' && source === 'affiliate_network' && networks.length === 0;
+  // A collected file is a file source everywhere; only its label, hints, warning body and the local-only
+  // block differ (S12.2).
+  const collected = source === 'collected_file';
+  const sourceHint = collected ? labels.source.hintCollected : source === 'catalogue_file' ? labels.source.hintFile : labels.source.hintNetwork;
+  const fixedSource = !fileEdit ? labels.source.fixedNetwork : collected ? labels.source.fixedCollected : labels.source.fixedFile;
+  const fileWarningBody = collected ? labels.collected.warningBody : labels.file.warningBody;
 
   return (
     <form
@@ -227,7 +255,7 @@ export function FeedForm(props: FeedFormProps) {
         setOpenedFor(null);
         const target = event.target;
         if (!(target instanceof HTMLSelectElement)) return;
-        if (target.name === 'source') setSource(target.value === 'catalogue_file' ? 'catalogue_file' : 'affiliate_network');
+        if (target.name === 'source') setSource(toSource(target.value));
         if (target.name === 'networkId') setNetworkChoice(target.value);
       }}
       noValidate
@@ -258,18 +286,15 @@ export function FeedForm(props: FeedFormProps) {
           options={[
             { value: 'affiliate_network', label: labels.source.optionNetwork },
             { value: 'catalogue_file', label: labels.source.optionFile },
+            { value: 'collected_file', label: labels.source.optionCollected },
           ]}
           defaultValue={source}
           readOnly={pending}
           error={sourceError}
-          hint={source === 'catalogue_file' ? labels.source.hintFile : labels.source.hintNetwork}
+          hint={sourceHint}
         />
       ) : (
-        <ValueLine
-          label={labels.source.fixedLabel}
-          value={fileEdit ? labels.source.fixedFile : labels.source.fixedNetwork}
-          testId="source-origin-fixed"
-        />
+        <ValueLine label={labels.source.fixedLabel} value={fixedSource} testId="source-origin-fixed" />
       )}
       {source === 'affiliate_network' && !noNetwork ? (
         <SelectField
@@ -286,11 +311,15 @@ export function FeedForm(props: FeedFormProps) {
       {props.mode === 'edit' && props.source === 'affiliate_network' ? (
         <ValueLine label={labels.domainLabel} value={props.domain} testId="source-domain" />
       ) : null}
+      {collected ? (
+        // Static and not tied to the field, so the field's description stays short (04-ux § Accessibility).
+        <InfoBlock title={labels.collected.infoTitle} body={labels.collected.infoBody} testId="collected-info" />
+      ) : null}
       {asks ? (
         <InfoBlock
           id={WARNING_ID}
           title={fileEdit ? labels.file.warningTitle : labels.warningTitle}
-          body={fileEdit ? labels.file.warningBody : labels.warningBody}
+          body={fileEdit ? fileWarningBody : labels.warningBody}
           testId="feed-warning"
         />
       ) : null}
@@ -298,14 +327,14 @@ export function FeedForm(props: FeedFormProps) {
         <InfoBlock title={labels.missingNetworkTitle} body={labels.missingNetworkBody} testId="missing-network">
           {props.mode === 'create' ? <LinkButton href={props.addNetwork.href} label={props.addNetwork.label} /> : null}
         </InfoBlock>
-      ) : source === 'catalogue_file' ? (
-        // A key per source: without it React reuses the one input between the two fields and the typed
-        // text (a secret address) would cross the switch.
+      ) : source !== 'affiliate_network' ? (
+        // A key per source: without it React reuses the one input between the fields and the typed text
+        // (a secret address, or a name meant for the other file kind) would cross the switch.
         <TextField
-          key="file"
+          key={collected ? 'file-collected' : 'file-catalogue'}
           id="source-file"
           name={FILE_FIELD}
-          label={labels.file.label}
+          label={collected ? labels.collected.label : labels.file.label}
           type="text"
           autoComplete="off"
           defaultValue={storedFileName ?? undefined}
@@ -318,7 +347,9 @@ export function FeedForm(props: FeedFormProps) {
               ? labels.file.refill
               : fileEdit && storedFileName === null
                 ? labels.file.storedUnavailable
-                : labels.file.hint
+                : collected
+                  ? labels.collected.hint
+                  : labels.file.hint
           }
           describedBy={asks ? WARNING_ID : undefined}
         />

@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic';
 const SOURCES_PATH = '/admin/tiendas';
 
 // One lookup per request, shared by `generateMetadata` and the page. An unknown id and a shop
-// upload are null (a 404); an affiliate feed and a catalogue-file feed each have their own form (S3.7).
+// upload are null (a 404); an affiliate feed has its own form, and both file kinds share the file form
+// (S3.7, S12.2).
 const load = cache((id: number) => getFeedForEdit(id));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -31,8 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // not-found title is decided here: an id that does not parse, or has no row, is the 404.
   const id = parseId((await params).id);
   const feed = id === null ? null : await load(id);
-  // S12.2: a collected-file feed has no edit form until T-12.2.4, so it takes the 404 title too.
-  if (!feed || feed.source === 'collected_file') return { title: t('notFoundTitle', { siteName }) };
+  if (!feed) return { title: t('notFoundTitle', { siteName }) };
   return { title: t('editFeedTitle', { siteName }) };
 }
 
@@ -43,8 +43,6 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
   if (id === null) notFound();
   const [feed, networks] = await Promise.all([load(id), listNetworksForAdmin()]);
   if (!feed) notFound();
-  // S12.2: the collected-file form arrives with T-12.2.4; until then its edit page is the 404.
-  if (feed.source === 'collected_file') notFound();
 
   const [t, sources] = await Promise.all([getTranslations('Admin.Form'), getTranslations('Admin.Sources')]);
   const limits = {
@@ -56,9 +54,8 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
   };
   const labels = feedFormLabels(t, { mode: 'edit', feedId: feed.id, demo: feed.demo, limits });
 
-  // A catalogue-file feed: the name is shown when it is a valid bare name, else the form says it is not (AC 13).
-  // The read's file variant carries both file kinds and the collected one is the 404 above, so the test is on
-  // the other variant: a source-literal test would not narrow the union for the affiliate form below.
+  // A file feed, catalogue or collected: the name is shown when it is a valid bare name, else the form says it
+  // is not (AC 13). The stored kind is passed as the form's fixed source and is never posted (S12.2 AC 5).
   if (feed.source !== 'affiliate_network') {
     return (
       <FormScreen
@@ -68,7 +65,7 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
       >
         <FeedForm
           mode="edit"
-          source="catalogue_file"
+          source={feed.source}
           action={updateFeedAction}
           cancelHref={SOURCES_PATH}
           id={feed.id}
