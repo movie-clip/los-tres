@@ -275,6 +275,40 @@ geometry written against Windows system-ui font metrics, which fails on the
 Linux runner. The local `npm run gate` stays the gate and runs everything,
 `@layout` included; a story is still not done until it exits 0.
 
+**Repeat run (`gate-repeat`, 0006 rule 7).** `.github/workflows/gate-repeat.yml`
+starts only by hand (its one trigger is `workflow_dispatch`): on GitHub, Actions,
+workflow `gate-repeat`, Run workflow. It takes two inputs:
+
+- `runs`: how many copies, a whole number from 1 to 10, default 5.
+- `pr`: optional, a pull request number, digits only. Blank tests the branch the
+  run was started on. A number tests the merge commit `refs/pull/<pr>/merge`
+  pointed at when the run began (what the `gate` check tests), and every job
+  checks out that one commit.
+
+A bad value, or a pull request with no merge ref (closed, merged or
+conflicting), fails the first job and nothing else starts. The workflow then
+runs, in parallel on separate runners:
+
+- **`runs` copies**, named `repeat <n>`, each the steps of the `gate` job of
+  `gate.yml` (checkout, Node, `npm ci`, `env:init`, Playwright chromium,
+  `npm run gate:ci`, Compose logs on failure, Compose down), with the same 45
+  minute timeout. One red copy does not stop the others. A pin in
+  `tests/unit/gate-determinism.test.ts` fails when a copy and the `gate` job
+  drift apart.
+- **One `timing` job**, which runs `npm run test:timing` twice, alone
+  (`TIMING_LABEL=alone`) and beside three busy loops (`TIMING_LABEL=cpu-load`),
+  and prints in its summary the commit, the runner's CPU count and model, for
+  each run the exit code of `test:timing` and the load averages before and after,
+  and the tables from `timing-results/`. It records the exit code instead of
+  failing on it, so a slow or failing timing does not turn the job red; the job
+  fails only when its setup fails (`npm ci`, `env:init`, the database).
+
+The workflow is never a required check: the required check is `gate`, from
+`gate.yml`, and no job of `gate-repeat` is named `gate`. Use it before merging a
+pull request that changes how tests execute (§ Git and tickets). At the time of
+writing the workflow has not been run on GitHub: it can be started only once its
+file is on `main`, so its first run, on `main`, is also its first check.
+
 Helpers:
 
 - `npm run env:init`: create `.env` with generated secrets; exits 1 and changes
@@ -307,6 +341,13 @@ Helpers:
 - **Agents may commit to the run's branch, push it and open a pull request.**
   Only the orchestrator does this, through the GitHub MCP server in `.mcp.json`.
   Specialist lanes never write to git or GitHub; read-only git is fine.
+- **A change to how tests execute is repeated before it is merged (0006 rule
+  7).** The owner starts `gate-repeat` on the pull request: five green copies of
+  the gate, ten when it changes the worker count, the test-database setup or the
+  CI job layout, with the run linked in the pull request body. A red copy is
+  explained, not started again until it passes. Nothing checks this by machine;
+  0006 holds the file list and the one case it cannot cover, a change to
+  `gate-repeat.yml` itself.
 - **Only a human merges.** No agent merges a pull request, pushes to `main` or
   force-pushes. `.claude/settings.json` denies those commands.
 - **The repo and the board are public.** Never put a secret, token, email or
