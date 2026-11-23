@@ -310,7 +310,12 @@ pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
 `gate` except that its e2e step skips the tests tagged `@layout`: pixel
 geometry written against Windows system-ui font metrics, which fails on the
 Linux runner. The local `npm run gate` stays the gate and runs everything,
-`@layout` included; a story is still not done until it exits 0.
+`@layout` included; a story is still not done until it exits 0. When a gate run
+fails, `gate.yml` uploads `test-results/` (the trace and screenshot of each
+failing test, which `playwright.config.ts` keeps on failure only) as a workflow
+artifact for 7 days; `gate-repeat.yml` does the same from an identical step
+(#361). A trace may hold the ephemeral CI admin session and test credentials, in
+a public repository's artifacts (#361).
 
 **Repeat run (`gate-repeat`, 0006 rule 7).** `.github/workflows/gate-repeat.yml`
 starts only by hand (its one trigger is `workflow_dispatch`): on GitHub, Actions,
@@ -328,7 +333,8 @@ runs, in parallel on separate runners:
 
 - **`runs` copies**, named `repeat <n>`, each the steps of the `gate` job of
   `gate.yml` (checkout, Node, `npm ci`, `env:init`, Playwright chromium,
-  `npm run gate:ci`, Compose logs on failure, Compose down), with the same 45
+  `npm run gate:ci`, Compose logs on failure, Playwright output upload on
+  failure, Compose down), with the same 45
   minute timeout. One red copy does not stop the others. A pin in
   `tests/unit/gate-determinism.test.ts` fails when a copy and the `gate` job
   drift apart.

@@ -66,6 +66,10 @@ Home e2e selects `home-panel`, `home-search[-input|-button|-notice]`, `home-all-
 
 Privacy assertions are contains/absent, never counts: the failing search logs its fixed code three times per request.
 
+`playwright.config.ts` keeps trace and screenshot on failure; `gate.yml` and `gate-repeat.yml` upload `test-results/` for 7 days from an identical `if: failure()` step (#361).
+
+An e2e that asserts a client-rendered element on a one-off 500 server (`public-error`) gives that one assertion an explicit timeout of `30_000` with a comment naming #361; no global timeout, retry or sleep.
+
 The Compose app image goes stale across branches: run `npm run stack:up` before iterating on e2e, or /buscar answers 404 from an old build. The same holds for a CSS mutation, or any `src` edit an e2e checks: it needs `npm run stack:up` to take effect, because the app image bakes the build; without it the pins pass against the old image.
 
 A raw-HTML "value never appears" assertion must strip `<script>` blocks first: Next puts the request URL (query included) in the inline flight payload, so the typed `q` is in the raw response even though app code never renders it.
