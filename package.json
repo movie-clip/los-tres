@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
+    "test:timing": "vitest run --config vitest.timing.config.mts",
     "test:e2e": "playwright test",
     "test:e2e:ci": "playwright test --grep-invert @layout",
     "test:e2e:install": "playwright install chromium",

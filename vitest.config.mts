@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 // This file must not import from tests/: `next build` in the Docker image type
 // checks it, and .dockerignore leaves tests/ out of the build context.
 const root = import.meta.dirname;
-const alias = {
+export const alias = {
   '@': path.resolve(root, 'src'),
   'server-only': path.resolve(root, 'tests/support/server-only-stub.ts'),
 };

@@ -12,6 +12,7 @@ npm-debug.log*
 next-env.d.ts
 playwright-report
 test-results
+timing-results
 docs
 tests
 Dockerfile

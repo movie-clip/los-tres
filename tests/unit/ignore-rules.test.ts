@@ -68,3 +68,18 @@ describe('agentic folder and root docs stay out of the image build', () => {
     expect(config.exclude).toContain('agentic');
   });
 });
+
+// No-clock-in-gate, S-1 (decision D-10): `npm run test:timing` writes its tables
+// to timing-results/ at the repo root. They describe one machine on one day, so
+// they are never committed, and they are never part of the image build context.
+// Removing a line fails.
+
+describe('timing results stay out of git and the image build', () => {
+  it('.gitignore ignores timing-results', () => {
+    expect(lines('.gitignore')).toContain('timing-results/');
+  });
+
+  it('.dockerignore leaves timing-results out of the build context', () => {
+    expect(lines('.dockerignore')).toContain('timing-results');
+  });
+});
