@@ -312,11 +312,16 @@ test.describe('refusals come back next to the field, never with the address (AC 
     await page.goto(SOURCES);
     await page.getByRole('link', { name: /^Editar red /, includeHidden: false }).first().click();
     await expect(page.getByTestId('source-form')).toBeVisible();
+    // The form is server-rendered and visible before React hydrates. A value rewritten in that gap can be put
+    // back by hydration, and the post then edits a real network instead of failing (seen once in the S12.2 gate:
+    // the page showed "Red guardada"). Wait for the page to settle first, and check the rewrite is still there.
+    await page.waitForLoadState('networkidle');
     // The id is rewritten to a row that does not exist: the real action answers failed and writes nothing.
     await page.locator('input[name="id"]').evaluate((input) => {
       (input as HTMLInputElement).value = '2000000000';
     });
     await page.getByLabel(form.nameLabel, { exact: true }).fill('Nombre tecleado');
+    await expect(page.locator('input[name="id"]')).toHaveValue('2000000000');
     await page.getByTestId('form-submit').click();
     const block = page.getByTestId('admin-error');
     await expect(block).toBeVisible();

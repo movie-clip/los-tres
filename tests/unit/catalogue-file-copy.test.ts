@@ -21,11 +21,12 @@ const placeholdersOf = (text: string): string[] => [...text.matchAll(/\{([A-Za-z
 describe('the {kinds} placeholder of the catalogue-file copy', () => {
   const withKinds = admin.filter(([, value]) => placeholdersOf(value).includes('kinds')).map(([key]) => key);
 
-  it('is used by exactly the three messages that list the accepted endings', () => {
+  it('is used by exactly the four messages that list the accepted endings (S12.2 adds the collected hint)', () => {
     expect(withKinds.sort()).toEqual([
       'Admin.Form.Errors.fileWrongKind',
       'Admin.Form.Feed.fileHintEdit',
       'Admin.Form.Feed.fileHintNew',
+      'Admin.Form.Feed.fileHintNewCollected',
     ]);
   });
 
@@ -55,7 +56,7 @@ describe('no file-name message can print what the admin typed (AC 13)', () => {
   });
 
   it('names no folder, drive or path in any sentence the admin reads', () => {
-    const offenders = fileMessages.filter(([, value]) => /catalogue-files|[A-Za-z]:\\|\/app\//.test(value)).map(([key]) => key);
+    const offenders = fileMessages.filter(([, value]) => /catalogue-files|collected-files|[A-Za-z]:\\|\/app\//.test(value)).map(([key]) => key);
     expect(offenders).toEqual([]);
   });
 });
