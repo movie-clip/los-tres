@@ -137,7 +137,11 @@ test.describe('the search term is never logged or stored (AC 31, 32)', () => {
       const response = await page.goto(`${origin}/buscar?q=${marker}`);
       expect(response?.status()).toBe(500);
       const error = page.getByTestId('public-error');
-      await expect(error).toBeVisible();
+      // #361: the boundary is a client component, so it appears only once React hydrates Next's
+      // empty 500 shell. On a loaded CI runner (two workers, two app containers) the default 5 s
+      // expect timeout was not enough once. The wait is for the observable state, with a longer
+      // timeout local to this assertion; no retry, no sleep (0006 rules 3 and 6).
+      await expect(error).toBeVisible({ timeout: 30_000 });
       await expect(error).toContainText(messages.Error.heading);
       await expect(error).toContainText(messages.Error.body);
       expectNoSecret((await page.locator('body').innerText()).trim(), 'the visible error page');

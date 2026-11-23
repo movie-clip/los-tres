@@ -144,7 +144,10 @@ test.describe('the error page carries the control (AC 1, AC 5)', () => {
       page.on('pageerror', (error) => errors.push(error.message));
       const response = await page.goto(`${origin}/buscar?q=filtro`);
       expect(response?.status()).toBe(500);
-      await expect(page.getByTestId('public-error')).toBeVisible();
+      // #361: the error boundary is a client component and shows only after React hydrates the
+      // empty 500 shell; on a loaded CI runner the default 5 s expect timeout was not enough once
+      // (search-privacy.spec.ts). The longer timeout is local to this assertion: no retry, no sleep.
+      await expect(page.getByTestId('public-error')).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId('car-control')).toBeVisible();
       await expect(page.getByTestId('car-select')).toHaveText(messages.Car.select);
       await expect(page.getByTestId('car-label')).toHaveCount(0);

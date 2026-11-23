@@ -38,7 +38,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: true,
   reporter: [['list']],
-  use: { baseURL },
+  // #361: a failed run keeps a trace and a screenshot in test-results/ (git- and docker-ignored);
+  // the CI workflows upload that folder when the gate fails. A passing test keeps nothing. Retries
+  // stay at their default of 0 (0006 rule 6).
+  use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   // The catalogue-file flow (S3.7) approves a feed of its own and imports it, so it runs in a second
   // project that starts only after every other spec has finished: an `import-feeds` of
   // `entrypoint.spec.ts`, or a spec that counts feeds or public products, would otherwise see
