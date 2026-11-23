@@ -39,7 +39,9 @@ Status: accepted, 2026-11-22. Builds on 0013 (a failed import rolls back).
   stays hidden on return, and unhiding a removed offer publishes nothing.
 - **Demo and catalogue-file feeds** follow the same rule.
 - **`hasNonDemoOfferWhere`** still counts a removed real offer, as it counts a
-  hidden one.
+  hidden one. Since S12.2 the function is `indexableProductWhere`
+  (`src/server/catalogue/demo.ts`): it counts an offer from a feed that is neither
+  demo nor collected, in any offer state, so this line stays true.
 
 ## Why
 

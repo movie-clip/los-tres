@@ -35,8 +35,9 @@ one lives in code:
   `src/server/catalogue/product-page.ts`, category listing in `category-page.ts`, home tree in `category-tree.ts`; all call `visibleProductWhere()`). One shared query scope decides what is public: an
   offer from an approved feed of an approved shop that is not hidden, not in the matching queue and not removed by import (`offers.is_removed`, S3.3), and a product that is not
   hidden and not in the matching queue. Every public read (catalogue, search,
-  product page, sitemap, `/go/<offer>`) goes through it (guardrail 1).
-- **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of the catalogue folder `catalogue-files/` (S3.7)). One importer, `import-feeds`, is the only writer of
+  product page, sitemap, `/go/<offer>`) goes through it (guardrail 1). Marked rows (S12.2) are excluded only inside `visibleOfferWhere`/`visibleProductWhere` via `collectedRowsShown()`; `indexableProductWhere` (`demo.ts`) excludes demo and collected alike, flag-independent.
+- **Local flag** (`src/config/local-flag.ts`): the only reader of `LOCAL_COLLECTED_DATA`; refusal at `docker-entrypoint.sh` `server` (`start-check.js`) and `src/instrumentation.ts` `register()`, exit 78 (S12.2).
+- **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of `catalogue-files/` (S3.7) and `collected-files/` (S12.2), both through `readCatalogueFile`). One importer, `import-feeds`, is the only writer of
   products and offers from outside data. It reads only feeds registered in the
   database and has no code path that fetches a shop's web pages (guardrail 2).
 - **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The importer is its only caller; there is no merge or split in the MVP (mvp.md § Matching).
