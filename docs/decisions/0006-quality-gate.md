@@ -43,9 +43,11 @@ Tests import from local fixture feed files and never call a live network.
 Owner ruling, run 2026-11-23-no-clock-in-gate (issue #348). The gate's result
 must not depend on how fast or how loaded the machine is.
 
-**Scope.** The rules apply to the `unit` and `integration` Vitest projects
+**Scope.** Rules 1 to 4 apply to the `unit` and `integration` Vitest projects
 (`tests/unit`, `tests/integration`, and the shared files in `tests/support`).
-The e2e tests are outside them.
+The e2e tests are outside rules 1 to 4. Rule 5 is pinned over `vitest.config.mts`,
+the `package.json` scripts and `gate.yml`; the rule 6 pin also reads
+`playwright.config.ts` and the sources in `tests/e2e` and `tests/timing`.
 
 1. **No test decides its result by reading the clock.** `Date.now()`,
    `performance.now()`, `process.hrtime`, `process.uptime()` and `new Date()`

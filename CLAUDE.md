@@ -258,10 +258,14 @@ the shell (Bash: `INTEGRATION_WORKERS=2 npm run test:integration`; PowerShell:
 `$env:INTEGRATION_WORKERS=2; npm run test:integration`) sets it; `.env` is
 not read for it. A value that is not a positive whole number fails the run.
 
-**Time in tests (0006, § Amendment 2026-11-23).** The unit and integration
-tests read no clock except on lines marked `// eslint-disable-next-line
-no-restricted-syntax -- clock: <reason>`; ESLint enforces it. Real timings are
-`npm run test:timing`, never a gate step. The e2e tests are outside that rule.
+**Time in tests (0006, § Amendment 2026-11-23).** The unit, integration and
+support test files do not use `Date.now()`, `performance.now()`,
+`process.hrtime`, `process.uptime()` or `new Date()` with no argument, except on
+a line marked `// eslint-disable-next-line no-restricted-syntax -- clock:
+<reason>`. ESLint flags exactly those forms; aliased or computed access, SQL
+time functions and sleeps are not flagged and fall to the integration review
+(0006 names them). Real timings are `npm run test:timing`, never a gate step.
+The e2e tests are outside that rule.
 
 **CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate:ci` on every
 pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
