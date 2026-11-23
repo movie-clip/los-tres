@@ -97,25 +97,31 @@ requests, not to test files, and no pin reads it.
    `tests/support/global-setup.ts`, `tests/support/test-database-env.ts`,
    `tests/support/env.ts`, `tests/support/db.ts`, `tests/support/isolated-app.ts`,
    `tests/e2e/global-setup.ts`, any file in `.github/workflows/`, the `test*`,
-   `gate*`, `db:*` and `stack:*` scripts in `package.json`, and the `db` service
+   `gate*`, `check*`, `db:*` and `stack:*` scripts in `package.json`, and the `db` service
    in `compose.yaml`. Nothing enforces rule 7 by machine: the owner checks it
    before merging and the integration review checks it, and no pin reads a pull
    request's body or diff. A change from a file outside that list that alters
    execution (a test that opens its own connection pool, for example) is not
    caught by the list; the integration review names it.
 
-   **The case rule 7 cannot cover.** A manual workflow cannot be started until
-   its file is on `main` (GitHub's rule for `workflow_dispatch`), so a pull request that adds or changes `gate-repeat.yml` cannot
-   be repeated before it is merged, and neither can any use of the workflow
-   before the file is on `main`. A change to the steps or job settings of
-   `gate.yml` is the same case, because the drift pin requires `gate-repeat.yml`
-   to change with them. With `pr` set, the jobs check out the pull request's
-   merge commit, so the copies run that commit's code, tests, `package.json`
-   scripts and pins, and the pins read the pull request's workflow files as
-   text. What they do not run is the pull request's own `gate-repeat.yml` as a
-   workflow: `plan`, `copy` and `timing` execute as written in the file the
-   dispatch started from, not as written in the pull request's merge commit. For such a pull request the owner merges on the `gate`
+   **The case rule 7 cannot cover.** Two pull requests cannot be repeated
+   before they are merged: the one that adds `gate-repeat.yml` while the file is
+   not yet on `main` (a manual workflow cannot be started until its file is on
+   the default branch), and a pull request from a fork that changes
+   `gate-repeat.yml` or `gate.yml`. For those the owner merges on the `gate`
    check and starts the repeat run on `main` afterwards.
+
+   A same-repository pull request that changes `gate-repeat.yml`, or the steps or
+   job settings of `gate.yml` (the drift pin requires `gate-repeat.yml` to change
+   with them), is repeated by starting `gate-repeat` on the pull request's own
+   branch with `pr` set to its number. The jobs run as written in the file the
+   dispatch started from, so that branch's `gate-repeat.yml` runs, and every job
+   checks out the pull request's merge commit, so the copies run that commit's
+   code, tests, `package.json` scripts and pins. Started on `main` instead, the
+   jobs run `main`'s `gate-repeat.yml`, not the pull request's. That a dispatch
+   uses the workflow file at the branch it is started from is expected from
+   GitHub's documentation; neither the repository nor a run has shown it, and
+   the first such dispatch will confirm it.
 
 **What enforces them.**
 

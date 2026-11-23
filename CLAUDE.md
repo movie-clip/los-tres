@@ -303,6 +303,14 @@ runs, in parallel on separate runners:
   failing on it, so a slow or failing timing does not turn the job red; the job
   fails only when its setup fails (`npm ci`, `env:init`, the database).
 
+With `pr` set, the jobs run that pull request's own code in this repository:
+its `npm ci` scripts, `package.json` scripts, tests and `compose.yaml`. The
+workflow references no secret and its token has `contents: read` only. For a
+pull request from a fork, read its diff first and start the run from a branch
+other than `main`: GitHub scopes the Actions cache by the ref a run starts on
+(GitHub's documented behaviour, not something the repository checks), so cache
+writes from the fork's code then stay in that branch's scope.
+
 The workflow is never a required check: the required check is `gate`, from
 `gate.yml`, and no job of `gate-repeat` is named `gate`. Use it before merging a
 pull request that changes how tests execute (§ Git and tickets). At the time of
@@ -343,11 +351,13 @@ Helpers:
   Specialist lanes never write to git or GitHub; read-only git is fine.
 - **A change to how tests execute is repeated before it is merged (0006 rule
   7).** The owner starts `gate-repeat` on the pull request: five green copies of
-  the gate, ten when it changes the worker count, the test-database setup or the
-  CI job layout, with the run linked in the pull request body. A red copy is
-  explained, not started again until it passes. Nothing checks this by machine;
-  0006 holds the file list and the one case it cannot cover, a change to
-  `gate-repeat.yml` itself.
+  the gate, ten when it changes the worker count, the test-database setup or
+  reset, or the CI job layout, with the run linked in the pull request body. A
+  red copy is explained, not started again until it passes. Nothing checks this
+  by machine. 0006 holds the file list and the uncovered case: the pull request
+  that adds `gate-repeat.yml` before it is on `main`, and a fork pull request
+  that changes `gate-repeat.yml` or `gate.yml`. A same-repository pull request
+  that changes either file is repeated by starting the run on its own branch.
 - **Only a human merges.** No agent merges a pull request, pushes to `main` or
   force-pushes. `.claude/settings.json` denies those commands.
 - **The repo and the board are public.** Never put a secret, token, email or
