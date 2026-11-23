@@ -242,10 +242,10 @@ deploy it must be the public https origin**, or all of them point at
 `npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
 in that order. It rebuilds the app image and runs the e2e against the Compose
 stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
-gate covers both `tsconfig.json` and `tsconfig.cli.json`. The gate asserts no
-wall-clock time: its two cost tests (`category-fit-cost`, `sitemap-performance`)
-assert a query-count ceiling, and the timings run on demand with
-`npm run test:timing`, which writes them to `timing-results/`. The gate has no
+gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
+(`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
+instead of a time, and their timings run on demand with `npm run test:timing`,
+which writes them to `timing-results/`. The gate has no
 migrate step, and the app container migrates on start. The integration tests
 use their own databases on the same `db` service (0010): each run drops and
 migrates a template, `<DB_NAME>_tpl_test`, from nothing and clones it into one
