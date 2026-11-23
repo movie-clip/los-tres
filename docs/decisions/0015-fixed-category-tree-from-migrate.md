@@ -41,7 +41,8 @@ Status: accepted, 2026-10-27. The owner approved the mechanism on 2026-10-27
   migrate. If an admin editor is added later, it has to account for this.
 - Products that were in a retired category become unmapped, and so not public,
   until the next `import-feeds` assigns them a category through a mapping.
-- Tests start from the migrated state: `resetDatabase` re-creates the tree
-  after truncating, so the six fixed categories take ids 1 to 6.
+- Tests start from the migrated state: `resetDatabase` empties every table
+  and copies the six fixed categories back from a snapshot of the migrated
+  template, so they keep ids 1 to 6.
 - The tree editor (S4.1) is replaced by this fixed tree; mapping feed
   categories to the five children stays with S4.2.
