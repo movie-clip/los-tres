@@ -10,7 +10,15 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 
-export const feedSourceType = pgEnum('feed_source_type', ['affiliate_network', 'shop_upload', 'catalogue_file']);
+// S12.2: `collected_file` is a feed whose rows come from a file made by the owner's local-only
+// collector (decision 0017). Set at creation, never changed; its offers and the products it creates
+// are the marked rows the visibility scope keeps off a public site.
+export const feedSourceType = pgEnum('feed_source_type', [
+  'affiliate_network',
+  'shop_upload',
+  'catalogue_file',
+  'collected_file',
+]);
 
 export const networks = pgTable('networks', {
   id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
@@ -56,6 +64,16 @@ export const feeds = pgTable(
     check(
       'feeds_catalogue_file_no_network',
       sql`${table.sourceType}::text <> 'catalogue_file' or ${table.networkId} is null`,
+    ),
+    // S12.2: a collected-file feed names a file, never a network, and is never a demo feed. The
+    // same text cast as above, for the same reason.
+    check(
+      'feeds_collected_file_no_network',
+      sql`${table.sourceType}::text <> 'collected_file' or ${table.networkId} is null`,
+    ),
+    check(
+      'feeds_collected_file_not_demo',
+      sql`${table.sourceType}::text <> 'collected_file' or ${table.isDemo} = false`,
     ),
   ],
 );

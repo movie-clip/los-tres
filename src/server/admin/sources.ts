@@ -36,23 +36,34 @@ import {
 // read (null for a stored value that is not a name). Registering or editing one
 // reads no file and approves nothing: the importer is the only reader of the
 // folder, and a file feed is created and edited unapproved (guardrail 1).
+//
+// S12.2: a collected-file feed is the second file kind. It is created and edited
+// by the same two file writers, parameterised by kind. Its kind is set by the
+// insert and never by an update: no `.set()` below names the source.
 
-export type AdminFeedSource = 'affiliate_network' | 'shop_upload' | 'catalogue_file';
+export type AdminFeedSource = 'affiliate_network' | 'shop_upload' | 'catalogue_file' | 'collected_file';
+
+/** The two file kinds: the stored value is a bare file name, never an address (S3.7, S12.2). */
+type FileFeedSource = Extract<AdminFeedSource, 'catalogue_file' | 'collected_file'>;
+
+function isFileSource(source: AdminFeedSource): source is FileFeedSource {
+  return source === 'catalogue_file' || source === 'collected_file';
+}
 
 export type AdminFeed = {
   id: number;
   approved: boolean;
   demo: boolean;
   source: AdminFeedSource;
-  /** `networks.id`; null for a shop upload and for a catalogue file. */
+  /** `networks.id`; null for a shop upload and for a catalogue or collected file. */
   networkId: number | null;
-  /** `networks.name`; null when the feed has no network (a shop upload, a catalogue file). */
+  /** `networks.name`; null when the feed has no network (a shop upload, a catalogue or collected file). */
   networkName: string | null;
   /** All stored offers of this feed, hidden and in-review included. */
   offerCount: number;
-  /** The host of the stored address, or null when it cannot be read as one (a demo feed, a file name); always null for a catalogue file, which is never read as an address. */
+  /** The host of the stored address, or null when it cannot be read as one (a demo feed, a file name); always null for a catalogue or collected file, which is never read as an address. */
   host: string | null;
-  /** A catalogue file only: the stored file name when it is one by the rule, else null; null for every other source. */
+  /** A catalogue or collected file only: the stored file name when it is one by the rule, else null; null for every other source. */
   fileName: string | null;
 };
 
@@ -92,7 +103,7 @@ export type AdminFeedEdit =
       host: string | null;
     }
   | {
-      source: 'catalogue_file';
+      source: FileFeedSource;
       id: number;
       shopId: number;
       shopName: string;
@@ -113,7 +124,7 @@ export type SourceFieldErrors = {
   /** None chosen, malformed, or no such network. */
   network?: 'required';
   url?: 'required' | 'invalid' | 'credentials' | 'too_long' | 'duplicate';
-  /** A create form with a source that is neither affiliate_network nor catalogue_file. */
+  /** A create form with a source that is none of affiliate_network, catalogue_file and collected_file. */
   source?: 'invalid';
   /** Catalogue-file feeds only (S3.7). */
   fileName?: CatalogueFileNameError | 'duplicate';
@@ -159,8 +170,8 @@ export async function listSourcesForAdmin(): Promise<AdminShop[]> {
 
   const feedsByShop = new Map<number, AdminFeed[]>();
   for (const row of feedRows) {
-    // A catalogue file's stored value is a file name, never an address: feedHost is not called for it.
-    const isFile = row.source === 'catalogue_file';
+    // A file feed's stored value is a file name, never an address: feedHost is not called for it.
+    const isFile = isFileSource(row.source);
     const feed: AdminFeed = {
       id: row.id,
       approved: row.approved,
@@ -238,7 +249,7 @@ export async function getShopForEdit(id: number): Promise<AdminNameSlug | null> 
   return rows[0] ?? null;
 }
 
-/** One affiliate or catalogue-file feed for its edit form, or null when the id is unknown or the feed is a shop upload. */
+/** One affiliate, catalogue-file or collected-file feed for its edit form, or null when the id is unknown or the feed is a shop upload. */
 export async function getFeedForEdit(id: number): Promise<AdminFeedEdit | null> {
   const rows = await getDb()
     .select({
@@ -256,9 +267,9 @@ export async function getFeedForEdit(id: number): Promise<AdminFeedEdit | null> 
     .where(eq(feeds.id, id));
   const row = rows[0];
   if (!row) return null;
-  if (row.source === 'catalogue_file') {
+  if (isFileSource(row.source)) {
     return {
-      source: 'catalogue_file',
+      source: row.source,
       id: row.id,
       shopId: row.shopId,
       shopName: row.shopName,
@@ -402,26 +413,28 @@ export async function updateShop(form: FormData): Promise<SourceWrite> {
 
 /**
  * Creates an unapproved, non-demo feed. The `source` field picks the kind: absent
- * or empty is an affiliate feed (the S3.1 form posts none), `affiliate_network`
- * and `catalogue_file` are the two kinds, and any other value is refused with no
- * write. No other field decides anything: approval and demo are never read.
+ * or empty is an affiliate feed (the S3.1 form posts none), `affiliate_network`,
+ * `catalogue_file` and `collected_file` are the three kinds, and any other value
+ * is refused with no write. No other field decides anything: approval and demo
+ * are never read.
  */
 export async function createFeed(form: FormData): Promise<SourceWrite> {
   const raw = form.get('source');
   if (raw === null || raw === '') return createAffiliateFeed(form);
   if (raw === 'affiliate_network') return createAffiliateFeed(form);
-  if (raw === 'catalogue_file') return createFileFeed(form);
+  if (raw === 'catalogue_file') return createFileFeed(form, 'catalogue_file');
+  if (raw === 'collected_file') return createFileFeed(form, 'collected_file');
   return refused({ source: 'invalid' });
 }
 
 /**
- * Creates an unapproved, non-demo catalogue-file feed from `shopId` and
- * `fileName`; `networkId` and `url` are not read. The name is checked by the
+ * Creates an unapproved, non-demo file feed of `kind` (catalogue or collected)
+ * from `shopId` and `fileName`; `networkId` and `url` are not read. The name is checked by the
  * shared rule and stored as accepted; nothing on disk is looked at (AC 9). A
  * second row for the same shop and name is refused by the unique constraint, so
  * two simultaneous requests make one row.
  */
-async function createFileFeed(form: FormData): Promise<SourceWrite> {
+async function createFileFeed(form: FormData, kind: FileFeedSource): Promise<SourceWrite> {
   const shopId = parseId(form.get('shopId'));
   const name = checkCatalogueFileName(textField(form, 'fileName'));
 
@@ -436,7 +449,7 @@ async function createFileFeed(form: FormData): Promise<SourceWrite> {
       .values({
         shopId,
         networkId: null,
-        sourceType: 'catalogue_file',
+        sourceType: kind,
         url: name.value,
         isApproved: false,
         isDemo: false,
@@ -489,9 +502,11 @@ async function createAffiliateFeed(form: FormData): Promise<SourceWrite> {
  * so `unapproved` is read from the state the UPDATE then changes.
  *
  * The branch is the stored source of the locked row, never a form field. A
- * catalogue-file feed (S3.7) reads `fileName` only: the same name, exactly after
- * the trim, writes nothing; a new name is stored and returns the feed to
- * unapproved in one UPDATE (D-7). A shop upload or an unknown id is `missing`.
+ * catalogue-file feed (S3.7) or a collected-file feed (S12.2) reads `fileName`
+ * only: the same name, exactly after the trim, writes nothing; a new name is
+ * stored and returns the feed to unapproved in one UPDATE (D-7). No branch writes
+ * the source, so a feed keeps its kind for as long as it exists (S12.2 AC 5). A
+ * shop upload or an unknown id is `missing`.
  */
 export async function updateFeed(form: FormData): Promise<SourceWrite> {
   const id = parseId(form.get('id'));
@@ -516,7 +531,7 @@ export async function updateFeed(form: FormData): Promise<SourceWrite> {
       const feed = rows[0];
       if (!feed) return MISSING;
 
-      if (feed.source === 'catalogue_file') {
+      if (isFileSource(feed.source)) {
         conflictField = 'fileName';
         const name = checkCatalogueFileName(textField(form, 'fileName'));
         if (name.error) return refused({ fileName: name.error });

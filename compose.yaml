@@ -32,6 +32,11 @@ services:
         source: ./catalogue-files
         target: /app/catalogue-files
         read_only: true
+      # Collected files (S12.2, decision 0017): read-only, never in git or the image.
+      - type: bind
+        source: ./collected-files
+        target: /app/collected-files
+        read_only: true
     depends_on:
       db:
         condition: service_healthy

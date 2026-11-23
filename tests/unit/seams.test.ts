@@ -1012,3 +1012,184 @@ describe('seams (guardrail 2, S3.7 catalogue folder)', () => {
     expect(code).toMatch(/export function checkCatalogueFileName/);
   });
 });
+
+// S12.2 (T-12.2.1, AC 47): the collected source kind, its folder and the product
+// marker are each named in the modules the design lists and nowhere else, and no
+// update of a feed ever writes its kind. Each rule is a named pattern and
+// allow-list, proved non-vacuous on the real tree and able to fail on a planted
+// offender. Lane B adds the flag and the marked-helper rules beside these.
+describe('seams (guardrails 1 and 2, S12.2 collected source and marker)', () => {
+  const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+  const planted = (
+    files: { file: string; code: string }[],
+    test: (code: string) => boolean,
+    allowed: (file: string) => boolean,
+  ): string[] => files.filter(({ file, code }) => test(code) && !allowed(file)).map(({ file }) => file);
+
+  const SOURCE_READER = 'src/server/importer/source.ts';
+  const IMPORTER = 'src/server/importer/index.ts';
+  const ADMIN_WRITER = 'src/server/admin/sources.ts';
+
+  // S-4: the product marker column, by its SQL or its TypeScript name.
+  const productMarker = /\bis_collected\b|\.isCollected\b/;
+  const mayNameProductMarker = (file: string): boolean =>
+    file.startsWith('src/db/') ||
+    [IMPORTER, 'src/server/matching.ts', 'src/server/visibility.ts'].includes(file);
+
+  it('names the product marker only in the schema, the importer, the matcher and the visibility scope (S-4)', () => {
+    expect(offenders(productMarker, mayNameProductMarker)).toEqual([]);
+    expect(codeOf('src/db/schema/catalogue.ts')).toMatch(productMarker);
+  });
+
+  it('keeps the product marker rule able to fail (S-4)', () => {
+    expect(productMarker.test('where(eq(products.isCollected, false))')).toBe(true);
+    expect(productMarker.test('sql`p.is_collected = true`')).toBe(true);
+    expect(productMarker.test('const isCollectedFeed = true')).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/server/catalogue/product-page.ts', code: 'and(eq(products.isCollected, false))' },
+        { file: 'src/app/admin/(shell)/productos/page.tsx', code: 'sql`is_collected`' },
+        { file: 'src/server/visibility.ts', code: 'eq(products.isCollected, true)' },
+      ],
+      (code) => productMarker.test(code),
+      mayNameProductMarker,
+    );
+    expect(found).toEqual(['src/server/catalogue/product-page.ts', 'src/app/admin/(shell)/productos/page.tsx']);
+  });
+
+  // S-5: a write of the product marker (an object key), only at product creation.
+  const writesProductMarker = /\bisCollected\s*:/;
+  const mayWriteProductMarker = (file: string): boolean => file.startsWith('src/db/') || file === IMPORTER;
+
+  it('writes the product marker only in the schema and the importer, once, at product creation (S-5)', () => {
+    expect(offenders(writesProductMarker, mayWriteProductMarker)).toEqual([]);
+    const importer = codeOf(IMPORTER);
+    expect(importer.match(new RegExp(writesProductMarker.source, 'g')) ?? []).toHaveLength(1);
+    const create = importer.match(/async function createProduct\([\s\S]*?\r?\n\}/)?.[0] ?? '';
+    expect(create).toMatch(/\.insert\(\s*products\s*\)/);
+    expect(create).toMatch(writesProductMarker);
+  });
+
+  it('keeps the product marker write rule able to fail (S-5)', () => {
+    expect(writesProductMarker.test('.values({ isCollected: markedRow })')).toBe(true);
+    expect(writesProductMarker.test('.set({ isCollected : true })')).toBe(true);
+    expect(writesProductMarker.test('eq(products.isCollected, true)')).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/server/admin/products.ts', code: 'tx.update(products).set({ isCollected: false })' },
+        { file: IMPORTER, code: '.values({ isCollected: markedRow })' },
+      ],
+      (code) => writesProductMarker.test(code),
+      mayWriteProductMarker,
+    );
+    expect(found).toEqual(['src/server/admin/products.ts']);
+  });
+
+  // S-6: the collected source value. Never in the public catalogue reads, the click
+  // modules, the public routes or the proxy: they see marked rows only through the
+  // visibility scope.
+  const collectedSource = /collected_file/;
+  const mayNameCollectedSource = (file: string): boolean =>
+    file.startsWith('src/db/') ||
+    [SOURCE_READER, 'src/server/importer/types.ts', IMPORTER, 'src/server/visibility.ts', ADMIN_WRITER].includes(
+      file,
+    ) ||
+    file.startsWith('src/app/admin/(shell)/tiendas/') ||
+    file.startsWith('src/app/admin/(shell)/categorias/') ||
+    file.startsWith('src/components/admin/');
+
+  it('names the collected source value only where the design lists it (S-6)', () => {
+    expect(offenders(collectedSource, mayNameCollectedSource)).toEqual([]);
+    for (const file of ['src/db/schema/sources.ts', SOURCE_READER, IMPORTER, ADMIN_WRITER]) {
+      expect(codeOf(file), file).toMatch(collectedSource);
+    }
+  });
+
+  it('keeps the collected source rule able to fail, in the catalogue, clicks, public routes and proxy (S-6)', () => {
+    expect(collectedSource.test("eq(feeds.sourceType, 'collected_file')")).toBe(true);
+    expect(collectedSource.test("'catalogue_file'")).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/server/catalogue/product-page.ts', code: "feeds.sourceType <> 'collected_file'" },
+        { file: 'src/server/clicks/offer-target.ts', code: "'collected_file'" },
+        { file: 'src/app/(public)/producto/[slug]/page.tsx', code: "'collected_file'" },
+        { file: 'src/proxy.ts', code: "'collected_file'" },
+        { file: 'src/server/admin/category-mappings.ts', code: "'collected_file'" },
+        { file: ADMIN_WRITER, code: "'collected_file'" },
+        { file: 'src/components/admin/FeedForm.tsx', code: "'collected_file'" },
+      ],
+      (code) => collectedSource.test(code),
+      mayNameCollectedSource,
+    );
+    expect(found).toEqual([
+      'src/server/catalogue/product-page.ts',
+      'src/server/clicks/offer-target.ts',
+      'src/app/(public)/producto/[slug]/page.tsx',
+      'src/proxy.ts',
+      'src/server/admin/category-mappings.ts',
+    ]);
+  });
+
+  // S-9: the collected folder, named by the one reader alone (as the catalogue folder is).
+  const collectedFolder = /collected-files/;
+
+  it('names the collected folder in src/ only in src/server/importer/source.ts (S-9)', () => {
+    expect(offenders(collectedFolder, (file) => file === SOURCE_READER)).toEqual([]);
+    expect(codeOf(SOURCE_READER)).toMatch(collectedFolder);
+  });
+
+  it('keeps the collected folder rule able to fail (S-9)', () => {
+    expect(collectedFolder.test("path.resolve(process.cwd(), 'collected-files')")).toBe(true);
+    expect(collectedFolder.test("'catalogue-files'")).toBe(false);
+    const found = planted(
+      [
+        { file: IMPORTER, code: "const dir = 'collected-files';" },
+        { file: SOURCE_READER, code: "const COLLECTED_FOLDER = 'collected-files';" },
+      ],
+      (code) => collectedFolder.test(code),
+      (file) => file === SOURCE_READER,
+    );
+    expect(found).toEqual([IMPORTER]);
+  });
+
+  // S-11: a feed's kind is set by its insert and never by an update (AC 5). Each
+  // `.update(feeds)` statement, up to its `;`, and each raw `update feeds set`,
+  // must not name the source column. No file is allowed.
+  const feedUpdates = (code: string): string[] => [
+    ...[...code.matchAll(/\.update\(\s*feeds\s*\)[^;]*/g)].map((match) => match[0]),
+    ...[...code.matchAll(/\bupdate\s+"?feeds"?\s+set\b[^;]*/gi)].map((match) => match[0]),
+  ];
+  const updatesFeedSource = (code: string): boolean =>
+    feedUpdates(code).some((statement) => /\bsource(Type|_type)\b/.test(statement));
+
+  it('never writes a feed source kind in an update, anywhere in src (S-11, AC 5)', () => {
+    expect(sources().filter(({ code }) => updatesFeedSource(code)).map(({ file }) => file)).toEqual([]);
+    // Not vacuous: the admin writer's feed updates are found and scanned.
+    expect(feedUpdates(codeOf(ADMIN_WRITER)).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps the feed source update rule able to fail (S-11)', () => {
+    expect(updatesFeedSource("await tx.update(feeds).set({ sourceType: 'collected_file' }).where(x);")).toBe(true);
+    expect(
+      updatesFeedSource('await tx\n  .update(feeds)\n  .set(next ? { url, sourceType: kind } : { url })\n  .where(x);'),
+    ).toBe(true);
+    expect(updatesFeedSource("await db.execute(sql`UPDATE \"feeds\" SET source_type = 'shop_upload'`);")).toBe(true);
+    expect(
+      updatesFeedSource('await tx.update(feeds).set({ url: name.value, isApproved: false }).where(eq(feeds.id, id));'),
+    ).toBe(false);
+    expect(updatesFeedSource('await tx.insert(feeds).values({ sourceType: kind });')).toBe(false);
+    // A source select after an unrelated update statement is not a write.
+    expect(
+      updatesFeedSource('await tx.update(feeds).set({ isApproved: false });\nselect({ source: feeds.sourceType })'),
+    ).toBe(false);
+    const found = planted(
+      [
+        { file: ADMIN_WRITER, code: "tx.update(feeds).set({ sourceType: 'catalogue_file' }).where(x);" },
+        { file: 'src/server/seed/index.ts', code: 'tx.update(feeds).set({ isApproved: true });' },
+      ],
+      updatesFeedSource,
+      () => false,
+    );
+    expect(found).toEqual([ADMIN_WRITER]);
+  });
+});

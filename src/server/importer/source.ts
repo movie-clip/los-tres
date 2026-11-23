@@ -11,7 +11,9 @@ import type { FeedBytes, FeedFailure, FeedSourceRef } from './types';
 // It serves registered feed rows only: the caller passes a feed row, never a
 // free URL or path. It is also the only place that names the one catalogue
 // folder (S3.7): a catalogue-file feed holds a bare file name, never a path, and
-// no command argument or request can name another folder. A feed URL can hold a network API key, so no message here
+// no command argument or request can name another folder. The same holds for the
+// one collected folder (S12.2): a collected-file feed reads only there, a
+// catalogue-file feed never does, and both use one reader and one name rule. A feed URL can hold a network API key, so no message here
 // carries it, and the underlying error is dropped on purpose (TD-36). The same
 // goes for a redirect target (`Location`): it is never logged or put in an error.
 
@@ -29,6 +31,8 @@ const DEMO_SCHEME = 'demo-feed:';
 const DEMO_FILE = /^[a-z0-9-]+\.(csv|xml)(\.gz)?$/;
 /** The one folder a catalogue-file feed reads, at the repo root (and in the container's /app). */
 const CATALOGUE_FOLDER = 'catalogue-files';
+/** The one folder a collected-file feed reads (S12.2), at the repo root (and in the container's /app). */
+const COLLECTED_FOLDER = 'collected-files';
 
 /** A feed whose source cannot be read. `code` is the report's `failure`. */
 export class SourceError extends Error {
@@ -56,12 +60,15 @@ export class SourceError extends Error {
  * a timeout and a size cap, following at most 5 redirects and only to https on
  * the feed URL's own host; and `demo-feed:<name>.csv|xml[.gz]` for a feed marked
  * `is_demo`, read from demo/feeds; and, for a `catalogue_file` feed, the file
- * its stored name gives in the catalogue folder (`readCatalogueFile`). Anything
- * else is `unsupported_url`. A feed's kind picks its branch, so a file feed never
- * reaches demo/feeds or the network, and the other kinds never reach the folder.
+ * its stored name gives in the catalogue folder (`readCatalogueFile`); and, for a
+ * `collected_file` feed, the file its stored name gives in the collected folder,
+ * by the same reader and the same name rule (S12.2). Anything else is
+ * `unsupported_url`. A feed's kind picks its branch, so a file feed never reaches
+ * demo/feeds, the network or the other kind's folder, and the other kinds never
+ * reach either folder.
  *
- * `options.catalogueDir` replaces the folder, for tests only: the importer, the
- * CLI and every command call this without it.
+ * `options.catalogueDir` and `options.collectedDir` replace the two folders, for
+ * tests only: the importer, the CLI and every command call this without them.
  *
  * Resolves once redirects are settled and a 2xx answer is in hand, so a refusal
  * (`unsupported_url`, `fetch_failed`, `redirect_refused`) is thrown here. The
@@ -71,13 +78,20 @@ export class SourceError extends Error {
  */
 export async function readFeedSource(
   feed: FeedSourceRef,
-  options: { catalogueDir?: string } = {},
+  options: { catalogueDir?: string; collectedDir?: string } = {},
 ): Promise<FeedBytes> {
   if (feed.sourceType === 'catalogue_file') {
     if (feed.isDemo) throw new SourceError('unsupported_url');
     return readCatalogueFile(
       feed.url,
       options.catalogueDir ?? path.resolve(process.cwd(), CATALOGUE_FOLDER),
+    );
+  }
+  if (feed.sourceType === 'collected_file') {
+    if (feed.isDemo) throw new SourceError('unsupported_url');
+    return readCatalogueFile(
+      feed.url,
+      options.collectedDir ?? path.resolve(process.cwd(), COLLECTED_FOLDER),
     );
   }
 
@@ -113,7 +127,8 @@ export async function readFeedSource(
 }
 
 /**
- * One file of the catalogue folder, by the exact name a feed row stores. Every
+ * One file of a feed-file folder (the catalogue folder, or the collected folder for
+ * a collected-file feed), by the exact name a feed row stores. Every
  * refusal is a `SourceError` with a fixed code and nothing else: no path, no
  * name and no system error reaches a message or a log (guardrail 5).
  *

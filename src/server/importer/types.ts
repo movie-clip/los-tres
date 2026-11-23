@@ -80,8 +80,11 @@ export type FeedSourceRef = {
   id: number;
   url: string;
   isDemo: boolean;
-  /** `catalogue_file`: `url` is a file name in the catalogue folder, not an address. */
-  sourceType: 'affiliate_network' | 'shop_upload' | 'catalogue_file';
+  /**
+   * `catalogue_file`: `url` is a file name in the catalogue folder, not an address.
+   * `collected_file` (S12.2): `url` is a file name in the collected folder; its rows are marked.
+   */
+  sourceType: 'affiliate_network' | 'shop_upload' | 'catalogue_file' | 'collected_file';
 };
 
 /** Raw feed bytes as served: maybe gzip, maybe CSV or XML. Consumed once. */

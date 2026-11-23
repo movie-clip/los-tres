@@ -182,6 +182,9 @@ async function importRecords(
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
+  // S12.2 (D-1): the feed's kind decides the marker. Every product a collected feed's row creates is
+  // marked; an offer is marked through its feed, which it never leaves, so it needs no write of its own.
+  const markedRow = feed.sourceType === 'collected_file';
   // Shares the feed row until this transaction ends, so an admin mapping save
   // (FOR NO KEY UPDATE on the same row) cannot run between loading the mappings
   // and writing categories: an import never refills what a save just cleared
@@ -228,7 +231,7 @@ async function importRecords(
     if (match.kind === 'attach') {
       productId = match.productId;
     } else {
-      productId = await createProduct(tx, row, brandNormalised, partNumberNormalised);
+      productId = await createProduct(tx, row, brandNormalised, partNumberNormalised, markedRow);
       report.productsCreated += 1;
       if (match.kind === 'own_product') report.ownProducts.push({ record, reason: match.reason });
     }
@@ -345,12 +348,16 @@ async function findOffer(tx: Executor, feedId: number, externalId: string) {
   return found;
 }
 
-/** Product text is written here only, once, and never updated (TD-23). */
+/**
+ * Product text is written here only, once, and never updated (TD-23). So is the
+ * collected marker (S12.2): `markedRow` is true for a row of a collected feed.
+ */
 async function createProduct(
   tx: Executor,
   row: ValidRow,
   brandNormalised: string | null,
   partNumberNormalised: string | null,
+  markedRow: boolean,
 ): Promise<number> {
   const slug = await uniqueSlug(slugify(row.title), async (candidate) => {
     const taken = await tx
@@ -372,6 +379,7 @@ async function createProduct(
       ean: row.ean,
       eanNormalised: row.eanNormalised,
       description: row.description,
+      isCollected: markedRow,
     })
     .returning({ id: products.id });
   return created.id;

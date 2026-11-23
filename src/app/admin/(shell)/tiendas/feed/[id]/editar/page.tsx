@@ -30,7 +30,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // The production build keeps the page's own title when the page throws notFound(), so the
   // not-found title is decided here: an id that does not parse, or has no row, is the 404.
   const id = parseId((await params).id);
-  if (id === null || !(await load(id))) return { title: t('notFoundTitle', { siteName }) };
+  const feed = id === null ? null : await load(id);
+  // S12.2: a collected-file feed has no edit form until T-12.2.4, so it takes the 404 title too.
+  if (!feed || feed.source === 'collected_file') return { title: t('notFoundTitle', { siteName }) };
   return { title: t('editFeedTitle', { siteName }) };
 }
 
@@ -41,6 +43,8 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
   if (id === null) notFound();
   const [feed, networks] = await Promise.all([load(id), listNetworksForAdmin()]);
   if (!feed) notFound();
+  // S12.2: the collected-file form arrives with T-12.2.4; until then its edit page is the 404.
+  if (feed.source === 'collected_file') notFound();
 
   const [t, sources] = await Promise.all([getTranslations('Admin.Form'), getTranslations('Admin.Sources')]);
   const limits = {
@@ -53,7 +57,9 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
   const labels = feedFormLabels(t, { mode: 'edit', feedId: feed.id, demo: feed.demo, limits });
 
   // A catalogue-file feed: the name is shown when it is a valid bare name, else the form says it is not (AC 13).
-  if (feed.source === 'catalogue_file') {
+  // The read's file variant carries both file kinds and the collected one is the 404 above, so the test is on
+  // the other variant: a source-literal test would not narrow the union for the affiliate form below.
+  if (feed.source !== 'affiliate_network') {
     return (
       <FormScreen
         back={{ href: SOURCES_PATH, label: t('backLink') }}
