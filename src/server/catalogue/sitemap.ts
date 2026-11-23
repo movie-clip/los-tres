@@ -6,7 +6,7 @@ import { getDb } from '../../db/client';
 import { categories, products } from '../../db/schema';
 import { isWellFormedSlug } from '../slug';
 import { visibleProductWhere } from '../visibility';
-import { hasNonDemoOfferWhere } from './demo';
+import { indexableProductWhere } from './demo';
 
 // What a search engine is offered (S6.2): products that are public by the one
 // visibility scope and are not demo-only, plus the categories whose subtree
@@ -23,7 +23,7 @@ export async function countSitemapProductChunks(
   const [row] = await getDb()
     .select({ total: sql<number>`count(*)::int` })
     .from(products)
-    .where(and(visibleProductWhere(), hasNonDemoOfferWhere()));
+    .where(and(visibleProductWhere(), indexableProductWhere()));
   return Math.ceil((row?.total ?? 0) / chunkSize);
 }
 
@@ -41,7 +41,7 @@ export async function getSitemapProductSlugs(
   const rows = await getDb()
     .select({ slug: products.slug })
     .from(products)
-    .where(and(visibleProductWhere(), hasNonDemoOfferWhere()))
+    .where(and(visibleProductWhere(), indexableProductWhere()))
     .orderBy(asc(products.id))
     .limit(chunkSize)
     .offset((chunk - 1) * chunkSize);
@@ -69,7 +69,7 @@ export async function getSitemapCategorySlugs(): Promise<string[]> {
       join ${products} on ${products.categoryId} = closure.descendant_id
       where closure.ancestor_id = c.id
         and ${visibleProductWhere()}
-        and ${hasNonDemoOfferWhere()}
+        and ${indexableProductWhere()}
     )
     order by c.id asc
   `);

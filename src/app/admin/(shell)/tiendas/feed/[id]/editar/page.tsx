@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic';
 const SOURCES_PATH = '/admin/tiendas';
 
 // One lookup per request, shared by `generateMetadata` and the page. An unknown id and a shop
-// upload are null (a 404); an affiliate feed and a catalogue-file feed each have their own form (S3.7).
+// upload are null (a 404); an affiliate feed has its own form, and both file kinds share the file form
+// (S3.7, S12.2).
 const load = cache((id: number) => getFeedForEdit(id));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -30,7 +31,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // The production build keeps the page's own title when the page throws notFound(), so the
   // not-found title is decided here: an id that does not parse, or has no row, is the 404.
   const id = parseId((await params).id);
-  if (id === null || !(await load(id))) return { title: t('notFoundTitle', { siteName }) };
+  const feed = id === null ? null : await load(id);
+  if (!feed) return { title: t('notFoundTitle', { siteName }) };
   return { title: t('editFeedTitle', { siteName }) };
 }
 
@@ -52,8 +54,9 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
   };
   const labels = feedFormLabels(t, { mode: 'edit', feedId: feed.id, demo: feed.demo, limits });
 
-  // A catalogue-file feed: the name is shown when it is a valid bare name, else the form says it is not (AC 13).
-  if (feed.source === 'catalogue_file') {
+  // A file feed, catalogue or collected: the name is shown when it is a valid bare name, else the form says it
+  // is not (AC 13). The stored kind is passed as the form's fixed source and is never posted (S12.2 AC 5).
+  if (feed.source !== 'affiliate_network') {
     return (
       <FormScreen
         back={{ href: SOURCES_PATH, label: t('backLink') }}
@@ -62,7 +65,7 @@ export default async function EditFeedPage({ params }: { params: Promise<{ id: s
       >
         <FeedForm
           mode="edit"
-          source="catalogue_file"
+          source={feed.source}
           action={updateFeedAction}
           cancelHref={SOURCES_PATH}
           id={feed.id}

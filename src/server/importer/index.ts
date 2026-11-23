@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
-import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
+import { matchProduct, normalizeBrand, normalizePartNumber, type MatchScope } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
 import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
@@ -182,6 +182,9 @@ async function importRecords(
 ): Promise<FeedImportReport> {
   const report = emptyReport(feed);
   const seenIds = new Set<string>();
+  // S12.2 (D-1): the feed's kind decides the marker. Every product a collected feed's row creates is
+  // marked; an offer is marked through its feed, which it never leaves, so it needs no write of its own.
+  const markedRow = feed.sourceType === 'collected_file';
   // Shares the feed row until this transaction ends, so an admin mapping save
   // (FOR NO KEY UPDATE on the same row) cannot run between loading the mappings
   // and writing categories: an import never refills what a save just cleared
@@ -210,7 +213,7 @@ async function importRecords(
     const known = await findOffer(tx, feed.id, row.externalId);
     if (known) {
       await writeOffer(tx, feed.id, known.productId, row, startedAt);
-      await assignCategory(tx, known.productId, mappedCategory(mappings, row));
+      await assignCategory(tx, known.productId, mappedCategory(mappings, row), { markedRow });
       fitmentsOfFeed.add(known.productId, row.fitment);
       report.offersUpdated += 1;
       continue;
@@ -218,22 +221,22 @@ async function importRecords(
 
     const brandNormalised = normalizeBrand(row.brand);
     const partNumberNormalised = normalizePartNumber(row.partNumber);
-    const match = await matchProduct(tx, {
-      eanNormalised: row.eanNormalised,
-      brandNormalised,
-      partNumberNormalised,
-    });
+    const match = await matchProduct(
+      tx,
+      { eanNormalised: row.eanNormalised, brandNormalised, partNumberNormalised },
+      { markedRow },
+    );
 
     let productId: number;
     if (match.kind === 'attach') {
       productId = match.productId;
     } else {
-      productId = await createProduct(tx, row, brandNormalised, partNumberNormalised);
+      productId = await createProduct(tx, row, brandNormalised, partNumberNormalised, markedRow);
       report.productsCreated += 1;
       if (match.kind === 'own_product') report.ownProducts.push({ record, reason: match.reason });
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
-    await assignCategory(tx, productId, mappedCategory(mappings, row));
+    await assignCategory(tx, productId, mappedCategory(mappings, row), { markedRow });
     fitmentsOfFeed.add(productId, row.fitment);
     report.offersCreated += 1;
   }
@@ -269,18 +272,27 @@ function mappedCategory(mappings: Map<string, number>, row: ValidRow): number | 
 
 /**
  * Sets the product's category only while it has none: first mapped wins, an
- * existing category is never overwritten and none is ever cleared (D-3).
+ * existing category is never overwritten and none is ever cleared (D-3). A row
+ * of a collected feed sets only a marked product's category, never an unmarked
+ * one's that its offer attached to (S12.2, DS-9).
  */
 async function assignCategory(
   tx: Executor,
   productId: number,
   categoryId: number | null,
+  scope: MatchScope,
 ): Promise<void> {
   if (categoryId === null) return;
   await tx
     .update(products)
     .set({ categoryId })
-    .where(and(eq(products.id, productId), isNull(products.categoryId)));
+    .where(
+      and(
+        eq(products.id, productId),
+        isNull(products.categoryId),
+        scope.markedRow ? eq(products.isCollected, true) : undefined,
+      ),
+    );
 }
 
 /** This feed's offers not flagged removed (hidden and in-review included): external id to offer id. */
@@ -345,12 +357,16 @@ async function findOffer(tx: Executor, feedId: number, externalId: string) {
   return found;
 }
 
-/** Product text is written here only, once, and never updated (TD-23). */
+/**
+ * Product text is written here only, once, and never updated (TD-23). So is the
+ * collected marker (S12.2): `markedRow` is true for a row of a collected feed.
+ */
 async function createProduct(
   tx: Executor,
   row: ValidRow,
   brandNormalised: string | null,
   partNumberNormalised: string | null,
+  markedRow: boolean,
 ): Promise<number> {
   const slug = await uniqueSlug(slugify(row.title), async (candidate) => {
     const taken = await tx
@@ -372,6 +388,7 @@ async function createProduct(
       ean: row.ean,
       eanNormalised: row.eanNormalised,
       description: row.description,
+      isCollected: markedRow,
     })
     .returning({ id: products.id });
   return created.id;

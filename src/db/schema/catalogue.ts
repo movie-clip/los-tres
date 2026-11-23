@@ -53,6 +53,9 @@ export const products = pgTable(
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'restrict' }),
     // Set by an admin only (guardrail 1).
     isHidden: boolean('is_hidden').notNull().default(false),
+    // S12.2: the product was created from a row of a collected feed (a marked product). Written once
+    // by the importer's createProduct, never updated.
+    isCollected: boolean('is_collected').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Searchable text (S5.4), generated and stored by PostgreSQL so the importer
     // never writes it and every insert or update refreshes it. The title is

@@ -24,7 +24,7 @@ function docker(args: string[], options: { input?: string; timeout?: number } = 
 }
 
 export type IsolatedApp = {
-  /** `http://127.0.0.1:<port>`: also the container's SITE_URL, so an admin sign-in from it is same-origin. */
+  /** `http://127.0.0.1:<port>`: the address the app is reached at, and its SITE_URL unless `options.env` overrides it (then an admin sign-in from it is not same-origin). */
   origin: string;
   /** The container's output so far (stdout and stderr). */
   logs(): string;
@@ -38,7 +38,18 @@ export type IsolatedApp = {
   stop(): void;
 };
 
-export async function startIsolatedApp(spec: string): Promise<IsolatedApp> {
+export type IsolatedAppOptions = {
+  /**
+   * Extra container environment, passed as `-e NAME=value` to the app, the import and `create-admin`
+   * (S12.2: `{ LOCAL_COLLECTED_DATA: 'true' }` starts the app with the local flag on beside its
+   * loopback SITE_URL; `{ LOCAL_COLLECTED_DATA: 'false', SITE_URL: 'https://...' }` starts it with the flag off
+   * beside a public origin). A later `-e` wins, so SITE_URL can be overridden; the app is still reached at
+   * `origin`, whatever SITE_URL it was told. DATABASE_URL cannot be overridden: the database is this run's own.
+   */
+  env?: Record<string, string>;
+};
+
+export async function startIsolatedApp(spec: string, options: IsolatedAppOptions = {}): Promise<IsolatedApp> {
   const password = process.env.DB_PASSWORD?.trim();
   if (!password) throw new Error(`${spec}: DB_PASSWORD is not set (run npm run env:init)`);
   const user = process.env.DB_USER?.trim() || 'lostres';
@@ -76,7 +87,10 @@ export async function startIsolatedApp(spec: string): Promise<IsolatedApp> {
     const databaseUrl = `postgres://${user}:${encodeURIComponent(password)}@db:5432/${database}`;
     const port = await unusedPort();
     const origin = `http://127.0.0.1:${port}`;
-    const env = ['-e', `DATABASE_URL=${databaseUrl}`, '-e', `SITE_URL=${origin}`];
+    const extra = Object.entries(options.env ?? {})
+      .filter(([name]) => name !== 'DATABASE_URL')
+      .flatMap(([name, value]) => ['-e', `${name}=${value}`]);
+    const env = ['-e', `DATABASE_URL=${databaseUrl}`, '-e', `SITE_URL=${origin}`, ...extra];
 
     // The default entrypoint migrates the new database on start and, with SEED_DEMO_DATA, seeds the demo shops.
     const started = docker(

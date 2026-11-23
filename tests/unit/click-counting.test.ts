@@ -15,13 +15,14 @@ const CUBOT =
 
 function input(
   headers: Record<string, string> = { 'user-agent': CHROME_WINDOWS },
-  o: { method?: string; isDemoFeed?: boolean } = {},
+  o: { method?: string; isDemoFeed?: boolean; collectedRow?: boolean } = {},
 ): CountingInput {
   const map = new Map(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
   return {
     method: o.method ?? 'GET',
     headers: { get: (name: string) => map.get(name.toLowerCase()) ?? null },
     isDemoFeed: o.isDemoFeed ?? false,
+    collectedRow: o.collectedRow ?? false,
   };
 }
 
@@ -126,5 +127,27 @@ describe('skipReason (S1.1 counting rules)', () => {
 
   it('counts a non-demo feed', () => {
     expect(skipReason(input(undefined, { isDemoFeed: false }))).toBeNull();
+  });
+
+  // S12.2, AC 24: a collected row is never a counted click, flag on or off. The reason is its own, so a
+  // collected offer is not mistaken for a demo one in a log or a test.
+  it('does not count a collected row, on an otherwise countable request (S12.2)', () => {
+    expect(skipReason(input(undefined, { collectedRow: true }))).toBe('collected');
+  });
+
+  it('counts the same request when the row is not collected (non-vacuity for the collected rule)', () => {
+    expect(skipReason(input(undefined, { collectedRow: false }))).toBeNull();
+  });
+
+  it.each([
+    ['a method that is not GET', { method: 'HEAD' }, undefined, 'method'],
+    ['a prefetch', undefined, { 'user-agent': CHROME_WINDOWS, Purpose: 'prefetch' }, 'prefetch'],
+    ['a crawler', undefined, { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' }, 'crawler'],
+  ] as const)('names %s before the collected reason', (_name, options, headers, expected) => {
+    expect(skipReason(input(headers, { ...options, collectedRow: true }))).toBe(expected);
+  });
+
+  it('names a demo feed before the collected reason', () => {
+    expect(skipReason(input(undefined, { isDemoFeed: true, collectedRow: true }))).toBe('demo');
   });
 });

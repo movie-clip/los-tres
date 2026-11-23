@@ -158,7 +158,9 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   file is read from. It holds `.gitkeep` and nothing else tracked: its other
   contents are git-ignored (`.gitignore`) and excluded from the Docker build
   context and image (`.dockerignore`). **Never commit a real catalogue file.**
-  **No file made by the collector goes in it before S12.2** (#306).
+  **No file made by the collector goes in it**: that is `collected-files/`
+  (next paragraph). The app cannot tell a collected file placed here from a
+  hand-written one, so it would import unmarked.
 - **Mount:** `compose.yaml` bind-mounts the folder read-only into `app` at
   `/app/catalogue-files`, so `npm run import-feeds` and
   `docker compose run --rm app import-feeds` read the same file with no step
@@ -192,6 +194,39 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   and hides or unhides it and its offers; hidden items stay hidden through
   every import, and an unhide publishes nothing by itself.
 
+**Collected file (S12.2, 0017).** A file made by the owner's local-only collector
+goes in its own folder, never in `catalogue-files/`. The full guide is the
+"Collected files" section of `docs/feeds/catalogue-file.md`. In short:
+
+- **Folder and registration:** `collected-files/` at the repo root, with the same
+  rules as `catalogue-files/` (`.gitkeep` only tracked, git-ignored, kept out of
+  the Docker context and image, mounted read-only at `/app/collected-files`).
+  **Never commit a collected file.** Register it on `/admin/tiendas` with the
+  source "Archivo recopilado (solo local)" and the bare file name; the name rule
+  and the two separate approvals are those of a catalogue file. The place decides
+  the marker: the importer marks every row of a collected feed, and nothing can
+  detect a collected file put in `catalogue-files/`.
+- **The local flag ("el ajuste local"):** `LOCAL_COLLECTED_DATA=true` in the
+  owner's local `.env` only; on only for `true` (any case, trimmed). `.env.example`
+  and `env:init` do not write it and Compose defaults it to `false`. After this
+  change, and after any change of the value, run `docker compose up -d` once, so
+  `app` is recreated with the new mount and the flag pass-through.
+- **What the flag does:** it lifts the exclusion of collected rows on the local
+  site and nothing else. Feed and shop approval, hide, review, removal and the
+  category mapping all still apply. Without the flag, collected rows are on no
+  public page. Collected rows are never indexed, never in the sitemap and never a
+  counted click, flag on or off, and their `fitment` never counts. A hand-written
+  row never merges into a collected product.
+- **Refusal (exit 78):** with the flag on and `SITE_URL` not a loopback origin
+  (`localhost`, `127.x.x.x`, `[::1]`; unset or unparsable counts as not loopback),
+  the container `server` verb, `npm run dev`, `next start` and `node server.js`
+  exit 78 and print one line,
+  `start refused: LOCAL_COLLECTED_DATA is on and SITE_URL is not a loopback origin`.
+  `migrate`, `seed`, `import-feeds` and `create-admin` do not refuse. As a backstop
+  the flag counts as off on every request whenever `SITE_URL` is not loopback.
+- **Not done:** the flag covers collected files only, not hand-written ones.
+  Using collected data on a public site needs a new owner decision (0017).
+
 **Search engines (S6.2).** `SITE_URL` is also the public origin of canonical
 links, the sitemap and the `Sitemap:` line of `/robots.txt`; **before any public
 deploy it must be the public https origin**, or all of them point at
@@ -200,9 +235,11 @@ deploy it must be the public https origin**, or all of them point at
 
 - `/sitemap.xml` is an index of `/sitemaps/paginas.xml` (home and category pages)
   and `/sitemaps/productos-<n>.xml` (5,000 products per file). It lists a
-  product only if it is public and has at least one offer from a non-demo feed;
-  a category only if its subtree holds such a product. No `lastmod`.
-- Demo-only products and categories are `noindex` and carry no canonical.
+  product only if it is public and has at least one offer from a feed that is
+  neither demo nor collected (S12.2); a category only if its subtree holds such a
+  product. No `lastmod`.
+- Demo-only and collected-only products and categories are `noindex` and carry no
+  canonical, whatever the local flag says.
 - Canonical keeps only `?pagina=<n>` for n above 1; any other query parameter,
   including any future filter, is dropped from it; `marca` and `orden` on a
   category page (S11.4) are dropped like any other, and so is `coche` (S5.7).

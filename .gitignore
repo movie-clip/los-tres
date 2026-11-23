@@ -34,3 +34,8 @@ agentic/runs/
 # placeholder is tracked, so the folder exists on every clone.
 /catalogue-files/*
 !/catalogue-files/.gitkeep
+
+# Collected files (S12.2, decision 0017): a file made by the owner's local-only
+# collector is never committed. Only the placeholder is tracked.
+/collected-files/*
+!/collected-files/.gitkeep

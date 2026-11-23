@@ -19,6 +19,7 @@ Dockerfile
 compose.yaml
 .dockerignore
 catalogue-files
+collected-files
 agentic
 AGENTS.md
 CLAUDE.md

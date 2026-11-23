@@ -51,13 +51,16 @@ export function keyRow(
   };
 }
 
-/** A shop and an approved feed; the feed's url is never read (`importRows` serves the text). */
+/**
+ * A shop and an approved feed; the feed's url is never read (`importRows` serves the text).
+ * `sourceType: 'collected_file'` (S12.2) makes it a collected feed: every product its rows create is marked.
+ */
 export async function aFeedOf(
   shopName?: string,
-  o: { feedApproved?: boolean; shopApproved?: boolean } = {},
+  o: { feedApproved?: boolean; shopApproved?: boolean; sourceType?: 'shop_upload' | 'collected_file' } = {},
 ): Promise<{ shopId: number; shopName: string; feedId: number }> {
   const shop = await insertShop({ name: shopName, isApproved: o.shopApproved });
-  const feedId = await insertFeed(shop.id, { isApproved: o.feedApproved });
+  const feedId = await insertFeed(shop.id, { isApproved: o.feedApproved, sourceType: o.sourceType });
   return { shopId: shop.id, shopName: shop.name, feedId };
 }
 

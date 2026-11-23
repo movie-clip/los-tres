@@ -82,4 +82,9 @@ Status: accepted, 2026-11-19. Amends 0007.
   new owner decision above.
 - Hand-written files are read from one fixed folder, `catalogue-files/`,
   git-ignored and kept out of the image (S3.7). A file made by the collector
-  does not go in it before S12.2 adds the provenance marker.
+  does not go in it. Since S12.2 a collected file has its own folder,
+  `collected-files/`, git-ignored, kept out of the image and mounted read-only;
+  a feed registered with the source "Archivo recopilado (solo local)" marks its
+  rows, and the local flag `LOCAL_COLLECTED_DATA` (allowed only beside a loopback
+  `SITE_URL`) is the only thing that shows them, on a local site. Public use
+  still needs the new owner decision above.

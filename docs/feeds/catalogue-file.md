@@ -9,7 +9,7 @@ A catalogue file is a **registered feed** like any other. Writing the file, regi
 ## Rules that hold for every file
 
 - **Never commit a real file.** The repository and the board are public. The folder's contents are git-ignored and kept out of the Docker image, but a real file of shop prices and links still names the shop: do not copy one into an issue, a test, a fixture or a doc. Use invented shops and products in anything that is committed.
-- **No collected file before S12.2.** A file made by the owner's local-only collector (decision 0017) does not go in this folder until S12.2 (#306) ships. S12.2 adds the marker that keeps collected rows off public surfaces; S3.7 has no marker and cannot tell a hand-written file from a collected one.
+- **No collected file in this folder.** A file made by the owner's local-only collector (decision 0017) goes in `collected-files/`, never here: see "Collected files (S12.2)" at the end. The app marks rows by the folder and the source a feed was registered with, so a collected file placed here imports unmarked, with no way to detect it, and with both approvals it would be public.
 - **The app never fetches anything for this source.** It reads the file you placed and nothing else.
 
 ## 1. Write the file
@@ -170,3 +170,27 @@ When the review is done, press "Aprobar tienda" on the shop. With the shop appro
 - **Hide or unhide** a single product or offer at `/admin/productos` (S2.4, #25), after the import. A hidden item stays hidden through every later import; unhiding publishes nothing by itself, since the two approvals and a mapped category are still needed.
 - **No upload, no preview, no "Import now" button, no row count and no file-exists check** in the admin; no images; no other column layouts (S3.5).
 - **No revenue or disclosure wording** is written anywhere while everything is local.
+
+## Collected files (S12.2)
+
+Added by S12.2 (#306, run `2026-11-23-s12-2-local-only`, decision 0017). This is how to load a file made by your local-only collector into your local stack, and what keeps it off any public page. The collector itself is a separate tool in a separate private repository; nothing here fetches anything.
+
+A collected file goes through the same steps as a catalogue file above (columns, file-name rule, import, categories), with these differences.
+
+1. **The folder.** Put the file in `collected-files/` at the repository root, never in `catalogue-files/`. Like the catalogue folder it holds only `.gitkeep` as a tracked file, its other contents are git-ignored and kept out of the Docker build context and image, and `compose.yaml` mounts it read-only into `app` at `/app/collected-files`. A collected feed reads only this folder and a catalogue feed only the other. **Never commit a collected file** (the repository and the board are public).
+2. **The source.** On `/admin/tiendas`, add the feed with "Origen del feed" set to "Archivo recopilado (solo local)" and type the bare file name. The name rule, the file never being checked at save, the two separate approvals (feed first, shop after the review) and the rename-returns-to-unapproved rule are the same as for a catalogue file. A feed's source cannot be changed after it is created. The importer marks every row of a collected feed as collected; the folder and the source decide that, so a collected file registered as "Archivo de catálogo" imports unmarked and nothing can detect it. The form's hint under that option says so.
+3. **The local flag ("el ajuste local").** Put `LOCAL_COLLECTED_DATA=true` in your local `.env`, and only there. It is on only for the value `true`, in any case, with spaces trimmed; anything else, or no line, is off. `.env.example` and `npm run env:init` do not write it and Compose defaults it to `false`. A changed value takes `docker compose up -d`, not a rebuild.
+4. **Once after pulling this change**, run `docker compose up -d` so `app` is recreated with the `collected-files/` mount and the flag pass-through. Without it the Compose form of `import-feeds` reports `file_not_found` for a collected feed. `npm run import-feeds` reads the folder on the host and needs no such step.
+5. **What the flag does.** It lifts the exclusion of collected rows on your local site, and nothing else. The feed and the shop still need their approval, hide, review, removal and the category mapping still apply, exactly as for any feed. Without the flag a collected row is on no public page, search, `/go` link or count, and the import and the admin screens still show it. The admin does not show whether the flag is on: a collected feed that is approved and mapped but shows nothing locally usually means the flag is off, or `SITE_URL` is not a loopback origin (next point).
+6. **The refusal.** With the flag on and `SITE_URL` not a loopback origin (`localhost`, an address in `127.0.0.0/8`, or `[::1]`, with `http` or `https`; unset, blank or unparsable counts as not loopback), the app does not start. The container `server` verb, `npm run dev`, `next start` and `node server.js` exit 78 and print this one line, which names the two settings and never a value:
+
+   ```
+   start refused: LOCAL_COLLECTED_DATA is on and SITE_URL is not a loopback origin
+   ```
+
+   In the container the check runs before the migration. `migrate`, `seed`, `import-feeds` and `create-admin` do not refuse. As a second layer, whenever `SITE_URL` is not loopback the flag counts as off on every request, whatever `.env` says. The fix is to set `SITE_URL` back to `http://127.0.0.1:<APP_PORT>` or to remove the flag. Never set both on a deployed site.
+7. **Never indexed, never counted.** Collected rows are `noindex`, out of the sitemap and never a counted click, whether the flag is on or off. Their `fitment` never counts toward a car match. A hand-written row never attaches to a collected product (a collected row can attach to a hand-written product as an offer); a collected row never sets or moves a hand-written product's category.
+8. **The flag covers collected files only.** A hand-written real catalogue on a careless deploy is still your care and the Before-going-live list in `docs/product/mvp.md`.
+9. **Public use needs a new owner decision.** Showing collected data on a public site is forbidden by decision 0017 until the owner records a new decision; nothing in S12.2 allows it.
+
+The refusal, exit 78 and the one fixed line are covered by `tests/e2e/collected-start.spec.ts`.

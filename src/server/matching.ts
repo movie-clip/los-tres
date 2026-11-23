@@ -9,6 +9,11 @@ import { products } from '../db/schema';
 // normalised part number; anything else is a new product. A conflict or an
 // ambiguity is not a rejection: the offer becomes its own product (D-5) and the
 // matcher says why. The matcher reads `products` only and sets no flag.
+//
+// S12.2 (D-4): a marked product (created from a row of a collected feed) does
+// not exist for an unmarked row: both lookups leave marked products out, so an
+// unmarked row never attaches to one and ambiguity counts unmarked products
+// only. A marked row matches as 0008 says, marked and unmarked products alike.
 
 export type ParsedEan =
   | { kind: 'absent' }
@@ -62,6 +67,16 @@ export type OwnProductReason =
   | 'brand_part_number_ean_conflict' // no product holds the EAN; the one key holder carries another EAN
   | 'ambiguous_brand_part_number'; // two or more products hold the key
 
+/** Whose row is being matched. The default is the side that cannot leak: an unmarked row. */
+export type MatchScope = { markedRow: boolean };
+
+const UNMARKED_ROW: MatchScope = { markedRow: false };
+
+/** The extra condition of a lookup: none for a marked row, unmarked products only otherwise. */
+function scopeWhere(scope: MatchScope) {
+  return scope.markedRow ? undefined : eq(products.isCollected, false);
+}
+
 export type MatchResult =
   | { kind: 'attach'; productId: number }
   | { kind: 'none' }
@@ -71,6 +86,7 @@ export type MatchResult =
 export function selectByBrandPartNumber(
   db: Executor,
   key: { brandNormalised: string; partNumberNormalised: string },
+  scope: MatchScope = UNMARKED_ROW,
 ) {
   return db
     .select({ id: products.id, eanNormalised: products.eanNormalised })
@@ -79,6 +95,7 @@ export function selectByBrandPartNumber(
       and(
         eq(products.partNumberNormalised, key.partNumberNormalised),
         eq(products.brandNormalised, key.brandNormalised),
+        scopeWhere(scope),
       ),
     )
     .limit(2);
@@ -94,12 +111,16 @@ export function selectByBrandPartNumber(
  * the offer attaches and stays invisible with it. Conflicts and ambiguities
  * make the offer its own product (D-5).
  */
-export async function matchProduct(db: Executor, candidate: MatchCandidate): Promise<MatchResult> {
+export async function matchProduct(
+  db: Executor,
+  candidate: MatchCandidate,
+  scope: MatchScope = UNMARKED_ROW,
+): Promise<MatchResult> {
   if (candidate.eanNormalised !== null) {
     const found = await db
       .select({ id: products.id, brandNormalised: products.brandNormalised })
       .from(products)
-      .where(eq(products.eanNormalised, candidate.eanNormalised))
+      .where(and(eq(products.eanNormalised, candidate.eanNormalised), scopeWhere(scope)))
       .limit(2);
     if (found.length > 1) return { kind: 'own_product', reason: 'ambiguous_ean' };
     if (found.length === 1) {
@@ -118,10 +139,14 @@ export async function matchProduct(db: Executor, candidate: MatchCandidate): Pro
   if (candidate.brandNormalised === null || candidate.partNumberNormalised === null) {
     return { kind: 'none' };
   }
-  const holders = await selectByBrandPartNumber(db, {
-    brandNormalised: candidate.brandNormalised,
-    partNumberNormalised: candidate.partNumberNormalised,
-  });
+  const holders = await selectByBrandPartNumber(
+    db,
+    {
+      brandNormalised: candidate.brandNormalised,
+      partNumberNormalised: candidate.partNumberNormalised,
+    },
+    scope,
+  );
   if (holders.length === 0) return { kind: 'none' };
   if (holders.length > 1) return { kind: 'own_product', reason: 'ambiguous_brand_part_number' };
   const [holder] = holders;

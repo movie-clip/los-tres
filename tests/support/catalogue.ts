@@ -18,7 +18,8 @@ import { assertTestDatabase } from './db';
 // `_test` database first. The defaults describe a fully VISIBLE state (shop and
 // feed approved, nothing hidden, not in review): a test that is about hiding
 // something sets exactly that one flag and asserts on the difference.
-// Feeds are `shop_upload`, so no network row is needed.
+// Feeds are `shop_upload` unless a test passes `sourceType` (the S12.2 tests pass `collected_file`
+// for a marked feed), so no network row is needed.
 // A product is public only when mapped to a category (S5.1), so `insertProduct`
 // defaults `categoryId` to a shared test category; pass `categoryId: null` to
 // build the unmapped state.
@@ -45,14 +46,14 @@ export async function insertShop(
 
 export async function insertFeed(
   shopId: number,
-  o: { url?: string; isApproved?: boolean; isDemo?: boolean } = {},
+  o: { url?: string; isApproved?: boolean; isDemo?: boolean; sourceType?: 'shop_upload' | 'collected_file' } = {},
 ): Promise<number> {
   await assertTestDatabase();
   const [row] = await getDb()
     .insert(feeds)
     .values({
       shopId,
-      sourceType: 'shop_upload',
+      sourceType: o.sourceType ?? 'shop_upload',
       url: o.url ?? `feed-${next()}.csv`,
       isApproved: o.isApproved ?? true,
       isDemo: o.isDemo ?? false,
@@ -174,6 +175,19 @@ export async function insertListedProduct(o: {
     offerIds.push(await insertOffer({ productId: product.id, feedId, priceCents }));
   }
   return { ...product, offerIds };
+}
+
+/**
+ * A collected feed (S12.2): approved, with an approved shop, nothing hidden, so a marked row
+ * is in the fully VISIBLE state apart from what the local flag decides. A test sets the one
+ * thing it is about. Returns the shop and the feed.
+ */
+export async function insertCollectedFeed(
+  o: { isApproved?: boolean; shopApproved?: boolean; url?: string } = {},
+): Promise<{ shopId: number; feedId: number }> {
+  const shop = await insertShop({ isApproved: o.shopApproved });
+  const feedId = await insertFeed(shop.id, { sourceType: 'collected_file', isApproved: o.isApproved, url: o.url });
+  return { shopId: shop.id, feedId };
 }
 
 /** A registered fixture-served feed: a shop and a feed whose url is a fixture file name. */

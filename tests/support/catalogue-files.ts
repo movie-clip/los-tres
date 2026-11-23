@@ -41,11 +41,14 @@ export async function tempCatalogueFolder(): Promise<{ dir: string; remove: () =
   return { dir, remove: () => rm(dir, { recursive: true, force: true }) };
 }
 
-/** A catalogue_file feed (no network), approved and not demo unless the test says otherwise. */
+/**
+ * A catalogue_file feed (no network), approved and not demo unless the test says otherwise.
+ * `kind: 'collected_file'` (S12.2) makes it a collected feed, read from the other folder.
+ */
 export async function insertFileFeed(
   shopId: number,
   name: string,
-  o: { isApproved?: boolean; isDemo?: boolean } = {},
+  o: { isApproved?: boolean; isDemo?: boolean; kind?: 'catalogue_file' | 'collected_file' } = {},
 ): Promise<number> {
   await assertTestDatabase();
   const [row] = await getDb()
@@ -53,7 +56,7 @@ export async function insertFileFeed(
     .values({
       shopId,
       networkId: null,
-      sourceType: 'catalogue_file',
+      sourceType: o.kind ?? 'catalogue_file',
       url: name,
       isApproved: o.isApproved ?? true,
       isDemo: o.isDemo ?? false,
@@ -65,17 +68,24 @@ export async function insertFileFeed(
 /** A shop and a file feed together. The shop is approved by default, like `insertShop`. */
 export async function aFileFeed(
   name: string,
-  o: { shopName?: string; shopApproved?: boolean; feedApproved?: boolean } = {},
+  o: { shopName?: string; shopApproved?: boolean; feedApproved?: boolean; kind?: 'catalogue_file' | 'collected_file' } = {},
 ): Promise<{ shopId: number; shopName: string; feedId: number }> {
   const shop = await insertShop({ name: o.shopName, isApproved: o.shopApproved });
-  const feedId = await insertFileFeed(shop.id, name, { isApproved: o.feedApproved });
+  const feedId = await insertFileFeed(shop.id, name, { isApproved: o.feedApproved, kind: o.kind });
   return { shopId: shop.id, shopName: shop.name, feedId };
 }
 
-/** `importFeeds` with the real source reader pointed at the temp folder. */
-export function importFromFolder(dir: string, o: { feedId?: number } = {}) {
+/**
+ * `importFeeds` with the real source reader pointed at the temp folder(s): `dir` is the
+ * catalogue folder, `collectedDir` (S12.2) the collected one. A test that gives only `dir`
+ * gets a collected folder that does not exist (a name inside `dir`), so no test can read the
+ * owner's real `collected-files/` by forgetting the option: a collected feed then fails
+ * `file_not_found`.
+ */
+export function importFromFolder(dir: string, o: { feedId?: number; collectedDir?: string } = {}) {
+  const collectedDir = o.collectedDir ?? path.join(dir, 'no-collected-folder-given');
   return importFeeds(getDb(), {
     ...(o.feedId === undefined ? {} : { feedId: o.feedId }),
-    deps: { readSource: (feed) => readFeedSource(feed, { catalogueDir: dir }) },
+    deps: { readSource: (feed) => readFeedSource(feed, { catalogueDir: dir, collectedDir }) },
   });
 }

@@ -1,7 +1,7 @@
 // Which requests to /go are counted as a click (decision 0009, S1.1).
 //
 // One pure function owns every rule: the method, the prefetch headers, the
-// crawler list and the demo flag. It is the only place in the app that reads
+// crawler list, the demo flag and the collected mark (S12.2). It is the only place in the app that reads
 // the user agent: the header is read into a local variable, tested against
 // CRAWLER_PATTERNS and dropped. It is never returned, stored, logged or passed
 // on (guardrail 5).
@@ -12,12 +12,14 @@
 //
 // No server-only import: this unit-tests with no database. No I/O, no console.
 
-export type SkipReason = 'method' | 'prefetch' | 'crawler' | 'demo';
+export type SkipReason = 'method' | 'prefetch' | 'crawler' | 'demo' | 'collected';
 
 export type CountingInput = {
   method: string;
   headers: Pick<Headers, 'get'>;
   isDemoFeed: boolean;
+  /** The offer's feed is a collected feed or its product is marked (S12.2): never counted. */
+  collectedRow: boolean;
 };
 
 // Our own short list, no dependency. A bare `bot` substring is out (it matches
@@ -53,5 +55,6 @@ export function skipReason(input: CountingInput): SkipReason | null {
   const agent = input.headers.get('user-agent') ?? '';
   if (agent !== '' && CRAWLER_PATTERNS.some((pattern) => pattern.test(agent))) return 'crawler';
   if (input.isDemoFeed) return 'demo';
+  if (input.collectedRow) return 'collected';
   return null;
 }

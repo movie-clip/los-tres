@@ -1,11 +1,12 @@
 import 'server-only';
 
-import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm';
 
 // Relative on purpose: files in src/server import each other relatively.
 import { FIXED_CATEGORY_TREE } from '../../db/category-tree';
 import { getDb, type Executor } from '../../db/client';
 import { categories, feedCategoryMappings, feeds, offers, products } from '../../db/schema';
+import { markedFeedSql, markedProductSql } from '../visibility';
 import { listSourcesForAdmin, type AdminFeedSource } from './sources';
 import { parseId, textField } from './source-rules';
 
@@ -257,11 +258,23 @@ async function recategorise(
   return changed.length;
 }
 
-function productsOfFeedCategory(tx: Executor, feedId: number, feedCategory: string) {
+/**
+ * The products named by a feed category's offers. For a collected feed only the
+ * marked ones, for any other feed only the unmarked ones: a collected feed's
+ * mapping never sets or clears an unmarked product's category (S12.2, DS-9).
+ */
+function productsOfFeedCategory(tx: Executor, feedId: number, feedCategory: string, collected: boolean) {
   return tx
     .select({ id: offers.productId })
     .from(offers)
-    .where(and(eq(offers.feedId, feedId), eq(offers.feedCategory, feedCategory)));
+    .innerJoin(products, eq(offers.productId, products.id))
+    .where(
+      and(
+        eq(offers.feedId, feedId),
+        eq(offers.feedCategory, feedCategory),
+        collected ? markedProductSql() : not(markedProductSql()),
+      ),
+    );
 }
 
 async function writeMapping(form: FormData, intent: Intent): Promise<CategoryWrite> {
@@ -280,7 +293,11 @@ async function writeMapping(form: FormData, intent: Intent): Promise<CategoryWri
     // Serialises saves on one feed (AC 25) and, with the importer's FOR SHARE,
     // keeps an import from interleaving with one. NO KEY UPDATE does not block
     // the importer's offer inserts, which only take KEY SHARE on this row.
-    const feed = await tx.select({ id: feeds.id }).from(feeds).where(eq(feeds.id, feedId)).for('no key update');
+    const feed = await tx
+      .select({ id: feeds.id, collected: sql<boolean>`${markedFeedSql()}` })
+      .from(feeds)
+      .where(eq(feeds.id, feedId))
+      .for('no key update');
     if (feed.length === 0) return refused('gone');
 
     let chosen: CategoryTarget | null = null;
@@ -337,7 +354,7 @@ async function writeMapping(form: FormData, intent: Intent): Promise<CategoryWri
     // on the old target); leaving a target clears the ones on it; a move between
     // not reviewed and outside scope touches none (AC 26 to 33).
     let productsChanged: number | null = null;
-    const inFeedCategory = productsOfFeedCategory(tx, feedId, feedCategory);
+    const inFeedCategory = productsOfFeedCategory(tx, feedId, feedCategory, feed[0].collected);
     if (stored.kind === 'mapped') {
       productsChanged = await recategorise(
         tx,

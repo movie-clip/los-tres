@@ -12,7 +12,7 @@ These bind this story and everything built from it.
 
 - **Two approvals, as for any feed (D-3, decision 0017).** A catalogue file belongs to a registered shop and a registered feed. The admin approves the shop and the feed separately, and each of them starts unapproved. Writing a file, registering a feed for it, importing it and mapping its categories each publish nothing by themselves (guardrail 1). No text this story adds may promise otherwise (AC 39).
 - **The app reads a file; it never fetches anything for this source (guardrail 2).** The only new way data enters is a file the owner wrote and placed in one fixed folder on his own machine. No crawler, no browser, no HTML parser and no network call is added. The reading stays in the one module the seams test already confines file reads to.
-- **Not for collected data yet.** Rows made by the owner's local-only collector (0017, S12.1) must be visible only where a local flag is set, and that marker is S12.2 (#306), which depends on this story. S3.7 adds no marker and no flag, so it cannot tell a hand-written file from a collected one. Until S12.2 ships, a collected file does not go in this folder (Open decision OD-3).
+- **Not for collected data yet.** Rows made by the owner's local-only collector (0017, S12.1) must be visible only where a local flag is set, and that marker is S12.2 (#306), which depends on this story. S3.7 adds no marker and no flag, so it cannot tell a hand-written file from a collected one. Until S12.2 ships, a collected file does not go in this folder (Open decision OD-3). *Update (S12.2, shipped on branch `306-collected-data-local-only`, pending merge): a collected file has its own folder, `collected-files/`, and a still-forbidden place in this one; the guide is `docs/feeds/catalogue-file.md` § Collected files.*
 - **Local-only until S2.2.** The admin area is still password-only. Nothing built here is deployed or reachable from the internet before S2.2 (#23) is done (US-3.1 Standing constraints).
 - **The public site is not changed.** No public page, message or `rel` attribute changes. The owner ruled that revenue wording is not written anywhere while everything is local (D-7); a plain shop link earns no commission and that stays unsaid.
 - **No real shop is named in this repository.** The repo and the board are public. Every file, fixture and test this story adds uses invented shops and products.
@@ -161,7 +161,7 @@ Copy and the page
 Owner's guide
 
 40. The owner can follow, from written steps in `CLAUDE.md` and a layout reference in `docs/`, in this order: where the folder is on his machine, the file's columns and what each means, that `price` is the final price with IVA included as decimal text, that `url` is the shop link, that `ean` is what makes two shops converge, how to register and approve the shop and the feed, how to run the import (both forms), how to map the categories, and which things this story does not do (no removal of dropped offers, no convergence without an EAN).
-41. The guide states that a file made by the collector does not go in the folder before S12.2 ships (OD-3), and that nothing about a real shop is committed.
+41. The guide states that a file made by the collector does not go in the folder before S12.2 ships (OD-3), and that nothing about a real shop is committed. (As written for S3.7; since S12.2 the guide says a collected file never goes in this folder and gives it `collected-files/`.)
 
 Public site and the rest unaffected
 

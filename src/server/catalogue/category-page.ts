@@ -9,7 +9,7 @@ import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { brandSlug, type CategorySort } from './category-query';
 import { readCategoryTrail, type PublicCategoryCrumb } from './category-trail';
-import { hasNonDemoOfferWhere } from './demo';
+import { indexableProductWhere } from './demo';
 import {
   fitCountsSql,
   fitScope,
@@ -326,7 +326,7 @@ async function readCategoryPage(
     db
       .select({ indexedCount: sql<number>`count(*)::int` })
       .from(products)
-      .where(and(visibleProductWhere(), hasNonDemoOfferWhere(), inSubtree(category.id))),
+      .where(and(visibleProductWhere(), indexableProductWhere(), inSubtree(category.id))),
     readBrandGroups(category.id, vehicleId),
     readCategoryTrail(category.id),
   ]);

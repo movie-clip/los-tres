@@ -1,10 +1,10 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { getDb } from '../../db/client';
 import { feeds, offers, products, shops } from '../../db/schema';
-import { visibleOfferWhere, visibleProductWhere } from '../visibility';
+import { markedFeedSql, markedProductSql, visibleOfferWhere, visibleProductWhere } from '../visibility';
 
 // The one place that reads the shop URL (offers.url) for the public side.
 // The redirect needs it; no other public read returns it (guardrail 1: the
@@ -20,6 +20,11 @@ export type RedirectTarget = {
   url: string;
   /** The offer's feed is a demo feed (feeds.is_demo): redirected, never counted. */
   isDemoFeed: boolean;
+  /**
+   * The offer's feed is a collected feed or its product is marked (S12.2):
+   * redirected, never counted. Reached only with the local flag shown.
+   */
+  collectedRow: boolean;
 };
 
 /**
@@ -35,6 +40,7 @@ export async function getRedirectTarget(offerId: number): Promise<RedirectTarget
       productId: offers.productId,
       url: offers.url,
       isDemoFeed: feeds.isDemo,
+      collectedRow: sql<boolean>`(${markedFeedSql()}) or (${markedProductSql()})`,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))

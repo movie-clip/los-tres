@@ -71,6 +71,13 @@
       "when": 1795360608791,
       "tag": "0009_offer_removed",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795451509031,
+      "tag": "0010_collected_file_source",
+      "breakpoints": true
     }
   ]
 }
