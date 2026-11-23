@@ -15,6 +15,10 @@ import { insertFeed, insertOffer, insertProduct, insertShop } from '../support/c
 import { resetDatabase } from '../support/db';
 import { redirectOf, startAdminRequest, startRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // US-2.4 / T2.4.2: the two admin product screens, rendered from the real page modules with a real
 // translator, so the markup is what the browser's first response carries. The reads and writers are
 // covered by admin-product-read, admin-product-writer and admin-product-actions; this file covers

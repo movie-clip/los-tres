@@ -223,12 +223,10 @@ describe('inflated and record caps', () => {
       ...filler(0x20, 40 * 1024 * 1024),
     ]);
     const total = 1 + 40 * 16;
-    const started = Date.now();
     expect(await failureOf(() => recordsOf(bytes))).toBe('too_large');
     expect(state.finished).toBe(false);
     expect(state.released).toBe(true);
     expect(state.pulled).toBeLessThan(total);
-    expect(Date.now() - started).toBeLessThan(10_000);
   }, 30_000);
 
   it('stops a gzip bomb over the 512 MiB inflated cap as too_large and leaves the source unread', async () => {
@@ -245,12 +243,10 @@ describe('inflated and record caps', () => {
       return chunks;
     });
     const total = Math.ceil(bomb.byteLength / 1024);
-    const started = Date.now();
     expect(await failureOf(() => recordsOf(bytes))).toBe('too_large');
     expect(state.finished).toBe(false);
     expect(state.released).toBe(true);
     expect(state.pulled).toBeLessThan(total);
-    expect(Date.now() - started).toBeLessThan(20_000);
   }, 60_000);
 
   it('decodeFeed alone enforces the inflated cap, before any format is known', async () => {

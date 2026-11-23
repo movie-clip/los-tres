@@ -13,6 +13,10 @@ import { insertShop } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 import { startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // US-3.1 / T3.1.3, ACs 6, 9, 13, 18, 21, 26, 37 and 38 on the server-rendered pages: the
 // sources list and the six form routes, rendered from the real page modules with a real
 // translator, so the markup is what the browser's first response carries.

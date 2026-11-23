@@ -21,6 +21,10 @@ import { assertTestDatabase, resetDatabase } from '../support/db';
 import { insertShop } from '../support/catalogue';
 import { nextRequest, redirectOf, startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // US-3.1 / T3.1.3, ACs 1 to 5 and 25: the six actions this story adds refuse a request with
 // no session, a forged, an expired or a signed-out cookie, and one from another origin, and
 // then write nothing and set no cookie (guardrail 3). A signed-in call writes what the form

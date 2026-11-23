@@ -65,7 +65,7 @@ export async function userRows() {
 export async function expireSessionRow(token: string): Promise<void> {
   await getDb()
     .update(adminSessions)
-    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    .set({ expiresAt: new Date(0) })
     .where(eq(adminSessions.token, token));
 }
 

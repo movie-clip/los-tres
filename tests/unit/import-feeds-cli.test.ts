@@ -20,7 +20,7 @@ vi.mock('@/server/importer', async () => {
     importFeeds: async (...args: unknown[]) => {
       hoisted.importFeeds(...args);
       if (hoisted.notRegistered) throw new types.FeedNotRegisteredError();
-      return { startedAt: new Date(), feeds: [] };
+      return { startedAt: new Date('2026-01-01T00:00:00Z'), feeds: [] };
     },
   };
 });

@@ -28,6 +28,10 @@ import { resetDatabase } from '../support/db';
 import { callGo } from '../support/go';
 import { stubNetworkOff } from '../support/network-off';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 beforeEach(async () => {
   await resetDatabase();
   stubNetworkOff();

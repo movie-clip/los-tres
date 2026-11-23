@@ -21,6 +21,10 @@ import {
 } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S11.7: src/proxy.ts rewrites a request to the root 404 when isMissingPublicPage says so. The
 // rewrite is only safe if "missing" is exactly what the page's own loader says, so each case here
 // asks both and requires them to agree (guardrail 1: the proxy must never call a hidden item present,

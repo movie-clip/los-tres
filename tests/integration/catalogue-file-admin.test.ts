@@ -18,6 +18,10 @@ import { insertFileFeed } from '../support/catalogue-files';
 import { assertTestDatabase, resetDatabase } from '../support/db';
 import { nextRequest, redirectOf, startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S3.7 T3.7.4. The two shipped feed actions on the catalogue-file source (ACs 5, 6, 7: no session,
 // forged, expired, signed-out and cross-origin, with no effect), and what the admin pages and
 // every log, state and client payload hold about a file feed (ACs 10 and 13, guardrail 5):

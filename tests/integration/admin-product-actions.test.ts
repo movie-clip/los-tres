@@ -17,6 +17,10 @@ import { resetDatabase } from '../support/db';
 import { hideForm, withFailingHideWrites } from '../support/hide';
 import { nextRequest, redirectOf, startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S2.4 (T2.4.1), ACs 2 to 6 and 26 to 30 on the two actions, and 57 for a failing write: the role check
 // comes before the form is read, another origin is refused, the target is explicit, a crafted request
 // cannot set anything but the one flag of the one item, and a failure leaves a code and nothing else.
