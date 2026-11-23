@@ -1,6 +1,7 @@
 #!/bin/sh
 # Verb dispatcher for the app image.
-#   server       migrate, seed when SEED_DEMO_DATA=true, then serve (default)
+#   server       refuse LOCAL_COLLECTED_DATA beside a non-loopback SITE_URL (exit 78),
+#                then migrate, seed when SEED_DEMO_DATA=true, then serve (default)
 #   migrate      apply pending migrations
 #   seed         load the demo data (always; `seed --if-enabled` honours the flag)
 #   import-feeds import the approved feeds; `--feed <id>` imports one
@@ -13,6 +14,9 @@ verb="${1:-server}"
 
 case "$verb" in
   server)
+    # The start check (S12.2) runs first, so a refusal ends the container
+    # before it migrates, seeds or serves (set -e).
+    node --conditions=react-server dist/cli/start-check.js
     # A failing migration ends the container (set -e): the restart policy
     # retries and the healthcheck never goes green, so a broken schema is loud.
     node --conditions=react-server dist/cli/migrate.js

@@ -22,6 +22,7 @@ function input(
     method: o.method ?? 'GET',
     headers: { get: (name: string) => map.get(name.toLowerCase()) ?? null },
     isDemoFeed: o.isDemoFeed ?? false,
+    collectedRow: false,
   };
 }
 

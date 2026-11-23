@@ -54,6 +54,7 @@ export async function handleGo(req: GoRequest): Promise<GoResult> {
     method: req.method,
     headers: req.headers,
     isDemoFeed: target.isDemoFeed,
+    collectedRow: target.collectedRow,
   });
   if (skip === null) {
     try {

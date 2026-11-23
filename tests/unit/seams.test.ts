@@ -645,7 +645,7 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     const code =
       sources().find(({ file }) => file === 'src/server/catalogue/sitemap.ts')?.code ?? '';
     expect(code).toContain('visibleProductWhere()');
-    expect(code).toContain('hasNonDemoOfferWhere()');
+    expect(code).toContain('indexableProductWhere()');
   });
 
   it('keeps the sitemap routes off the database layer and the visibility flags (S6.2)', () => {
@@ -656,9 +656,29 @@ describe('seams (guardrails 3 and 5, US-2.1 admin sign-in)', () => {
     expect(found).toEqual([]);
   });
 
-  it('reads AUTH_SECRET and SITE_URL only in src/config/auth.ts', () => {
-    const found = offenders(/\b(AUTH_SECRET|SITE_URL)\b/, (file) => file === 'src/config/auth.ts');
+  // S12.2 (S-10): the local-flag module also judges SITE_URL, for the loopback rule.
+  it('reads AUTH_SECRET and SITE_URL only in src/config/auth.ts and src/config/local-flag.ts', () => {
+    const found = offenders(
+      /\b(AUTH_SECRET|SITE_URL)\b/,
+      (file) => file === 'src/config/auth.ts' || file === 'src/config/local-flag.ts',
+    );
     expect(found).toEqual([]);
+  });
+
+  it('keeps the AUTH_SECRET and SITE_URL rule able to fail (S-10)', () => {
+    const settings = /\b(AUTH_SECRET|SITE_URL)\b/;
+    const allowed = (file: string) => file === 'src/config/auth.ts' || file === 'src/config/local-flag.ts';
+    for (const file of ['src/config/auth.ts', 'src/config/local-flag.ts']) {
+      expect(sources().find((entry) => entry.file === file)?.code ?? '', file).toMatch(settings);
+    }
+    const found = [
+      { file: 'src/server/visibility.ts', code: 'process.env.SITE_URL' },
+      { file: 'src/instrumentation-node.ts', code: "process.env['AUTH_SECRET']" },
+      { file: 'src/config/local-flag.ts', code: 'env.SITE_URL' },
+    ]
+      .filter(({ file, code }) => settings.test(code) && !allowed(file))
+      .map(({ file }) => file);
+    expect(found).toEqual(['src/server/visibility.ts', 'src/instrumentation-node.ts']);
   });
 
   // Deliberate (issue #26, S3.1): the writer of networks, shops and feeds is one
@@ -1191,5 +1211,159 @@ describe('seams (guardrails 1 and 2, S12.2 collected source and marker)', () => 
       () => false,
     );
     expect(found).toEqual([ADMIN_WRITER]);
+  });
+});
+
+// S12.2 (T-12.2.2, T-12.2.3, AC 47): the local flag is read from the environment
+// in one pure module, imported only by the visibility scope and the two start
+// checks; whether marked rows are shown is named only in that module and the
+// scope; and the two marked-row helpers are named only in the scope and the
+// three readers the design lists (indexability, the /go lookup, the mapping
+// writer). Each rule is proved non-vacuous on the real tree and able to fail on
+// a planted offender.
+describe('seams (guardrails 1 and 2, S12.2 local flag and the one marked-row rule)', () => {
+  const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+  const planted = (
+    files: { file: string; code: string }[],
+    test: (code: string) => boolean,
+    allowed: (file: string) => boolean,
+  ): string[] => files.filter(({ file, code }) => test(code) && !allowed(file)).map(({ file }) => file);
+
+  const FLAG_MODULE = 'src/config/local-flag.ts';
+  const VISIBILITY = 'src/server/visibility.ts';
+  const INSTRUMENTATION_NODE = 'src/instrumentation-node.ts';
+  const START_CHECK = 'src/cli/start-check.ts';
+
+  // S-1: the flag's variable name.
+  const flagVariable = /\bLOCAL_COLLECTED_DATA\b/;
+
+  it('names LOCAL_COLLECTED_DATA in src/ only in src/config/local-flag.ts (S-1)', () => {
+    expect(offenders(flagVariable, (file) => file === FLAG_MODULE)).toEqual([]);
+    expect(codeOf(FLAG_MODULE)).toMatch(flagVariable);
+  });
+
+  it('keeps the flag variable rule able to fail (S-1)', () => {
+    expect(flagVariable.test("process.env.LOCAL_COLLECTED_DATA === 'true'")).toBe(true);
+    expect(flagVariable.test('LOCAL_COLLECTED_DATA_X')).toBe(false);
+    const found = planted(
+      [
+        { file: VISIBILITY, code: 'process.env.LOCAL_COLLECTED_DATA' },
+        { file: 'src/server/catalogue/product-page.ts', code: "env['LOCAL_COLLECTED_DATA']" },
+        { file: FLAG_MODULE, code: 'env.LOCAL_COLLECTED_DATA' },
+      ],
+      (code) => flagVariable.test(code),
+      (file) => file === FLAG_MODULE,
+    );
+    expect(found).toEqual([VISIBILITY, 'src/server/catalogue/product-page.ts']);
+  });
+
+  // S-2: an import of the flag module, by any relative or alias path.
+  const importsFlagModule = /from\s+['"][^'"]*config\/local-flag['"]|import\(\s*['"][^'"]*config\/local-flag['"]\s*\)/;
+  const mayImportFlagModule = (file: string): boolean =>
+    [VISIBILITY, INSTRUMENTATION_NODE, START_CHECK].includes(file);
+
+  it('imports src/config/local-flag only in the visibility scope and the two start checks (S-2)', () => {
+    expect(offenders(importsFlagModule, mayImportFlagModule)).toEqual([]);
+    for (const file of [VISIBILITY, INSTRUMENTATION_NODE, START_CHECK]) {
+      expect(codeOf(file), file).toMatch(importsFlagModule);
+    }
+  });
+
+  it('keeps the flag import rule able to fail (S-2)', () => {
+    expect(importsFlagModule.test("import { collectedRowsShown } from '../config/local-flag';")).toBe(true);
+    expect(importsFlagModule.test("import { x } from '@/config/local-flag';")).toBe(true);
+    expect(importsFlagModule.test("const m = await import('../../config/local-flag');")).toBe(true);
+    expect(importsFlagModule.test("import { getSiteUrl } from '../config/auth';")).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/server/catalogue/search-page.ts', code: "import { isLocalFlagOn } from '../../config/local-flag';" },
+        { file: 'src/app/(public)/page.tsx', code: "import { collectedRowsShown } from '@/config/local-flag';" },
+        { file: START_CHECK, code: "import { localFlagRefusal } from '../config/local-flag';" },
+      ],
+      (code) => importsFlagModule.test(code),
+      mayImportFlagModule,
+    );
+    expect(found).toEqual(['src/server/catalogue/search-page.ts', 'src/app/(public)/page.tsx']);
+  });
+
+  // S-3: whether marked rows are shown is asked only by the one scope.
+  const shownCall = /\bcollectedRowsShown\b/;
+  const mayAskShown = (file: string): boolean => file === FLAG_MODULE || file === VISIBILITY;
+
+  it('names collectedRowsShown only in the flag module and the visibility scope (S-3)', () => {
+    expect(offenders(shownCall, mayAskShown)).toEqual([]);
+    expect(codeOf(FLAG_MODULE)).toMatch(shownCall);
+    expect(codeOf(VISIBILITY)).toMatch(shownCall);
+  });
+
+  it('keeps the shown rule able to fail (S-3)', () => {
+    expect(shownCall.test('collectedRowsShown() ? undefined : x')).toBe(true);
+    const found = planted(
+      [
+        { file: 'src/server/clicks/offer-target.ts', code: 'if (collectedRowsShown()) return null;' },
+        { file: 'src/server/catalogue/sitemap.ts', code: 'collectedRowsShown()' },
+        { file: VISIBILITY, code: 'collectedRowsShown()' },
+      ],
+      (code) => shownCall.test(code),
+      mayAskShown,
+    );
+    expect(found).toEqual(['src/server/clicks/offer-target.ts', 'src/server/catalogue/sitemap.ts']);
+  });
+
+  // S-7: the two marked-row helpers. Every public read sees marked rows only
+  // through the scope; the three named readers are flag-independent by design.
+  const markedHelpers = /\b(markedFeedSql|markedProductSql)\b/;
+  const mayNameMarkedHelpers = (file: string): boolean =>
+    [
+      VISIBILITY,
+      'src/server/catalogue/demo.ts',
+      'src/server/clicks/offer-target.ts',
+      'src/server/admin/category-mappings.ts',
+    ].includes(file);
+
+  it('names the marked-row helpers only in the scope, indexability, the /go lookup and the mapping writer (S-7)', () => {
+    expect(offenders(markedHelpers, mayNameMarkedHelpers)).toEqual([]);
+    for (const file of [
+      VISIBILITY,
+      'src/server/catalogue/demo.ts',
+      'src/server/clicks/offer-target.ts',
+      'src/server/admin/category-mappings.ts',
+    ]) {
+      expect(codeOf(file), file).toMatch(markedHelpers);
+    }
+  });
+
+  it('keeps the marked-row helper rule able to fail (S-7)', () => {
+    expect(markedHelpers.test('not(markedFeedSql())')).toBe(true);
+    expect(markedHelpers.test('and(markedProductSql())')).toBe(true);
+    expect(markedHelpers.test('markedRow')).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/server/catalogue/category-page.ts', code: 'not(markedProductSql())' },
+        { file: 'src/server/catalogue/search-page.ts', code: 'not(markedFeedSql())' },
+        { file: 'src/server/catalogue/fit-state.ts', code: 'markedFeedSql()' },
+        { file: 'src/server/catalogue/demo.ts', code: 'not(markedFeedSql())' },
+      ],
+      (code) => markedHelpers.test(code),
+      mayNameMarkedHelpers,
+    );
+    expect(found).toEqual([
+      'src/server/catalogue/category-page.ts',
+      'src/server/catalogue/search-page.ts',
+      'src/server/catalogue/fit-state.ts',
+    ]);
+  });
+
+  it('excludes marked rows in the scope only when they are not shown, and never counts a collected fitment (C-4)', () => {
+    const code = codeOf(VISIBILITY);
+    const body = (name: string) =>
+      code.match(new RegExp(`function\\s+${name}\\s*\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\r?\\n\\}`))?.[1] ?? '';
+    expect(body('visibleOfferWhere')).toMatch(/collectedRowsShown\(\)\s*\?\s*undefined\s*:\s*not\(markedFeedSql\(\)\)/);
+    expect(body('visibleProductWhere')).toMatch(
+      /collectedRowsShown\(\)\s*\?\s*undefined\s*:\s*not\(markedProductSql\(\)\)/,
+    );
+    expect(body('countedFitmentWhere')).toContain('not(markedFeedSql())');
+    expect(body('countedFitmentWhere')).not.toMatch(shownCall);
+    expect(codeOf('src/server/catalogue/demo.ts')).not.toMatch(shownCall);
   });
 });

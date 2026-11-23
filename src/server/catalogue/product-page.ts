@@ -8,7 +8,7 @@ import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { bestPriceFlags } from './best-price';
 import { readCategoryTrail, type PublicCategoryCrumb } from './category-trail';
-import { hasNonDemoOfferWhere } from './demo';
+import { indexableProductWhere } from './demo';
 
 // The backend/frontend contract for the product page (C-11). The page formats;
 // this returns integer cents and `Date`, never a formatted amount or date.
@@ -84,7 +84,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       priceCents: offers.priceCents,
       priceUpdatedAt: offers.priceUpdatedAt,
       isDemo: feeds.isDemo,
-      indexable: sql<boolean>`${hasNonDemoOfferWhere()}`,
+      indexable: sql<boolean>`${indexableProductWhere()}`,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))

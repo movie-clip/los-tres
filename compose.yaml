@@ -23,6 +23,9 @@ services:
       # area then shows Unavailable.
       AUTH_SECRET: ${AUTH_SECRET:-}
       SITE_URL: ${SITE_URL:-}
+      # Collected rows (S12.2, decision 0017): off unless set in a local .env.
+      # Beside a SITE_URL that is not loopback the app refuses to start (exit 78).
+      LOCAL_COLLECTED_DATA: ${LOCAL_COLLECTED_DATA:-false}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production

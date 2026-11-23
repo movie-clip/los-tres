@@ -1,8 +1,9 @@
 import 'server-only';
 
-import { and, eq, exists, isNotNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 
+import { collectedRowsShown } from '../config/local-flag';
 import { feeds, offers, products, shops, vehicles } from '../db/schema';
 
 // The one visibility scope (guardrail 1). Every public read applies these
@@ -18,8 +19,24 @@ import { feeds, offers, products, shops, vehicles } from '../db/schema';
 //                     (products.category_id is not null) AND it has at least
 //                     one visible offer
 //   fitment counted = feed approved AND shop approved AND vehicle not retired
-//                     (no offer or product flag: a fitment never makes a
-//                     product public, S5.5)
+//                     AND feed not a collected feed (no offer or product flag:
+//                     a fitment never makes a product public, S5.5)
+//
+// Marked rows (S12.2, decision 0017): an offer of a collected feed and a product
+// created from a row of one. Both scopes leave them out unless the local flag is
+// on beside a loopback SITE_URL (`collectedRowsShown`, read on every call); the
+// flag lifts that exclusion and no other rule. A collected feed's fitment never
+// counts, flag on or off.
+
+/** Condition over `feeds`: the feed is a collected feed. Flag-independent. */
+export function markedFeedSql(): SQL {
+  return eq(feeds.sourceType, 'collected_file');
+}
+
+/** Condition over `products`: the product was created from a collected row. Flag-independent. */
+export function markedProductSql(): SQL {
+  return eq(products.isCollected, true);
+}
 
 /**
  * Condition over `offers` joined to `feeds` (offers.feed_id) and `shops`
@@ -32,6 +49,7 @@ export function visibleOfferWhere(): SQL {
     eq(offers.isHidden, false),
     eq(offers.inReview, false),
     eq(offers.isRemoved, false),
+    collectedRowsShown() ? undefined : not(markedFeedSql()),
   ) as SQL;
 }
 
@@ -46,6 +64,7 @@ export function visibleProductWhere(): SQL {
   return and(
     eq(products.isHidden, false),
     isNotNull(products.categoryId),
+    collectedRowsShown() ? undefined : not(markedProductSql()),
     exists(visibleOffer),
   ) as SQL;
 }
@@ -58,8 +77,14 @@ export function activeVehicleWhere(): SQL {
 /**
  * Condition over `fitments` joined to `feeds` (fitments.feed_id), `shops`
  * (feeds.shop_id) and `vehicles` (fitments.vehicle_id): the fitment counts.
- * It names no offer or product flag, so it never decides what is public.
+ * It names no offer or product flag, so it never decides what is public. A
+ * collected feed's fitment never counts, whatever the local flag says (AC 32).
  */
 export function countedFitmentWhere(): SQL {
-  return and(eq(feeds.isApproved, true), eq(shops.isApproved, true), activeVehicleWhere()) as SQL;
+  return and(
+    eq(feeds.isApproved, true),
+    eq(shops.isApproved, true),
+    activeVehicleWhere(),
+    not(markedFeedSql()),
+  ) as SQL;
 }

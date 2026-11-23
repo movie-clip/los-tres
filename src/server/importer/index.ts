@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
-import { matchProduct, normalizeBrand, normalizePartNumber } from '../matching';
+import { matchProduct, normalizeBrand, normalizePartNumber, type MatchScope } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
 import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
@@ -213,7 +213,7 @@ async function importRecords(
     const known = await findOffer(tx, feed.id, row.externalId);
     if (known) {
       await writeOffer(tx, feed.id, known.productId, row, startedAt);
-      await assignCategory(tx, known.productId, mappedCategory(mappings, row));
+      await assignCategory(tx, known.productId, mappedCategory(mappings, row), { markedRow });
       fitmentsOfFeed.add(known.productId, row.fitment);
       report.offersUpdated += 1;
       continue;
@@ -221,11 +221,11 @@ async function importRecords(
 
     const brandNormalised = normalizeBrand(row.brand);
     const partNumberNormalised = normalizePartNumber(row.partNumber);
-    const match = await matchProduct(tx, {
-      eanNormalised: row.eanNormalised,
-      brandNormalised,
-      partNumberNormalised,
-    });
+    const match = await matchProduct(
+      tx,
+      { eanNormalised: row.eanNormalised, brandNormalised, partNumberNormalised },
+      { markedRow },
+    );
 
     let productId: number;
     if (match.kind === 'attach') {
@@ -236,7 +236,7 @@ async function importRecords(
       if (match.kind === 'own_product') report.ownProducts.push({ record, reason: match.reason });
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
-    await assignCategory(tx, productId, mappedCategory(mappings, row));
+    await assignCategory(tx, productId, mappedCategory(mappings, row), { markedRow });
     fitmentsOfFeed.add(productId, row.fitment);
     report.offersCreated += 1;
   }
@@ -272,18 +272,27 @@ function mappedCategory(mappings: Map<string, number>, row: ValidRow): number | 
 
 /**
  * Sets the product's category only while it has none: first mapped wins, an
- * existing category is never overwritten and none is ever cleared (D-3).
+ * existing category is never overwritten and none is ever cleared (D-3). A row
+ * of a collected feed sets only a marked product's category, never an unmarked
+ * one's that its offer attached to (S12.2, DS-9).
  */
 async function assignCategory(
   tx: Executor,
   productId: number,
   categoryId: number | null,
+  scope: MatchScope,
 ): Promise<void> {
   if (categoryId === null) return;
   await tx
     .update(products)
     .set({ categoryId })
-    .where(and(eq(products.id, productId), isNull(products.categoryId)));
+    .where(
+      and(
+        eq(products.id, productId),
+        isNull(products.categoryId),
+        scope.markedRow ? eq(products.isCollected, true) : undefined,
+      ),
+    );
 }
 
 /** This feed's offers not flagged removed (hidden and in-review included): external id to offer id. */
