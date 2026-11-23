@@ -3,9 +3,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { configDefaults } from 'vitest/config';
 
 // No clock in the gate (run 2026-11-23-no-clock-in-gate, S-1, 02-design § Where the
-// timings live): the gate asserts no wall-clock time. Real timings live in
+// timings live): the two cost tests (category-fit-cost, sitemap-performance)
+// assert no wall-clock time, only a query-count ceiling. Real timings live in
 // tests/timing/ and run only by `npm run test:timing`, a separate Vitest config.
 // This file pins that the gate cannot pick them up and that the separate config
 // still sets up the same database as the integration project. Later slices of the
@@ -35,9 +37,12 @@ const read = (file: string): string => readFileSync(path.resolve(process.cwd(), 
 
 const TIMING_FILE = 'tests/timing/x.timing.test.ts';
 
-/** True when any include pattern of a project matches a file under tests/timing. */
+/**
+ * True when any include pattern of a project matches a file under tests/timing.
+ * A project with no `include` gets Vitest's default include, which matches it.
+ */
 function includesTimingFile(patterns: string[] | undefined): boolean {
-  return (patterns ?? []).some((pattern) => path.posix.matchesGlob(TIMING_FILE, pattern));
+  return (patterns ?? configDefaults.include).some((pattern) => path.posix.matchesGlob(TIMING_FILE, pattern));
 }
 
 function projectNamed(config: LoadedConfig, name: string): ProjectConfig {
@@ -51,7 +56,9 @@ describe('the include check is not vacuous', () => {
     expect(includesTimingFile(['tests/**/*.test.ts'])).toBe(true);
     expect(includesTimingFile(['tests/timing/**/*.timing.test.ts'])).toBe(true);
     expect(includesTimingFile(['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'])).toBe(false);
-    expect(includesTimingFile(undefined)).toBe(false);
+    // No include at all means Vitest's default include, which matches every test file.
+    expect(includesTimingFile(undefined)).toBe(true);
+    expect(includesTimingFile([])).toBe(false);
   });
 });
 

@@ -49,8 +49,13 @@ describe('sitemap generation at scale', () => {
     const files = bodies.slice(1).map((answer) => answer.file);
     expect(files).toEqual(['paginas.xml', ...Array.from({ length: chunks }, (_, i) => `productos-${i + 1}.xml`)]);
 
+    // Product URLs are collected over every file but the index, paginas.xml
+    // included, so a product URL in the page sitemap fails the count; the size
+    // limit is per product file.
     const productBodies = bodies.slice(2).map((answer) => answer.body);
-    const productLocs = productBodies.flatMap((body) => [...body.matchAll(/\/producto\/(perf-\d+)</g)].map((m) => m[1]));
+    const productLocs = bodies
+      .slice(1)
+      .flatMap((answer) => [...answer.body.matchAll(/\/producto\/(perf-\d+)</g)].map((m) => m[1]));
     expect(productLocs).toHaveLength(PRODUCTS);
     expect(new Set(productLocs).size).toBe(PRODUCTS);
     for (const body of productBodies) {
@@ -59,7 +64,9 @@ describe('sitemap generation at scale', () => {
 
     // The index counts the chunks (1 query), the page sitemap reads the category
     // closure (1), and each product file counts again and reads its slugs (2). A
-    // read per product would show as thousands.
+    // read per product would show as thousands. The floor fails a sequence that
+    // went round the spied pool and so counted nothing.
+    expect(queries.length).toBeGreaterThan(0);
     expect(queries.length).toBeLessThanOrEqual(2 + 2 * chunks);
   }, 60000);
 });
