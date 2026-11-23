@@ -357,7 +357,9 @@ Helpers:
   by machine. 0006 holds the file list and the uncovered case: the pull request
   that adds `gate-repeat.yml` before it is on `main`, and a fork pull request
   that changes `gate-repeat.yml` or `gate.yml`. A same-repository pull request
-  that changes either file is repeated by starting the run on its own branch.
+  that changes either file is expected to be repeatable by starting the run on
+  its own branch with `pr` set: that is GitHub's documented behaviour, no run
+  has shown it yet, and the first such dispatch will confirm it (0006).
 - **Only a human merges.** No agent merges a pull request, pushes to `main` or
   force-pushes. `.claude/settings.json` denies those commands.
 - **The repo and the board are public.** Never put a secret, token, email or
