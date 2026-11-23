@@ -24,6 +24,7 @@ next-env.d.ts
 *.tsbuildinfo
 playwright-report/
 test-results/
+timing-results/
 
 # Written at the repo root by next build and next dev; never commit it
 AGENTS.md

@@ -227,6 +227,7 @@ deploy it must be the public https origin**, or all of them point at
 | unit tests | `npm run test:unit` (`vitest run --project unit`) | nothing, no database |
 | integration tests | `npm run test:integration` (`vitest run --project integration`) | `npm run db:up` |
 | unit + integration | `npm test` (`vitest run`) | `npm run db:up` |
+| timing tests | `npm run test:timing` (`vitest run --config vitest.timing.config.mts`: the files `tests/timing/**/*.timing.test.ts`, one worker, one file at a time; writes its tables to `timing-results/`, git- and docker-ignored; no gate step runs it) | `npm run db:up`; not beside another Vitest run, its setup drops every integration database and the next integration run rebuilds them |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts` and the vehicle list from `src/db/vehicle-catalogue.ts`; every migrate path does both, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
 | import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line reads `... offers_created=<n> offers_updated=<n> offers_removed=<n> rejected=<n> unknown_vehicles=<n>` and ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; a row that became its own product because of an EAN or brand + part number conflict or ambiguity prints `  record <n>: own_product <reason>` (S7.1; one of `ean_brand_conflict`, `ambiguous_ean`, `brand_part_number_ean_conflict`, `ambiguous_brand_part_number`; after the rejected lines, no row text, never fails the run); when the removal guard skips removal (S3.3, decision 0018) the last indented line of that feed is `  removal: skipped <reason> missing=<n> current=<n>`, `<reason>` being `empty_import` or `small_import`, and the skip does not change the exit code (exit 1 still means a feed failed); `npm run import-feeds -- --feed <id>` imports one, and `npm run import-feeds -- --feed <id> --allow-large-removal` also lifts `small_import` for that feed (any other argument form prints `usage: import-feeds [--feed <id> [--allow-large-removal]]` and exits 2); a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
@@ -241,7 +242,10 @@ deploy it must be the public https origin**, or all of them point at
 `npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
 in that order. It rebuilds the app image and runs the e2e against the Compose
 stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
-gate covers both `tsconfig.json` and `tsconfig.cli.json`. The gate has no
+gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
+(`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
+instead of a time, and their timings run on demand with `npm run test:timing`,
+which writes them to `timing-results/`. The gate has no
 migrate step, and the app container migrates on start. The integration tests
 use their own databases on the same `db` service (0010): each run drops and
 migrates a template, `<DB_NAME>_tpl_test`, from nothing and clones it into one

@@ -1,20 +1,23 @@
-import { sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { GET as getIndex } from '@/app/(public)/sitemap.xml/route';
 import { GET as getFile } from '@/app/(public)/sitemaps/[file]/route';
-import { closeDb, getDb } from '@/db/client';
+import { closeDb } from '@/db/client';
 import { SITEMAP_CHUNK_SIZE } from '@/server/catalogue/sitemap';
 
-import { defaultCategoryId, insertFeed, insertShop } from '../support/catalogue';
-import { assertTestDatabase, resetDatabase } from '../support/db';
+import { resetDatabase } from '../support/db';
+import { captureQueries } from '../support/query-count';
+import { seedSitemapProducts } from '../support/scale-fixtures';
 
 // S6.2 design: the sitemap is generated per request, with no index and no
-// cache, so 10,000 public products must stay cheap. Wall clock is noisy on a
-// slow machine, so the budget is generous: the real cost is milliseconds.
+// cache, so 10,000 public products must stay cheap. The gate asserts no time
+// (no-clock-in-gate, S-1): it checks the 10,000-product answer and that the
+// whole sequence stays within a ceiling of database round trips, which the
+// speed of the machine cannot change. The timing (median of 5 sequences, the
+// 3,000 ms ceiling) is tests/timing/sitemap.timing.test.ts, run by
+// `npm run test:timing`.
 
 const PRODUCTS = 10000;
-const BUDGET_MS = 3000;
 
 beforeEach(resetDatabase);
 afterAll(async () => {
@@ -22,49 +25,48 @@ afterAll(async () => {
 });
 
 describe('sitemap generation at scale', () => {
-  it('generates the index, every product chunk and the page sitemap for 10,000 products within the budget', async () => {
-    await assertTestDatabase();
-    const db = getDb();
-    const categoryId = await defaultCategoryId();
-    const feedId = await insertFeed((await insertShop()).id);
+  it('generates the index, every product chunk and the page sitemap for 10,000 products within the query ceiling', async () => {
+    await seedSitemapProducts(PRODUCTS);
 
-    await db.execute(sql`
-      insert into products (slug, title, category_id)
-      select 'perf-' || g, 'Producto ' || g, ${categoryId} from generate_series(1, ${PRODUCTS}) as g
-    `);
-    await db.execute(sql`
-      insert into offers (product_id, feed_id, external_id, price_cents, url, price_updated_at)
-      select id, ${feedId}, 'e-' || id, 1000, 'https://affiliate.example/never-public', now() from products
-    `);
-    await db.execute(sql`analyze products`);
-    await db.execute(sql`analyze offers`);
-
-    const started = performance.now();
-    const index = await getIndex();
-    const indexBody = await index.text();
-    const files = [...indexBody.matchAll(/<loc>[^<]*\/sitemaps\/([^<]+)<\/loc>/g)].map((m) => m[1]);
-    const bodies: string[] = [];
-    for (const file of files) {
-      const response = await getFile(new Request(`http://127.0.0.1:3000/sitemaps/${file}`), {
-        params: Promise.resolve({ file }),
-      });
-      expect(response.status).toBe(200);
-      bodies.push(await response.text());
-    }
-    const elapsed = performance.now() - started;
-
-    expect(elapsed).toBeLessThan(BUDGET_MS);
+    const { result: bodies, queries } = await captureQueries(async () => {
+      const index = await getIndex();
+      const indexBody = await index.text();
+      const files = [...indexBody.matchAll(/<loc>[^<]*\/sitemaps\/([^<]+)<\/loc>/g)].map((m) => m[1]);
+      const answers: { file: string; body: string }[] = [{ file: 'index', body: indexBody }];
+      for (const file of files) {
+        const response = await getFile(new Request(`http://127.0.0.1:3000/sitemaps/${file}`), {
+          params: Promise.resolve({ file }),
+        });
+        expect(response.status).toBe(200);
+        answers.push({ file, body: await response.text() });
+      }
+      return answers;
+    });
 
     // Chunking is live: 10,000 products over chunks of SITEMAP_CHUNK_SIZE.
     const chunks = Math.ceil(PRODUCTS / SITEMAP_CHUNK_SIZE);
     expect(chunks).toBeGreaterThanOrEqual(2);
+    const files = bodies.slice(1).map((answer) => answer.file);
     expect(files).toEqual(['paginas.xml', ...Array.from({ length: chunks }, (_, i) => `productos-${i + 1}.xml`)]);
 
-    const productLocs = bodies.flatMap((body) => [...body.matchAll(/\/producto\/(perf-\d+)</g)].map((m) => m[1]));
+    // Product URLs are collected over every file but the index, paginas.xml
+    // included, so a product URL in the page sitemap fails the count; the size
+    // limit is per product file.
+    const productBodies = bodies.slice(2).map((answer) => answer.body);
+    const productLocs = bodies
+      .slice(1)
+      .flatMap((answer) => [...answer.body.matchAll(/\/producto\/(perf-\d+)</g)].map((m) => m[1]));
     expect(productLocs).toHaveLength(PRODUCTS);
     expect(new Set(productLocs).size).toBe(PRODUCTS);
-    for (const body of bodies.slice(1)) {
+    for (const body of productBodies) {
       expect((body.match(/<url>/g) ?? []).length).toBeLessThanOrEqual(SITEMAP_CHUNK_SIZE);
     }
+
+    // The index counts the chunks (1 query), the page sitemap reads the category
+    // closure (1), and each product file counts again and reads its slugs (2). A
+    // read per product would show as thousands. The floor fails a sequence that
+    // went round the spied pool and so counted nothing.
+    expect(queries.length).toBeGreaterThan(0);
+    expect(queries.length).toBeLessThanOrEqual(2 + 2 * chunks);
   }, 60000);
 });
