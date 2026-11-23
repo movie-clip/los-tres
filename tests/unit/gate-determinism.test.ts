@@ -222,8 +222,8 @@ describe('the script check is not vacuous', () => {
   });
 });
 
-/** A comment of a TypeScript source: its text without the delimiters, and its 1-based line. */
-type SourceComment = { text: string; line: number };
+/** A comment of a TypeScript source: its text without the delimiters, its 1-based line, and whether it is a block comment. */
+type SourceComment = { text: string; line: number; block: boolean };
 
 /**
  * Every real comment of a source. The parser tells a comment from the text of a
@@ -243,6 +243,7 @@ function commentsOf(source: string): SourceComment[] {
       found.push({
         text: block ? raw.slice(2, -2) : raw.slice(2),
         line: file.getLineAndCharacterOfPosition(range.pos).line + 1,
+        block,
       });
     }
   };
@@ -255,9 +256,15 @@ function commentsOf(source: string): SourceComment[] {
   return found;
 }
 
-// The one directive that may switch the clock rule off (0006, rule 2): the next-line
-// form, for that rule alone, with `clock:` and a reason of at least ten characters.
+// The one directive that may switch the clock rule off (0006, rule 2): a line comment,
+// `// eslint-disable-next-line no-restricted-syntax -- clock: <reason>`, for that rule
+// alone, with a reason of at least ten characters. ESLint also honours the block form
+// `/* eslint-disable-next-line ... */`; the rule does not give it, so it is refused.
 const CLOCK_DIRECTIVE = /^eslint-disable-next-line no-restricted-syntax -- clock: \S[\s\S]{8,}\S$/;
+
+function isClockDirective(comment: SourceComment): boolean {
+  return !comment.block && CLOCK_DIRECTIVE.test(comment.text.trim());
+}
 
 /**
  * The comments that could switch off `no-restricted-syntax`, the clock rule, without
@@ -276,7 +283,7 @@ function clockDirectiveOffenders(source: string): SourceComment[] {
         .map((name) => name.trim())
         .filter(Boolean);
       const coversTheRule = names.length === 0 || names.includes('no-restricted-syntax');
-      return coversTheRule && !CLOCK_DIRECTIVE.test(text);
+      return coversTheRule && !isClockDirective(comment);
     }
     return /^eslint\s/.test(text) && text.includes('no-restricted-syntax');
   });
@@ -296,7 +303,9 @@ describe('the directive guard is not vacuous', () => {
     ['a file-level directive with a clock reason', '/* eslint-disable no-restricted-syntax -- clock: a reason long enough to count */'],
     ['a directive naming no rule, which covers every rule', '/* eslint-disable */'],
     ['a next-line directive naming no rule', '// eslint-disable-next-line'],
-    ['a rule list', '// eslint-disable-next-line no-console, no-restricted-syntax -- clock: a reason long enough to count'],
+    ['the next-line form as a block comment', '/* eslint-disable-next-line no-restricted-syntax -- clock: a reason long enough to count */'],
+    ['the next-line form as a block comment on its own lines', '/*\n eslint-disable-next-line no-restricted-syntax -- clock: a reason long enough to count\n */'],
+    ['a rule list','// eslint-disable-next-line no-console, no-restricted-syntax -- clock: a reason long enough to count'],
     ['an inline configuration that turns the rule off', '/* eslint no-restricted-syntax: off */'],
     ['an inline configuration with an array', '/* eslint no-restricted-syntax: ["off"] */'],
   ])('flags %s', (_name, text) => {
@@ -344,7 +353,7 @@ describe('the clock rule has one escape hatch (0006, rule 2)', () => {
 
   it('the scan finds the directives the tests carry today', () => {
     const allowed = CLOCK_RULE_DIRS.flatMap(tsFilesUnder).flatMap((file) =>
-      commentsOf(read(file)).filter((comment) => CLOCK_DIRECTIVE.test(comment.text.trim())),
+      commentsOf(read(file)).filter(isClockDirective),
     );
     expect(allowed.length).toBeGreaterThan(0);
   }, SCAN_TIMEOUT);
