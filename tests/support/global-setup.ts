@@ -98,17 +98,20 @@ export default async function setup(project: TestProject): Promise<void> {
 
     const pool = new Pool({ connectionString: withDatabaseName(developmentUrl, template) });
     try {
-      await runMigrations(drizzle({ client: pool }));
-    } catch {
-      // A driver or migration message can carry the URL: say only what to do.
-      throw new Error('Migrating the test database failed: check src/db/migrations (npm run db:generate)');
-    }
-    try {
-      // The reference rows `resetDatabase` restores, copied from what `runMigrations` just wrote.
-      await pool.query(SNAPSHOT_SQL);
-    } catch {
-      throw new Error('Copying the migrated rows for the test reset failed: check SNAPSHOT_SQL in tests/support/db.ts');
+      try {
+        await runMigrations(drizzle({ client: pool }));
+      } catch {
+        // A driver or migration message can carry the URL: say only what to do.
+        throw new Error('Migrating the test database failed: check src/db/migrations (npm run db:generate)');
+      }
+      try {
+        // The reference rows `resetDatabase` restores, copied from what `runMigrations` just wrote.
+        await pool.query(SNAPSHOT_SQL);
+      } catch {
+        throw new Error('Copying the migrated rows for the test reset failed: check SNAPSHOT_SQL in tests/support/db.ts');
+      }
     } finally {
+      // Every way out of the two steps ends the pool, so no session stays on the template.
       await pool.end();
     }
 
