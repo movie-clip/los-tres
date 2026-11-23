@@ -105,6 +105,19 @@ frontend, then test. Name which lane owns what.
    matcher, the money helper or the role check.
 5. **Tests test the contract**, not the implementation.
 6. **Every exported server function of an admin page or layout** (`default`, `generateMetadata`, `generateViewport`) runs the role check first; the AC 22 enumerator calls each.
+7. **Time in tests** (decision 0006, amendment 2026-11-23). Rules 3 and 4 and
+   the clock forms the lint cannot see are checked by hand, in `tests/unit`,
+   `tests/integration` and `tests/support`:
+   - No fixed sleep or short deadline decides a result: a `setTimeout` wait, a
+     poll with a deadline, or `vi.waitFor` left at its 1000 ms default.
+   - A timeout is a hang guard: read the `testTimeout` lines (a file-level
+     `vi.setConfig` counts) and check a new or slow test sets one at least ten
+     times its duration, not the 5 s default.
+   - Clock reads the lint misses: aliased or computed access (`Date['now']`,
+     `const { now } = Date`), `globalThis.performance.now()`, `Date()` without
+     `new`, `vi.getRealSystemTime()`, SQL `now()` compared in an assert.
+   - A change to a query the timing tests measure ran `npm run test:timing`
+     and records the table in its report.
 
 ## Severity calls
 
