@@ -12,10 +12,12 @@ import { configDefaults } from 'vitest/config';
 // time, only a query-count ceiling. Real timings live in tests/timing/ and run only
 // by `npm run test:timing`, a separate Vitest config. This file pins:
 // - rule 5: the gate cannot pick the timing tests up, by an include, a script, a
-//   hook or a workflow, and the separate config still sets up the same database as
-//   the integration project;
+//   hook or the required workflow, and the separate config still sets up the same
+//   database as the integration project; the one workflow job that runs them is the
+//   `timing` job of gate-repeat.yml, which is manual and report-only (run
+//   2026-11-23-gate-repeat-workflow, issue #349, pinned at the end of this file);
 // - rule 6: nothing retries a test, in either Vitest config, in Playwright, in a
-//   test file, in a script or in a workflow;
+//   test file, in a script or in any workflow;
 // - the escape hatch of the ESLint clock rule (tests/unit/eslint-guardrails.test.ts
 //   pins the rule itself): the only directive that may switch it off is the
 //   next-line form with a `clock:` reason.
@@ -364,7 +366,11 @@ function retriesAboveZero(text: string): string[] {
   return [...text.matchAll(/\bretries\s*:\s*([^,}\n]+)/g)].map((match) => match[1].trim()).filter((value) => value !== '0');
 }
 
-/** The lines of a workflow, comments left out, that retry a step or a job or let a failure pass. */
+/**
+ * The lines of a workflow, comments left out, that retry a step or a job or set
+ * `continue-on-error`. A shell `||` that swallows a command is a different check, made
+ * below (`swallowingLines`), because one job is allowed it.
+ */
 function retryLines(workflow: string): string[] {
   return workflow
     .split(/\r?\n/)
@@ -396,10 +402,10 @@ describe('no automatic retries (rule 6)', () => {
     for (const [name, text] of Object.entries(scripts)) expect(text, name).not.toMatch(/--retr(?:y|ies)\b/);
   });
 
-  it('no workflow retries a step or a job, or lets a failure pass', () => {
+  it('no workflow retries a step or a job, or sets continue-on-error', () => {
     const dir = path.resolve(process.cwd(), '.github/workflows');
     const files = readdirSync(dir).filter((name) => /\.ya?ml$/.test(name));
-    expect(files).toContain('gate.yml');
+    expect(files).toEqual(expect.arrayContaining(['gate.yml', 'gate-repeat.yml']));
     for (const file of files) expect(retryLines(readFileSync(path.join(dir, file), 'utf8')), file).toEqual([]);
   });
 
@@ -427,5 +433,370 @@ describe('no automatic retries (rule 6)', () => {
     expect(retryOptions("describe('x', { retry: 3 }, () => {});")).toHaveLength(1);
     expect(retryOptions("vi.setConfig({ retry: 1 }); test.retry(2);")).toHaveLength(2);
     expect(retryOptions("it('works', () => { expect(retried).toBe(1); });")).toEqual([]);
+  });
+});
+
+// The manual workflow gate-repeat.yml (run 2026-11-23-gate-repeat-workflow, issue #349;
+// design: run 2026-11-23-no-clock-in-gate, 02-design § CI repetition, choice L15). The
+// workflows are read as text, line by line, with no YAML parser (js-yaml is only a
+// transitive dependency): a job is the block two spaces in under `jobs:`, a job setting
+// the block four spaces in, a step a list item under `steps:`. Comment lines are left out.
+// What text cannot see (an expression, an anchor, a script that swallows a failure with
+// no `||`) is named in the run report, not here.
+
+const GATE_FILE = 'gate.yml';
+const REPEAT_FILE = 'gate-repeat.yml';
+/** The one job that may swallow a failing command: it measures and reports, it does not gate. */
+const TIMING_JOB = `${REPEAT_FILE}#timing`;
+
+const workflowFiles = (): string[] =>
+  readdirSync(path.resolve(process.cwd(), '.github/workflows'))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+const workflowText = (file: string): string => read(`.github/workflows/${file}`);
+
+/** The lines of a workflow that are not blank and not comments, trailing space removed. */
+function codeLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
+}
+
+const indentOf = (line: string): number => line.length - line.trimStart().length;
+const unquote = (value: string): string => value.trim().replace(/^(["'])(.*)\1$/, '$2');
+
+type Block = { key: string; inline: string; body: string[] };
+
+/** The `key:` entries exactly `indent` spaces in, each with its inline value and the lines below it. */
+function blocksAt(lines: string[], indent: number): Block[] {
+  const entry = new RegExp(`^ {${indent}}(?! )["']?([\\w.-]+)["']?\\s*:(?:\\s+(.*))?$`);
+  const blocks: Block[] = [];
+  for (const line of lines) {
+    const match = entry.exec(line);
+    if (match) blocks.push({ key: match[1], inline: (match[2] ?? '').trim(), body: [] });
+    else blocks.at(-1)?.body.push(line);
+  }
+  return blocks;
+}
+
+type Job = { id: string; body: string[]; keys: Block[] };
+
+function jobsOf(workflow: string): Job[] {
+  const jobs = blocksAt(codeLines(workflow), 0).find((block) => block.key === 'jobs');
+  if (!jobs) throw new Error('the workflow has no jobs: block');
+  return blocksAt(jobs.body, 2).map((job) => ({ id: job.key, body: job.body, keys: blocksAt(job.body, 4) }));
+}
+
+function jobNamed(workflow: string, id: string): Job {
+  const job = jobsOf(workflow).find((candidate) => candidate.id === id);
+  if (!job) throw new Error(`no job named ${id}`);
+  return job;
+}
+
+/** The name GitHub shows for the job's check: its `name:`, or its id when it has none. */
+function checkNameOf(job: Job): string {
+  return unquote(job.keys.find((key) => key.key === 'name')?.inline ?? '') || job.id;
+}
+
+/** The events that start a workflow, from any of the forms `on:` takes: a scalar, a flow list, a block list, a map. */
+function triggersOf(workflow: string): string[] {
+  const on = blocksAt(codeLines(workflow), 0).find((block) => block.key === 'on');
+  if (!on) throw new Error('the workflow has no on: block');
+  if (on.inline) {
+    const flow = /^\[(.*)\]$/.exec(on.inline);
+    return (flow ? flow[1].split(',') : [on.inline]).map(unquote).filter(Boolean);
+  }
+  const base = Math.min(...on.body.map(indentOf));
+  return on.body
+    .filter((line) => indentOf(line) === base)
+    .map((line) => /^\s*(?:-\s+)?["']?([\w-]+)["']?\s*(?::|$)/.exec(line)?.[1] ?? line.trim());
+}
+
+/** The steps of a job, each as its lines with the list indent taken off. */
+function stepsOf(job: Job): string[][] {
+  const lines = job.keys.find((key) => key.key === 'steps')?.body ?? [];
+  if (lines.length === 0) throw new Error(`job ${job.id} has no steps`);
+  const itemIndent = indentOf(lines[0]);
+  const steps: string[][] = [];
+  for (const line of lines) {
+    if (indentOf(line) === itemIndent && line.trimStart().startsWith('- ')) steps.push([]);
+    steps.at(-1)?.push(line.slice(itemIndent));
+  }
+  return steps;
+}
+
+// The one way a copy's steps may differ from the gate job's: its checkout takes the
+// commit `plan` resolved, so the `pr` input tests that pull request's merge commit.
+const COPY_REF_LINES = ['with:', 'ref: ${{ needs.plan.outputs.ref }}'];
+
+/** The copy job's steps with the allowed difference taken out of the checkout step; `removed` counts where it was. */
+function withoutCopyRef(steps: string[][]): { steps: string[][]; removed: number } {
+  let removed = 0;
+  const kept = steps.map((step) => {
+    const rest = step.slice(1);
+    const isCheckout = /^- uses: actions\/checkout@/.test(step[0]);
+    if (isCheckout && rest.length === COPY_REF_LINES.length && rest.every((line, at) => line.trim() === COPY_REF_LINES[at])) {
+      removed += 1;
+      return step.slice(0, 1);
+    }
+    return step;
+  });
+  return { steps: kept, removed };
+}
+
+// What a job is, apart from the steps and apart from who it is: a copy and the gate job
+// must agree on the runner, the timeout and anything else set on the job.
+const JOB_IDENTITY_KEYS = ['name', 'needs', 'strategy'];
+
+function jobSettings(job: Job): Record<string, string[]> {
+  return Object.fromEntries(
+    job.keys
+      .filter((key) => key.key !== 'steps' && !JOB_IDENTITY_KEYS.includes(key.key))
+      .map((key) => [key.key, [key.inline, ...key.body]]),
+  );
+}
+
+const timeoutOf = (job: Job): number => Number(job.keys.find((key) => key.key === 'timeout-minutes')?.inline);
+
+// The ways a workflow line lets a failing command pass: a shell `||`, `continue-on-error`,
+// `set +e`, a trailing `; true`, `; :` or `; exit 0`, a bare `exit 0`, and a custom
+// `shell:` with `{0}`, which drops the default `-e`. A `||` inside `${{ }}` is an
+// expression, not a shell, and is not one.
+const SWALLOWS = [/\|\|/, /continue-on-error/i, /\bset\s+\+e\b/, /;\s*(?:true|:|exit\s+0)\s*$/, /^\s*exit\s+0\b/, /\bshell\s*:.*\{0\}/];
+
+function swallowingLines(lines: string[]): string[] {
+  return lines
+    .filter((line) => {
+      const shell = line.replace(/\$\{\{.*?\}\}/g, '');
+      return SWALLOWS.some((pattern) => pattern.test(shell));
+    })
+    .map((line) => line.trim());
+}
+
+// The swallowing lines allowed outside the timing job, by `file#job`. `plan` reads the
+// pull request's merge ref with `git ls-remote`; a failing call leaves `sha` empty, and
+// the next line fails the job on anything that is not a 40-hex commit.
+const SWALLOW_ALLOWED: Record<string, string[]> = {
+  [`${REPEAT_FILE}#plan`]: [
+    `sha="$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/pull/$PR/merge" | cut -f1)" || sha=''`,
+  ],
+};
+
+describe('the copy job runs what the gate job runs', () => {
+  const gate = (): Job => jobNamed(workflowText(GATE_FILE), 'gate');
+  const copy = (): Job => jobNamed(workflowText(REPEAT_FILE), 'copy');
+
+  it('its steps are the gate job steps, step by step, but for the ref its checkout takes', () => {
+    const expected = stepsOf(gate());
+    const { steps, removed } = withoutCopyRef(stepsOf(copy()));
+    expect(steps).toEqual(expected);
+    // The allowed difference is there, once: without it `pr` would test the dispatched ref.
+    expect(removed).toBe(1);
+    // The comparison holds the steps the gate is made of, or an empty pair would pass.
+    expect(expected.length).toBeGreaterThan(5);
+    expect(expected.flat().join('\n')).toContain('npm run gate:ci');
+  });
+
+  it('its runner, timeout and every other job setting equal the gate job, apart from name, needs and strategy', () => {
+    const settings = jobSettings(gate());
+    expect(Object.keys(settings)).toEqual(expect.arrayContaining(['runs-on', 'timeout-minutes']));
+    expect(jobSettings(copy())).toEqual(settings);
+  });
+
+  it('its timeout is the gate job timeout', () => {
+    expect(Number.isInteger(timeoutOf(gate()))).toBe(true);
+    expect(timeoutOf(copy())).toBe(timeoutOf(gate()));
+  });
+
+  it('neither workflow sets env or defaults for all its jobs, which would reach the copy and not the gate, or the reverse', () => {
+    for (const file of [GATE_FILE, REPEAT_FILE]) {
+      const keys = blocksAt(codeLines(workflowText(file)), 0).map((block) => block.key);
+      expect(keys, file).toContain('jobs');
+      expect(keys, file).not.toContain('env');
+      expect(keys, file).not.toContain('defaults');
+    }
+  });
+});
+
+describe('no copy can be mistaken for the required check', () => {
+  it('the required check is the gate job of gate.yml, and no job of gate-repeat.yml is named or called gate', () => {
+    expect(jobsOf(workflowText(GATE_FILE)).map(checkNameOf)).toEqual(['gate']);
+    const jobs = jobsOf(workflowText(REPEAT_FILE));
+    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['plan', 'copy', 'timing']));
+    for (const job of jobs) {
+      expect(job.id, `the id of ${job.id}`).not.toBe('gate');
+      expect(checkNameOf(job), `the check name of ${job.id}`).not.toBe('gate');
+    }
+  });
+
+  it('the workflow itself is not named gate', () => {
+    const name = blocksAt(codeLines(workflowText(REPEAT_FILE)), 0).find((block) => block.key === 'name');
+    expect(name, 'the workflow has a name').toBeDefined();
+    expect(unquote(name?.inline ?? '')).not.toBe('gate');
+  });
+});
+
+describe('gate-repeat can only be started by hand', () => {
+  it('its only trigger is workflow_dispatch', () => {
+    expect(triggersOf(workflowText(REPEAT_FILE))).toEqual(['workflow_dispatch']);
+  });
+});
+
+describe('only the timing job may swallow a failing command or run the timing suite', () => {
+  /** Every job of every workflow but the timing job, as `file#job`. */
+  const otherJobs = (): { key: string; job: Job }[] =>
+    workflowFiles()
+      .flatMap((file) => jobsOf(workflowText(file)).map((job) => ({ key: `${file}#${job.id}`, job })))
+      .filter(({ key }) => key !== TIMING_JOB);
+
+  it('no other job has a line that lets a failure pass, bar the one allowed in plan', () => {
+    const jobs = otherJobs();
+    // The sweep reaches the gate job, the copy job and plan, or an empty list would pass.
+    expect(jobs.map(({ key }) => key)).toEqual(
+      expect.arrayContaining([`${GATE_FILE}#gate`, `${REPEAT_FILE}#copy`, `${REPEAT_FILE}#plan`]),
+    );
+    for (const { key, job } of jobs) expect(swallowingLines(job.body), key).toEqual(SWALLOW_ALLOWED[key] ?? []);
+  });
+
+  it('the swallow allowed in plan is followed by a check that fails the job on an empty or malformed commit', () => {
+    const plan = jobNamed(workflowText(REPEAT_FILE), 'plan').body.map((line) => line.trim());
+    const [allowed] = SWALLOW_ALLOWED[`${REPEAT_FILE}#plan`];
+    const at = plan.indexOf(allowed);
+    expect(at, 'the allowed line is in plan').toBeGreaterThanOrEqual(0);
+    expect(plan[at + 1]).toMatch(/^if ! .*\$sha.*grep -Eq /);
+    expect(plan.slice(at + 2, at + 4)).toContain('exit 1');
+  });
+
+  it('no other job runs, or names, the timing suite', () => {
+    for (const { key, job } of otherJobs()) expect(job.body.filter((line) => TIMING_TEXT.test(line)), key).toEqual([]);
+    const timing = jobNamed(workflowText(REPEAT_FILE), 'timing').body;
+    expect(timing.some((line) => line.includes('npm run test:timing'))).toBe(true);
+  });
+});
+
+describe('the workflow checks are not vacuous', () => {
+  const gateJob = [
+    'jobs:',
+    '  gate:',
+    '    name: gate',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 45',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '',
+    '      - name: Gate',
+    '        run: npm run gate:ci',
+  ];
+  const copyJob = (...steps: string[]): string[] => [
+    'jobs:',
+    '  copy:',
+    '    name: repeat ${{ matrix.attempt }}',
+    '    needs: plan',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 45',
+    '    steps:',
+    ...steps,
+  ];
+  const checkout = ['      - uses: actions/checkout@v4'];
+  const refWith = ['        with:', '          ref: ${{ needs.plan.outputs.ref }}'];
+  const gate = (): Job => jobNamed(gateJob.join('\n'), 'gate');
+  const copyStepsOf = (...lines: string[]) => withoutCopyRef(stepsOf(jobNamed(copyJob(...lines).join('\n'), 'copy')));
+  const gateStep = ['      - name: Gate', '        run: npm run gate:ci'];
+
+  it('reads jobs, check names, settings and steps through comments, blank lines and CRLF', () => {
+    const text = ['# a comment', ...gateJob, '      # another', ''].join('\r\n');
+    expect(jobsOf(text).map((job) => job.id)).toEqual(['gate']);
+    expect(checkNameOf(jobNamed(text, 'gate'))).toBe('gate');
+    expect(timeoutOf(jobNamed(text, 'gate'))).toBe(45);
+    expect(stepsOf(jobNamed(text, 'gate'))).toHaveLength(2);
+    expect(checkNameOf(jobNamed(copyJob(...gateStep).join('\n'), 'copy'))).toBe('repeat ${{ matrix.attempt }}');
+    // A job with no name is shown by its id, and a quoted name loses its quotes.
+    expect(checkNameOf({ id: 'build', body: [], keys: [] })).toBe('build');
+    expect(checkNameOf({ id: 'x', body: [], keys: [{ key: 'name', inline: '"gate"', body: [] }] })).toBe('gate');
+  });
+
+  it('finds a step, a setting, a timeout and an extra step that differ from the gate job', () => {
+    const same = copyStepsOf(...checkout, ...refWith, '', ...gateStep);
+    expect(same.removed).toBe(1);
+    expect(same.steps).toEqual(stepsOf(gate()));
+    const changed = copyStepsOf(...checkout, ...refWith, '      - name: Gate', '        run: npm run gate');
+    expect(changed.steps).not.toEqual(stepsOf(gate()));
+    const extra = copyStepsOf(...checkout, ...refWith, ...gateStep, '      - run: echo done');
+    expect(extra.steps).not.toEqual(stepsOf(gate()));
+    const guarded = copyStepsOf(...checkout, ...refWith, ...gateStep, '        if: always()');
+    expect(guarded.steps).not.toEqual(stepsOf(gate()));
+    const slower = jobNamed(copyJob(...gateStep).join('\n').replace('timeout-minutes: 45', 'timeout-minutes: 60'), 'copy');
+    expect(timeoutOf(slower)).not.toBe(timeoutOf(gate()));
+    expect(jobSettings(slower)).not.toEqual(jobSettings(gate()));
+    const env = jobNamed(copyJob(...gateStep).join('\n').replace('    steps:', '    env:\n      CI: x\n    steps:'), 'copy');
+    expect(jobSettings(env)).not.toEqual(jobSettings(gate()));
+    // The identity keys are not settings: the copy's name, needs and strategy are not compared.
+    expect(jobSettings(jobNamed(copyJob(...gateStep).join('\n'), 'copy'))).toEqual(jobSettings(gate()));
+  });
+
+  it('allows the checkout ref and nothing like it', () => {
+    expect(copyStepsOf(...checkout, ...refWith).removed).toBe(1);
+    expect(copyStepsOf(...checkout).removed).toBe(0);
+    // Another `with:` on the checkout, or a ref from somewhere else, is a difference.
+    expect(copyStepsOf(...checkout, '        with:', '          ref: main').removed).toBe(0);
+    expect(copyStepsOf(...checkout, '        with:', '          fetch-depth: 0').removed).toBe(0);
+    expect(copyStepsOf(...checkout, ...refWith, '          fetch-depth: 0').removed).toBe(0);
+    // The ref is allowed on a checkout step only.
+    expect(copyStepsOf('      - uses: actions/setup-node@v4', ...refWith).removed).toBe(0);
+  });
+
+  it('reads the trigger from every form of on:', () => {
+    const on = (...lines: string[]): string[] => triggersOf([...lines, 'jobs:', '  a:', '    runs-on: x'].join('\n'));
+    expect(on('on:', '  workflow_dispatch:', '    inputs:', '      runs:', '        type: number')).toEqual(['workflow_dispatch']);
+    expect(on('on:', '  workflow_dispatch:', '  pull_request:')).toEqual(['workflow_dispatch', 'pull_request']);
+    expect(on('on:', '  push:', '    branches: [main]', '  schedule:', '    - cron: "0 0 * * *"')).toEqual(['push', 'schedule']);
+    expect(on('on:', '  - workflow_dispatch', '  - push')).toEqual(['workflow_dispatch', 'push']);
+    expect(on('on:', '- push')).toEqual(['push']);
+    expect(on('on: push')).toEqual(['push']);
+    expect(on('on: [workflow_dispatch, pull_request]')).toEqual(['workflow_dispatch', 'pull_request']);
+    expect(on('"on":', '  pull_request:')).toEqual(['pull_request']);
+    expect(triggersOf(workflowText(GATE_FILE))).toEqual(['pull_request']);
+  });
+
+  it('finds every way a line lets a failure pass, and none in a plain line or an expression', () => {
+    for (const line of [
+      'run: npm run test:timing || true',
+      'run: npm run test:timing || status=$?',
+      'run: npm run test:timing || :',
+      'run: npm run test:timing || exit 0',
+      '  continue-on-error: true',
+      '  Continue-On-Error: ${{ matrix.x }}',
+      'set +e',
+      'run: npm run test:timing; true',
+      'run: npm run test:timing ; exit 0',
+      '  exit 0',
+      '  shell: bash {0}',
+    ]) {
+      expect(swallowingLines([line]), line).toEqual([line.trim()]);
+    }
+    for (const line of [
+      'run: npm run gate:ci',
+      'group: gate-repeat-${{ inputs.pr || github.ref }}',
+      'if: always()',
+      'if: failure()',
+      'run: set -e',
+      '  exit 1',
+      '  shell: bash',
+    ]) {
+      expect(swallowingLines([line]), line).toEqual([]);
+    }
+  });
+
+  it('finds the timing suite in a job by any of its names, and not in the gate scripts', () => {
+    for (const line of [
+      'run: npm run test:timing',
+      'run: npx vitest run --config vitest.timing.config.mts',
+      'run: npx vitest run tests/timing',
+      'run: npx vitest run x.timing.test.ts',
+    ]) {
+      expect(TIMING_TEXT.test(line), line).toBe(true);
+    }
+    expect(TIMING_TEXT.test('run: npm run gate:ci')).toBe(false);
   });
 });
