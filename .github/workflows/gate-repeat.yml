@@ -1,0 +1,228 @@
+# Manual only (decision 0006, time in tests; run 2026-11-23-no-clock-in-gate,
+# 02-design § CI repetition, owner ruling D-4). Never make any job of this
+# workflow a required check: the required check is `gate`, from gate.yml.
+#
+# It runs `runs` independent copies of the CI gate in parallel, each on its own
+# runner, so a change to how tests execute can be shown green by repetition,
+# and one report-only timing job that runs `npm run test:timing` twice (alone,
+# then beside three busy loops) and puts both timing tables in its summary.
+#
+# Inputs:
+#   runs  how many copies, 1 to 10 (default 5).
+#   pr    optional pull request number, digits only. When set, every job checks
+#         out the one commit refs/pull/<pr>/merge pointed at when `plan` ran
+#         (what the `gate` check tests); otherwise the dispatched ref.
+# Both are read in `plan` through env and validated there; no other step reads
+# an input. A bad value fails `plan`, and nothing else starts.
+#
+# Copies: the steps of the `copy` job are gate.yml's `gate` job steps, with one
+# difference only, the checkout `ref`. A drift pin in
+# tests/unit/gate-determinism.test.ts compares them. No copy is named `gate`.
+#
+# Timing: a slow timing cannot fail this workflow. The timing commands keep
+# their exit code and write it to the summary instead of failing the step, so
+# the job stays green on a slow or failing timing test; it fails only if its
+# setup fails (install, .env, database). No step is ever run a second time.
+name: gate-repeat
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'Copies of the gate to run in parallel (1 to 10)'
+        type: number
+        default: 5
+        required: true
+      pr:
+        description: 'Pull request number to test (digits only; blank tests the selected branch)'
+        type: string
+        default: ''
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-repeat-${{ inputs.pr || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      attempts: ${{ steps.plan.outputs.attempts }}
+      ref: ${{ steps.plan.outputs.ref }}
+    steps:
+      - name: Validate inputs and list the copies
+        id: plan
+        env:
+          RUNS: ${{ inputs.runs }}
+          PR: ${{ inputs.pr }}
+        run: |
+          if ! printf '%s' "$RUNS" | grep -Eq '^([1-9]|10)$'; then
+            echo "::error title=gate-repeat::runs must be a whole number from 1 to 10."
+            exit 1
+          fi
+          ref=''
+          if [ -n "$PR" ]; then
+            if ! printf '%s' "$PR" | grep -Eq '^[1-9][0-9]{0,8}$'; then
+              echo "::error title=gate-repeat::pr must be a pull request number, digits only, or blank."
+              exit 1
+            fi
+            sha="$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/pull/$PR/merge" | cut -f1)" || sha=''
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "::error title=gate-repeat::pull request $PR has no merge ref (closed, merged, conflicting or not a pull request)."
+              exit 1
+            fi
+            ref="$sha"
+            echo "Testing pull request $PR at merge commit $sha"
+          else
+            echo "Testing the dispatched ref $GITHUB_REF at $GITHUB_SHA"
+          fi
+          echo "attempts=$(seq 1 "$RUNS" | jq -cs .)" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  copy:
+    name: repeat ${{ matrix.attempt }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Gate
+        run: npm run gate:ci
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=300
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
+  timing:
+    name: timing
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Start the database
+        run: npm run db:up
+
+      # Report-only: the exit code of test:timing is kept, not raised, so a
+      # slow timing never fails the job. The tables of each run are moved out of
+      # timing-results/ before the next run writes files of the same names.
+      - name: Timing, alone
+        env:
+          TIMING_LABEL: alone
+        run: |
+          out="$RUNNER_TEMP/timing/alone"
+          mkdir -p "$out"
+          cat /proc/loadavg > "$out/loadavg-before"
+          status=0
+          npm run test:timing || status=$?
+          cat /proc/loadavg > "$out/loadavg-after"
+          echo "$status" > "$out/exit-code"
+          if [ -d timing-results ]; then mv timing-results "$out/tables"; fi
+          echo "test:timing (alone) exited $status"
+
+      - name: Timing, beside three busy loops
+        env:
+          TIMING_LABEL: cpu-load
+        run: |
+          out="$RUNNER_TEMP/timing/cpu-load"
+          mkdir -p "$out"
+          pids=''
+          for n in 1 2 3; do
+            ( while :; do :; done ) &
+            pids="$pids $!"
+          done
+          trap 'kill $pids 2>/dev/null || true' EXIT
+          cat /proc/loadavg > "$out/loadavg-before"
+          status=0
+          npm run test:timing || status=$?
+          cat /proc/loadavg > "$out/loadavg-after"
+          echo "$status" > "$out/exit-code"
+          if [ -d timing-results ]; then mv timing-results "$out/tables"; fi
+          echo "test:timing (cpu-load) exited $status"
+
+      - name: Timing summary
+        if: always()
+        run: |
+          {
+            echo "## gate-repeat timing"
+            echo
+            echo "- commit: \`$(git rev-parse HEAD)\`"
+            echo "- runner CPUs: nproc=$(nproc), availableParallelism=$(node -p 'require("node:os").availableParallelism()')"
+            echo "- CPU model: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')"
+            for label in alone cpu-load; do
+              dir="$RUNNER_TEMP/timing/$label"
+              echo
+              echo "### TIMING_LABEL=$label"
+              echo
+              if [ ! -d "$dir" ]; then
+                echo "Not run (an earlier step failed)."
+                continue
+              fi
+              echo "- test:timing exit code: $(cat "$dir/exit-code" 2>/dev/null || echo 'none (the step stopped before it was recorded)')"
+              echo "- load average (1, 5, 15 min) before: $(cut -d' ' -f1-3 "$dir/loadavg-before" 2>/dev/null)"
+              echo "- load average (1, 5, 15 min) after: $(cut -d' ' -f1-3 "$dir/loadavg-after" 2>/dev/null)"
+              found=0
+              for table in "$dir"/tables/*.md; do
+                [ -f "$table" ] || continue
+                found=1
+                echo
+                echo "#### $(basename "$table")"
+                echo
+                echo '```text'
+                cat "$table"
+                echo '```'
+              done
+              if [ "$found" = 0 ]; then
+                echo
+                echo "No timing table was written."
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop the database
+        if: always()
+        run: docker compose down --volumes
