@@ -12,10 +12,12 @@ import { configDefaults } from 'vitest/config';
 // time, only a query-count ceiling. Real timings live in tests/timing/ and run only
 // by `npm run test:timing`, a separate Vitest config. This file pins:
 // - rule 5: the gate cannot pick the timing tests up, by an include, a script, a
-//   hook or a workflow, and the separate config still sets up the same database as
-//   the integration project;
+//   hook or the required workflow, and the separate config still sets up the same
+//   database as the integration project; the one workflow job that runs them is the
+//   `timing` job of gate-repeat.yml, which is manual and report-only (run
+//   2026-11-23-gate-repeat-workflow, issue #349, pinned at the end of this file);
 // - rule 6: nothing retries a test, in either Vitest config, in Playwright, in a
-//   test file, in a script or in a workflow;
+//   test file, in a script or in any workflow;
 // - the escape hatch of the ESLint clock rule (tests/unit/eslint-guardrails.test.ts
 //   pins the rule itself): the only directive that may switch it off is the
 //   next-line form with a `clock:` reason.
@@ -364,7 +366,11 @@ function retriesAboveZero(text: string): string[] {
   return [...text.matchAll(/\bretries\s*:\s*([^,}\n]+)/g)].map((match) => match[1].trim()).filter((value) => value !== '0');
 }
 
-/** The lines of a workflow, comments left out, that retry a step or a job or let a failure pass. */
+/**
+ * The lines of a workflow, comments left out, that retry a step or a job or set
+ * `continue-on-error`. A shell `||` that swallows a command is a different check, made
+ * below (`swallowingLines`), because one job is allowed it.
+ */
 function retryLines(workflow: string): string[] {
   return workflow
     .split(/\r?\n/)
@@ -396,10 +402,10 @@ describe('no automatic retries (rule 6)', () => {
     for (const [name, text] of Object.entries(scripts)) expect(text, name).not.toMatch(/--retr(?:y|ies)\b/);
   });
 
-  it('no workflow retries a step or a job, or lets a failure pass', () => {
+  it('no workflow retries a step or a job, or sets continue-on-error', () => {
     const dir = path.resolve(process.cwd(), '.github/workflows');
     const files = readdirSync(dir).filter((name) => /\.ya?ml$/.test(name));
-    expect(files).toContain('gate.yml');
+    expect(files).toEqual(expect.arrayContaining(['gate.yml', 'gate-repeat.yml']));
     for (const file of files) expect(retryLines(readFileSync(path.join(dir, file), 'utf8')), file).toEqual([]);
   });
 
@@ -427,5 +433,623 @@ describe('no automatic retries (rule 6)', () => {
     expect(retryOptions("describe('x', { retry: 3 }, () => {});")).toHaveLength(1);
     expect(retryOptions("vi.setConfig({ retry: 1 }); test.retry(2);")).toHaveLength(2);
     expect(retryOptions("it('works', () => { expect(retried).toBe(1); });")).toEqual([]);
+  });
+});
+
+// The manual workflow gate-repeat.yml (run 2026-11-23-gate-repeat-workflow, issue #349;
+// design: run 2026-11-23-no-clock-in-gate, 02-design § CI repetition, choice L15). The
+// workflows are read as text, line by line, with no YAML parser (js-yaml is only a
+// transitive dependency): a job is the block two spaces in under `jobs:`, a job setting
+// the block four spaces in, a step a list item under `steps:`. Comment lines are left out.
+// What text cannot see (an expression, an anchor, a script that swallows a failure with
+// no `||`) is named in the run report, not here.
+
+const GATE_FILE = 'gate.yml';
+const REPEAT_FILE = 'gate-repeat.yml';
+/** The one job that may swallow a failing command: it measures and reports, it does not gate. */
+const TIMING_JOB = `${REPEAT_FILE}#timing`;
+
+const workflowFiles = (): string[] =>
+  readdirSync(path.resolve(process.cwd(), '.github/workflows'))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+const workflowText = (file: string): string => read(`.github/workflows/${file}`);
+
+/** The lines of a workflow that are not blank and not comments, trailing space removed. */
+function codeLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
+}
+
+const indentOf = (line: string): number => line.length - line.trimStart().length;
+const unquote = (value: string): string => value.trim().replace(/^(["'])(.*)\1$/, '$2');
+
+type Block = { key: string; inline: string; body: string[] };
+
+/** The `key:` entries exactly `indent` spaces in, each with its inline value and the lines below it. */
+function blocksAt(lines: string[], indent: number): Block[] {
+  const entry = new RegExp(`^ {${indent}}(?! )["']?([\\w.-]+)["']?\\s*:(?:\\s+(.*))?$`);
+  const blocks: Block[] = [];
+  for (const line of lines) {
+    const match = entry.exec(line);
+    if (match) blocks.push({ key: match[1], inline: (match[2] ?? '').trim(), body: [] });
+    else blocks.at(-1)?.body.push(line);
+  }
+  return blocks;
+}
+
+type Job = { id: string; body: string[]; keys: Block[] };
+
+function jobsOf(workflow: string): Job[] {
+  const jobs = blocksAt(codeLines(workflow), 0).find((block) => block.key === 'jobs');
+  if (!jobs) throw new Error('the workflow has no jobs: block');
+  return blocksAt(jobs.body, 2).map((job) => ({ id: job.key, body: job.body, keys: blocksAt(job.body, 4) }));
+}
+
+function jobNamed(workflow: string, id: string): Job {
+  const job = jobsOf(workflow).find((candidate) => candidate.id === id);
+  if (!job) throw new Error(`no job named ${id}`);
+  return job;
+}
+
+/** The name GitHub shows for the job's check: its `name:`, or its id when it has none. */
+function checkNameOf(job: Job): string {
+  return unquote(job.keys.find((key) => key.key === 'name')?.inline ?? '') || job.id;
+}
+
+/** The events that start a workflow, from any of the forms `on:` takes: a scalar, a flow list, a block list, a map. */
+function triggersOf(workflow: string): string[] {
+  const on = blocksAt(codeLines(workflow), 0).find((block) => block.key === 'on');
+  if (!on) throw new Error('the workflow has no on: block');
+  if (on.inline) {
+    const flow = /^\[(.*)\]$/.exec(on.inline);
+    return (flow ? flow[1].split(',') : [on.inline]).map(unquote).filter(Boolean);
+  }
+  const base = Math.min(...on.body.map(indentOf));
+  return on.body
+    .filter((line) => indentOf(line) === base)
+    .map((line) => /^\s*(?:-\s+)?["']?([\w-]+)["']?\s*(?::|$)/.exec(line)?.[1] ?? line.trim());
+}
+
+/** The steps of a job, each as its lines with the list indent taken off. */
+function stepsOf(job: Job): string[][] {
+  const lines = job.keys.find((key) => key.key === 'steps')?.body ?? [];
+  if (lines.length === 0) throw new Error(`job ${job.id} has no steps`);
+  const itemIndent = indentOf(lines[0]);
+  const steps: string[][] = [];
+  for (const line of lines) {
+    if (indentOf(line) === itemIndent && line.trimStart().startsWith('- ')) steps.push([]);
+    steps.at(-1)?.push(line.slice(itemIndent));
+  }
+  return steps;
+}
+
+// The one way a copy's steps may differ from the gate job's: its checkout takes the
+// commit `plan` resolved, so the `pr` input tests that pull request's merge commit.
+const COPY_REF_LINES = ['with:', 'ref: ${{ needs.plan.outputs.ref }}'];
+
+/** The copy job's steps with the allowed difference taken out of the checkout step; `removed` counts where it was. */
+function withoutCopyRef(steps: string[][]): { steps: string[][]; removed: number } {
+  let removed = 0;
+  const kept = steps.map((step) => {
+    const rest = step.slice(1);
+    const isCheckout = /^- uses: actions\/checkout@/.test(step[0]);
+    if (isCheckout && rest.length === COPY_REF_LINES.length && rest.every((line, at) => line.trim() === COPY_REF_LINES[at])) {
+      removed += 1;
+      return step.slice(0, 1);
+    }
+    return step;
+  });
+  return { steps: kept, removed };
+}
+
+// What a job is, apart from the steps and apart from who it is: a copy and the gate job
+// must agree on the runner, the timeout and anything else set on the job.
+const JOB_IDENTITY_KEYS = ['name', 'needs', 'strategy'];
+
+function jobSettings(job: Job): Record<string, string[]> {
+  return Object.fromEntries(
+    job.keys
+      .filter((key) => key.key !== 'steps' && !JOB_IDENTITY_KEYS.includes(key.key))
+      .map((key) => [key.key, [key.inline, ...key.body]]),
+  );
+}
+
+const timeoutOf = (job: Job): number => Number(job.keys.find((key) => key.key === 'timeout-minutes')?.inline);
+
+// The ways a workflow line lets a failing command pass: a shell `||`, `continue-on-error`,
+// `set +e`, a trailing `; true`, `; :` or `; exit 0`, a bare `exit 0`, and a custom
+// `shell:` with `{0}`, which drops the default `-e`. A `||` inside `${{ }}` is an
+// expression, not a shell, and is not one.
+const SWALLOWS = [/\|\|/, /continue-on-error/i, /\bset\s+\+e\b/, /;\s*(?:true|:|exit\s+0)\s*$/, /^\s*exit\s+0\b/, /\bshell\s*:.*\{0\}/];
+
+function swallowingLines(lines: string[]): string[] {
+  return lines
+    .filter((line) => {
+      const shell = line.replace(/\$\{\{.*?\}\}/g, '');
+      return SWALLOWS.some((pattern) => pattern.test(shell));
+    })
+    .map((line) => line.trim());
+}
+
+// The swallowing lines allowed outside the timing job, by `file#job`. `plan` reads the
+// pull request's merge ref with `git ls-remote`; a failing call leaves `sha` empty, and
+// the next line fails the job on anything that is not a 40-hex commit.
+const SWALLOW_ALLOWED: Record<string, string[]> = {
+  [`${REPEAT_FILE}#plan`]: [
+    `sha="$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/pull/$PR/merge" | cut -f1)" || sha=''`,
+  ],
+};
+
+describe('the copy job runs what the gate job runs', () => {
+  const gate = (): Job => jobNamed(workflowText(GATE_FILE), 'gate');
+  const copy = (): Job => jobNamed(workflowText(REPEAT_FILE), 'copy');
+
+  it('its steps are the gate job steps, step by step, but for the ref its checkout takes', () => {
+    const expected = stepsOf(gate());
+    const { steps, removed } = withoutCopyRef(stepsOf(copy()));
+    expect(steps).toEqual(expected);
+    // The allowed difference is there, once: without it `pr` would test the dispatched ref.
+    expect(removed).toBe(1);
+    // The comparison holds the steps the gate is made of, or an empty pair would pass.
+    expect(expected.length).toBeGreaterThan(5);
+    expect(expected.flat().join('\n')).toContain('npm run gate:ci');
+  });
+
+  it('its runner, timeout and every other job setting equal the gate job, apart from name, needs and strategy', () => {
+    const settings = jobSettings(gate());
+    expect(Object.keys(settings)).toEqual(expect.arrayContaining(['runs-on', 'timeout-minutes']));
+    expect(jobSettings(copy())).toEqual(settings);
+  });
+
+  it('its timeout is the gate job timeout', () => {
+    expect(Number.isInteger(timeoutOf(gate()))).toBe(true);
+    expect(timeoutOf(copy())).toBe(timeoutOf(gate()));
+  });
+
+  it('neither workflow sets env or defaults for all its jobs, which would reach the copy and not the gate, or the reverse', () => {
+    for (const file of [GATE_FILE, REPEAT_FILE]) {
+      const keys = blocksAt(codeLines(workflowText(file)), 0).map((block) => block.key);
+      expect(keys, file).toContain('jobs');
+      expect(keys, file).not.toContain('env');
+      expect(keys, file).not.toContain('defaults');
+    }
+  });
+});
+
+describe('no copy can be mistaken for the required check', () => {
+  it('the required check is the gate job of gate.yml, and no job of gate-repeat.yml is named or called gate', () => {
+    expect(jobsOf(workflowText(GATE_FILE)).map(checkNameOf)).toEqual(['gate']);
+    const jobs = jobsOf(workflowText(REPEAT_FILE));
+    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['plan', 'copy', 'timing']));
+    for (const job of jobs) {
+      expect(job.id, `the id of ${job.id}`).not.toBe('gate');
+      expect(checkNameOf(job), `the check name of ${job.id}`).not.toBe('gate');
+    }
+  });
+
+  it('the workflow itself is not named gate', () => {
+    const name = blocksAt(codeLines(workflowText(REPEAT_FILE)), 0).find((block) => block.key === 'name');
+    expect(name, 'the workflow has a name').toBeDefined();
+    expect(unquote(name?.inline ?? '')).not.toBe('gate');
+  });
+});
+
+describe('gate-repeat can only be started by hand', () => {
+  it('its only trigger is workflow_dispatch', () => {
+    expect(triggersOf(workflowText(REPEAT_FILE))).toEqual(['workflow_dispatch']);
+  });
+});
+
+describe('only the timing job may swallow a failing command or run the timing suite', () => {
+  /** Every job of every workflow but the timing job, as `file#job`. */
+  const otherJobs = (): { key: string; job: Job }[] =>
+    workflowFiles()
+      .flatMap((file) => jobsOf(workflowText(file)).map((job) => ({ key: `${file}#${job.id}`, job })))
+      .filter(({ key }) => key !== TIMING_JOB);
+
+  it('no other job has a line that lets a failure pass, bar the one allowed in plan', () => {
+    const jobs = otherJobs();
+    // The sweep reaches the gate job, the copy job and plan, or an empty list would pass.
+    expect(jobs.map(({ key }) => key)).toEqual(
+      expect.arrayContaining([`${GATE_FILE}#gate`, `${REPEAT_FILE}#copy`, `${REPEAT_FILE}#plan`]),
+    );
+    for (const { key, job } of jobs) expect(swallowingLines(job.body), key).toEqual(SWALLOW_ALLOWED[key] ?? []);
+  });
+
+  it('the swallow allowed in plan is followed by a check that fails the job on an empty or malformed commit', () => {
+    const plan = jobNamed(workflowText(REPEAT_FILE), 'plan').body.map((line) => line.trim());
+    const [allowed] = SWALLOW_ALLOWED[`${REPEAT_FILE}#plan`];
+    const at = plan.indexOf(allowed);
+    expect(at, 'the allowed line is in plan').toBeGreaterThanOrEqual(0);
+    expect(plan[at + 1]).toMatch(/^if ! .*\$sha.*grep -Eq /);
+    expect(plan.slice(at + 2, at + 4)).toContain('exit 1');
+  });
+
+  it('no other job runs, or names, the timing suite', () => {
+    for (const { key, job } of otherJobs()) expect(job.body.filter((line) => TIMING_TEXT.test(line)), key).toEqual([]);
+    const timing = jobNamed(workflowText(REPEAT_FILE), 'timing').body;
+    expect(timing.some((line) => line.includes('npm run test:timing'))).toBe(true);
+  });
+});
+
+// What the `pr` input tests, what the workflow may read or write, and how `plan` checks
+// its inputs (run 2026-11-23-gate-repeat-workflow, CR-6 and CR-5). A public repository
+// runs this workflow on a pull request's code, so a quiet edit here changes what a green
+// repeat means or what that code is given.
+
+const trimmed = (lines: string[]): string[] => lines.map((line) => line.trim());
+
+/** The lines that write a step output, the job environment or the PATH, whatever the form. */
+const outputWrites = (lines: string[]): string[] =>
+  trimmed(lines).filter((line) => /GITHUB_OUTPUT|GITHUB_ENV|GITHUB_PATH|set-output/.test(line));
+
+/** The lines that assign the shell variable `ref`. */
+const refAssignments = (lines: string[]): string[] =>
+  trimmed(lines).filter((line) => /^(?:(?:export|declare|local|typeset|readonly)\s+(?:-\S+\s+)?)?ref\+?=/.test(line));
+
+/**
+ * The problems with the checkouts of a job that must take plan's ref: each checkout
+ * step that does not carry exactly that `with: ref`, and a job with no checkout at all.
+ */
+function checkoutRefProblems(job: Job): string[] {
+  const checkouts = stepsOf(job).filter((step) => /^- uses: actions\/checkout@/.test(step[0]));
+  if (checkouts.length === 0) return [`${job.id}: no checkout`];
+  return checkouts
+    .filter((step) => JSON.stringify(trimmed(step.slice(1))) !== JSON.stringify(COPY_REF_LINES))
+    .map((step) => `${job.id}: ${trimmed(step).join(' | ')}`);
+}
+
+/**
+ * The pattern a plan line `if ! [[ $<name> =~ ^...$ ]]; then` tests, as a JavaScript
+ * RegExp, or null when no line checks the variable that way. Bash `=~` and JavaScript
+ * without the `m` flag both anchor `^` and `$` to the whole value, newlines included.
+ */
+function wholeValueCheck(lines: string[], name: string): RegExp | null {
+  for (const line of trimmed(lines)) {
+    const match = new RegExp(`^if ! \\[\\[ \\$${name} =~ (\\^\\S*\\$) \\]\\]; then$`).exec(line);
+    if (match) return new RegExp(match[1]);
+  }
+  return null;
+}
+
+/** The lines that hand an input to `grep`, which matches line by line and so passes a value any one line of which matches. */
+const inputGrepLines = (lines: string[]): string[] =>
+  trimmed(lines).filter((line) => /\bgrep\b/.test(line) && /\$\{?(?:RUNS|PR)\}?(?![\w])/.test(line));
+
+describe('what the pr input tests', () => {
+  const plan = (): string[] => jobNamed(workflowText(REPEAT_FILE), 'plan').body;
+
+  it('plan sets its ref output from one place: the validated merge commit, or empty', () => {
+    const lines = trimmed(plan());
+    // Nothing else writes an output, the environment or the PATH.
+    expect(outputWrites(plan())).toEqual([
+      expect.stringMatching(/^echo "attempts=.*" >> "\$GITHUB_OUTPUT"$/),
+      'echo "ref=$ref" >> "$GITHUB_OUTPUT"',
+    ]);
+    // `ref` is empty, or the sha: no other assignment, and the sha is set after its check.
+    expect(refAssignments(plan())).toEqual(["ref=''", 'ref="$sha"']);
+    const [allowed] = SWALLOW_ALLOWED[`${REPEAT_FILE}#plan`];
+    const checked = lines.indexOf(allowed) + 3;
+    expect(checked, 'the allowed line is in plan').toBeGreaterThanOrEqual(3);
+    expect(lines.indexOf('exit 1', checked - 1), 'the sha check ends in exit 1').toBe(checked);
+    expect(lines.indexOf('ref="$sha"')).toBeGreaterThan(checked);
+  });
+
+  it('plan hands its outputs on from its own step', () => {
+    const job = jobNamed(workflowText(REPEAT_FILE), 'plan');
+    const outputs = trimmed(job.keys.find((key) => key.key === 'outputs')?.body ?? []);
+    expect(outputs).toEqual(['attempts: ${{ steps.plan.outputs.attempts }}', 'ref: ${{ steps.plan.outputs.ref }}']);
+    expect(trimmed(job.body)).toContain('id: plan');
+  });
+
+  it('every checkout of the copy and timing jobs takes the ref plan resolved, so all test one commit', () => {
+    const jobs = jobsOf(workflowText(REPEAT_FILE)).filter((job) => job.id !== 'plan');
+    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['copy', 'timing']));
+    for (const job of jobs) expect(checkoutRefProblems(job), job.id).toEqual([]);
+  });
+});
+
+describe('plan checks its inputs as whole values', () => {
+  const plan = (): string[] => jobNamed(workflowText(REPEAT_FILE), 'plan').body;
+  const cases: [string, string[], string[]][] = [
+    ['RUNS', ['1', '5', '10'], ['', '0', '11', '5.0', ' 5', 'abc', '5\nabc', 'abc\n5', '5\n', '\n5', '05']],
+    ['PR', ['1', '42', '999999999'], ['0', '04', '1234567890', '7\n../../x', '42\n', '\n42', '1;echo pwned', '$(echo pwned)']],
+  ];
+
+  it.each(cases)('%s is tested with a bash [[ =~ ]] over the whole value, and the pattern takes and refuses what it should', (name, accepted, refused) => {
+    const check = wholeValueCheck(plan(), name);
+    expect(check, `a whole-value check of ${name}`).not.toBeNull();
+    for (const value of accepted) expect(check?.test(value), JSON.stringify(value)).toBe(true);
+    for (const value of refused) expect(check?.test(value), JSON.stringify(value)).toBe(false);
+  });
+
+  it('no input goes through grep, which would pass a value that has one matching line', () => {
+    expect(inputGrepLines(plan())).toEqual([]);
+  });
+
+  it('each check fails the job with an error line before the input is used', () => {
+    const lines = trimmed(plan());
+    for (const name of ['RUNS', 'PR']) {
+      const at = lines.findIndex((line) => line.startsWith(`if ! [[ $${name} =~`));
+      expect(at, `the ${name} check is in plan`).toBeGreaterThanOrEqual(0);
+      expect(lines[at + 1], name).toMatch(/^echo "::error title=gate-repeat::/);
+      expect(lines[at + 2], name).toBe('exit 1');
+    }
+    // The checks come before the input's first use: the ls-remote and the matrix.
+    const runsAt = lines.findIndex((line) => line.startsWith('if ! [[ $RUNS =~'));
+    const prAt = lines.findIndex((line) => line.startsWith('if ! [[ $PR =~'));
+    expect(prAt).toBeGreaterThan(runsAt);
+    expect(lines.findIndex((line) => line.includes('git ls-remote'))).toBeGreaterThan(prAt);
+    expect(lines.findIndex((line) => line.startsWith('echo "attempts='))).toBeGreaterThan(prAt);
+  });
+});
+
+/** What is wrong with a workflow's permissions: not exactly one top-level `contents: read`, or any job setting its own. */
+function permissionProblems(workflow: string): string[] {
+  const problems: string[] = [];
+  const top = blocksAt(codeLines(workflow), 0).filter((block) => block.key === 'permissions');
+  if (top.length !== 1) problems.push(`${top.length} top-level permissions blocks`);
+  else if (top[0].inline !== '' || JSON.stringify(trimmed(top[0].body)) !== JSON.stringify(['contents: read'])) {
+    problems.push(`top-level permissions: ${[top[0].inline, ...trimmed(top[0].body)].join(' ').trim()}`);
+  }
+  for (const job of jobsOf(workflow)) {
+    if (job.keys.some((key) => key.key === 'permissions')) problems.push(`job ${job.id} sets permissions`);
+  }
+  return problems;
+}
+
+/** The non-comment lines that name a secret, as `secrets.X`, `secrets['X']`, `secrets: inherit` or `${{ secrets }}`. */
+const secretLines = (workflow: string): string[] => codeLines(workflow).filter((line) => /\bsecrets\b/.test(line));
+
+/** What is wrong with a copy job's strategy: copies that stop each other or run one at a time, or a matrix not from `plan`. */
+function strategyProblems(job: Job): string[] {
+  const strategy = job.keys.find((key) => key.key === 'strategy');
+  if (!strategy) return ['no strategy'];
+  const lines = trimmed(strategy.body);
+  const problems = ['fail-fast: false', 'matrix:', 'attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}']
+    .filter((line) => !lines.includes(line))
+    .map((line) => `missing ${line}`);
+  return [...problems, ...lines.filter((line) => line.startsWith('max-parallel')).map((line) => `sets ${line}`)];
+}
+
+describe('the manual workflow gets read access and no secret', () => {
+  const text = (): string => workflowText(REPEAT_FILE);
+
+  it('its top-level permissions are exactly contents: read, and no job sets its own', () => {
+    expect(permissionProblems(text())).toEqual([]);
+  });
+
+  it('no line of it names a secret', () => {
+    expect(secretLines(text())).toEqual([]);
+  });
+});
+
+describe('the copy jobs run side by side and one red copy does not stop the others', () => {
+  it('the copy strategy keeps fail-fast false and the matrix from plan, and sets no max-parallel', () => {
+    expect(strategyProblems(jobNamed(workflowText(REPEAT_FILE), 'copy'))).toEqual([]);
+  });
+});
+
+describe('the workflow checks are not vacuous', () => {
+  const gateJob = [
+    'jobs:',
+    '  gate:',
+    '    name: gate',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 45',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '',
+    '      - name: Gate',
+    '        run: npm run gate:ci',
+  ];
+  const copyJob = (...steps: string[]): string[] => [
+    'jobs:',
+    '  copy:',
+    '    name: repeat ${{ matrix.attempt }}',
+    '    needs: plan',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 45',
+    '    steps:',
+    ...steps,
+  ];
+  const checkout = ['      - uses: actions/checkout@v4'];
+  const refWith = ['        with:', '          ref: ${{ needs.plan.outputs.ref }}'];
+  const gate = (): Job => jobNamed(gateJob.join('\n'), 'gate');
+  const copyStepsOf = (...lines: string[]) => withoutCopyRef(stepsOf(jobNamed(copyJob(...lines).join('\n'), 'copy')));
+  const gateStep = ['      - name: Gate', '        run: npm run gate:ci'];
+
+  it('reads jobs, check names, settings and steps through comments, blank lines and CRLF', () => {
+    const text = ['# a comment', ...gateJob, '      # another', ''].join('\r\n');
+    expect(jobsOf(text).map((job) => job.id)).toEqual(['gate']);
+    expect(checkNameOf(jobNamed(text, 'gate'))).toBe('gate');
+    expect(timeoutOf(jobNamed(text, 'gate'))).toBe(45);
+    expect(stepsOf(jobNamed(text, 'gate'))).toHaveLength(2);
+    expect(checkNameOf(jobNamed(copyJob(...gateStep).join('\n'), 'copy'))).toBe('repeat ${{ matrix.attempt }}');
+    // A job with no name is shown by its id, and a quoted name loses its quotes.
+    expect(checkNameOf({ id: 'build', body: [], keys: [] })).toBe('build');
+    expect(checkNameOf({ id: 'x', body: [], keys: [{ key: 'name', inline: '"gate"', body: [] }] })).toBe('gate');
+  });
+
+  it('finds a step, a setting, a timeout and an extra step that differ from the gate job', () => {
+    const same = copyStepsOf(...checkout, ...refWith, '', ...gateStep);
+    expect(same.removed).toBe(1);
+    expect(same.steps).toEqual(stepsOf(gate()));
+    const changed = copyStepsOf(...checkout, ...refWith, '      - name: Gate', '        run: npm run gate');
+    expect(changed.steps).not.toEqual(stepsOf(gate()));
+    const extra = copyStepsOf(...checkout, ...refWith, ...gateStep, '      - run: echo done');
+    expect(extra.steps).not.toEqual(stepsOf(gate()));
+    const guarded = copyStepsOf(...checkout, ...refWith, ...gateStep, '        if: always()');
+    expect(guarded.steps).not.toEqual(stepsOf(gate()));
+    const slower = jobNamed(copyJob(...gateStep).join('\n').replace('timeout-minutes: 45', 'timeout-minutes: 60'), 'copy');
+    expect(timeoutOf(slower)).not.toBe(timeoutOf(gate()));
+    expect(jobSettings(slower)).not.toEqual(jobSettings(gate()));
+    const env = jobNamed(copyJob(...gateStep).join('\n').replace('    steps:', '    env:\n      CI: x\n    steps:'), 'copy');
+    expect(jobSettings(env)).not.toEqual(jobSettings(gate()));
+    // The identity keys are not settings: the copy's name, needs and strategy are not compared.
+    expect(jobSettings(jobNamed(copyJob(...gateStep).join('\n'), 'copy'))).toEqual(jobSettings(gate()));
+  });
+
+  it('allows the checkout ref and nothing like it', () => {
+    expect(copyStepsOf(...checkout, ...refWith).removed).toBe(1);
+    expect(copyStepsOf(...checkout).removed).toBe(0);
+    // Another `with:` on the checkout, or a ref from somewhere else, is a difference.
+    expect(copyStepsOf(...checkout, '        with:', '          ref: main').removed).toBe(0);
+    expect(copyStepsOf(...checkout, '        with:', '          fetch-depth: 0').removed).toBe(0);
+    expect(copyStepsOf(...checkout, ...refWith, '          fetch-depth: 0').removed).toBe(0);
+    // The ref is allowed on a checkout step only.
+    expect(copyStepsOf('      - uses: actions/setup-node@v4', ...refWith).removed).toBe(0);
+  });
+
+  it('reads the trigger from every form of on:', () => {
+    const on = (...lines: string[]): string[] => triggersOf([...lines, 'jobs:', '  a:', '    runs-on: x'].join('\n'));
+    expect(on('on:', '  workflow_dispatch:', '    inputs:', '      runs:', '        type: number')).toEqual(['workflow_dispatch']);
+    expect(on('on:', '  workflow_dispatch:', '  pull_request:')).toEqual(['workflow_dispatch', 'pull_request']);
+    expect(on('on:', '  push:', '    branches: [main]', '  schedule:', '    - cron: "0 0 * * *"')).toEqual(['push', 'schedule']);
+    expect(on('on:', '  - workflow_dispatch', '  - push')).toEqual(['workflow_dispatch', 'push']);
+    expect(on('on:', '- push')).toEqual(['push']);
+    expect(on('on: push')).toEqual(['push']);
+    expect(on('on: [workflow_dispatch, pull_request]')).toEqual(['workflow_dispatch', 'pull_request']);
+    expect(on('"on":', '  pull_request:')).toEqual(['pull_request']);
+    expect(triggersOf(workflowText(GATE_FILE))).toEqual(['pull_request']);
+  });
+
+  it('finds every way a line lets a failure pass, and none in a plain line or an expression', () => {
+    for (const line of [
+      'run: npm run test:timing || true',
+      'run: npm run test:timing || status=$?',
+      'run: npm run test:timing || :',
+      'run: npm run test:timing || exit 0',
+      '  continue-on-error: true',
+      '  Continue-On-Error: ${{ matrix.x }}',
+      'set +e',
+      'run: npm run test:timing; true',
+      'run: npm run test:timing ; exit 0',
+      '  exit 0',
+      '  shell: bash {0}',
+    ]) {
+      expect(swallowingLines([line]), line).toEqual([line.trim()]);
+    }
+    for (const line of [
+      'run: npm run gate:ci',
+      'group: gate-repeat-${{ inputs.pr || github.ref }}',
+      'if: always()',
+      'if: failure()',
+      'run: set -e',
+      '  exit 1',
+      '  shell: bash',
+    ]) {
+      expect(swallowingLines([line]), line).toEqual([]);
+    }
+  });
+
+  it('finds the timing suite in a job by any of its names, and not in the gate scripts', () => {
+    for (const line of [
+      'run: npm run test:timing',
+      'run: npx vitest run --config vitest.timing.config.mts',
+      'run: npx vitest run tests/timing',
+      'run: npx vitest run x.timing.test.ts',
+    ]) {
+      expect(TIMING_TEXT.test(line), line).toBe(true);
+    }
+    expect(TIMING_TEXT.test('run: npm run gate:ci')).toBe(false);
+  });
+});
+
+describe('the ref, input, permission and strategy checks are not vacuous', () => {
+  const jobWith = (...steps: string[]): Job =>
+    jobNamed(['jobs:', '  copy:', '    runs-on: x', '    steps:', ...steps].join('\n'), 'copy');
+  const checkout = '      - uses: actions/checkout@v4';
+  const refWith = ['        with:', '          ref: ${{ needs.plan.outputs.ref }}'];
+  const workflowWith = (...head: string[]): string => [...head, 'jobs:', '  a:', '    runs-on: x', '    steps:', '      - run: echo'].join('\n');
+
+  it('finds every line that writes an output, the environment or the PATH, and not an ordinary line', () => {
+    for (const line of [
+      'echo "ref=main" >> "$GITHUB_OUTPUT"',
+      'echo ref=main >> $GITHUB_OUTPUT',
+      'echo "ref=main" >> "$GITHUB_ENV"',
+      'echo "::set-output name=ref::main"',
+      'echo /x >> "$GITHUB_PATH"',
+    ]) {
+      expect(outputWrites([`  ${line}`]), line).toEqual([line]);
+    }
+    expect(outputWrites(['echo "Testing the dispatched ref $GITHUB_REF at $GITHUB_SHA"', 'ref="$sha"'])).toEqual([]);
+  });
+
+  it('finds every assignment to ref, and not a use of it', () => {
+    for (const line of ['ref=main', 'ref="refs/pull/$PR/head"', 'export ref=x', 'declare -x ref=1', 'readonly ref=2', 'ref+=x', "ref=''"]) {
+      expect(refAssignments([`  ${line}`]), line).toEqual([line]);
+    }
+    for (const line of ['echo "ref=$ref" >> "$GITHUB_OUTPUT"', 'sha="$(git ls-remote x "refs/pull/$PR/merge")"', 'prefix=1', 'echo $ref']) {
+      expect(refAssignments([line]), line).toEqual([]);
+    }
+  });
+
+  it('finds a checkout that takes no ref, another ref, an extra option, or no checkout at all', () => {
+    expect(checkoutRefProblems(jobWith(checkout, ...refWith))).toEqual([]);
+    expect(checkoutRefProblems(jobWith(checkout))).toHaveLength(1);
+    expect(checkoutRefProblems(jobWith(checkout, '        with:', '          ref: main'))).toHaveLength(1);
+    expect(checkoutRefProblems(jobWith(checkout, '        with:', '          ref: refs/pull/1/head'))).toHaveLength(1);
+    expect(checkoutRefProblems(jobWith(checkout, ...refWith, '          fetch-depth: 0'))).toHaveLength(1);
+    expect(checkoutRefProblems(jobWith('      - uses: actions/setup-node@v4'))).toEqual(['copy: no checkout']);
+    // One good checkout does not excuse a second that takes no ref.
+    expect(checkoutRefProblems(jobWith(checkout, ...refWith, checkout))).toHaveLength(1);
+  });
+
+  it('reads a whole-value check, and finds none in a grep, an unanchored or a half-anchored test', () => {
+    const check = (line: string): RegExp | null => wholeValueCheck([`  ${line}`], 'RUNS');
+    const good = check('if ! [[ $RUNS =~ ^([1-9]|10)$ ]]; then');
+    expect(good?.test('10')).toBe(true);
+    expect(good?.test('5\nabc')).toBe(false);
+    expect(check("if ! printf '%s' \"$RUNS\" | grep -Eq '^([1-9]|10)$'; then")).toBeNull();
+    expect(check('if ! [[ $RUNS =~ ([1-9]|10) ]]; then')).toBeNull();
+    expect(check('if ! [[ $RUNS =~ ^([1-9]|10) ]]; then')).toBeNull();
+    expect(check('if ! [[ $RUNS =~ ([1-9]|10)$ ]]; then')).toBeNull();
+    expect(check('if [[ $RUNS =~ ^([1-9]|10)$ ]]; then')).toBeNull();
+    expect(wholeValueCheck(['if ! [[ $RUNS =~ ^([1-9]|10)$ ]]; then'], 'PR')).toBeNull();
+    // A pattern that is whole-value but too wide is read, and the real test's cases refuse it.
+    expect(check('if ! [[ $RUNS =~ ^[0-9]+$ ]]; then')?.test('11')).toBe(true);
+    // The per-line match the old check made passes a value the whole-value one refuses.
+    expect(/^([1-9]|10)$/m.test('5\nabc')).toBe(true);
+    expect(/^([1-9]|10)$/.test('5\nabc')).toBe(false);
+  });
+
+  it('finds an input handed to grep, and not a grep of something else', () => {
+    for (const line of ['printf \'%s\' "$RUNS" | grep -Eq x', 'echo "$PR" | grep -q 4', 'grep -q x <<< "${PR}"']) {
+      expect(inputGrepLines([line]), line).toEqual([line]);
+    }
+    expect(inputGrepLines(['printf \'%s\' "$sha" | grep -Eq x', 'echo "$PRIOR" | grep x', 'echo "$RUNS"'])).toEqual([]);
+  });
+
+  it('finds permissions that are missing, wider, inline or set on a job, and a secret in any form', () => {
+    expect(permissionProblems(workflowWith('permissions:', '  contents: read'))).toEqual([]);
+    expect(permissionProblems(workflowWith())).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions:', '  contents: write'))).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions:', '  contents: read', '  pull-requests: write'))).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions: write-all'))).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions: read-all'))).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions: {}'))).toHaveLength(1);
+    expect(permissionProblems(workflowWith('permissions:', '  contents: read', 'permissions:', '  contents: read'))).toHaveLength(1);
+    const jobLevel = workflowWith('permissions:', '  contents: read').replace('    runs-on: x', '    runs-on: x\n    permissions:\n      contents: read');
+    expect(permissionProblems(jobLevel)).toEqual(['job a sets permissions']);
+    for (const line of ['  X: ${{ secrets.TOKEN }}', "  X: ${{ secrets['TOKEN'] }}", '    secrets: inherit', '  X: ${{ toJSON(secrets) }}']) {
+      expect(secretLines(`# secrets.A\n${line}\n`), line).toEqual([line]);
+    }
+    expect(secretLines('# secrets.A\nrun: echo "random secretsx"\nrun: npm run env:init\n')).toEqual([]);
+  });
+
+  it('finds a strategy that stops the other copies, runs them one at a time, or takes a matrix not from plan', () => {
+    const copy = (...strategy: string[]): Job =>
+      jobNamed(['jobs:', '  copy:', '    runs-on: x', '    strategy:', ...strategy, '    steps:', '      - run: echo'].join('\n'), 'copy');
+    const matrix = ['      matrix:', '        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}'];
+    expect(strategyProblems(copy('      fail-fast: false', ...matrix))).toEqual([]);
+    expect(strategyProblems(copy('      fail-fast: true', ...matrix))).toEqual(['missing fail-fast: false']);
+    expect(strategyProblems(copy(...matrix))).toEqual(['missing fail-fast: false']);
+    expect(strategyProblems(copy('      fail-fast: false', '      matrix:', '        attempt: [1]'))).toHaveLength(1);
+    expect(strategyProblems(copy('      fail-fast: false', '      max-parallel: 1', ...matrix))).toEqual(['sets max-parallel: 1']);
+    expect(strategyProblems(jobWith('      - run: echo'))).toEqual(['no strategy']);
   });
 });
