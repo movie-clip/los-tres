@@ -29,6 +29,6 @@ export default function globalSetup(): void {
     );
   }
   if (Number(total[2]) < 2) {
-    throw new Error(`e2e setup: expected the 2 demo feeds to import, got ${total[2]}. ${NO_FEED_MESSAGE}`);
+    throw new Error(`e2e setup: expected at least 2 feeds to import, got ${total[2]}. ${NO_FEED_MESSAGE}`);
   }
 }
