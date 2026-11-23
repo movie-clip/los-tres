@@ -166,9 +166,11 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   `docker compose up -d` once, so `app` is recreated with the mount.
 - **Steps:** write the file; place it in the folder; on `/admin/tiendas` create
   the shop and a feed with the source "Archivo de catálogo" and the bare file
-  name (no network); approve the shop, then the feed (two separate approvals,
-  each starts unapproved); run `import-feeds [--feed <id>]`; map the file's
-  categories on `/admin/categorias`; check the product. Registering, approving,
+  name (no network); approve the feed first and leave the shop unapproved (two
+  separate approvals, each starts unapproved; the import reads approved feeds
+  only); run `import-feeds [--feed <id>]`; review the output, `/admin/productos`
+  and `/admin/categorias` while nothing is public, mapping the file's
+  categories there; then approve the shop and check the product. Registering, approving,
   importing or mapping alone publishes nothing: a product is public only with
   both approvals and a mapped category.
 - **File name:** a bare name, at most 100 characters, only letters without
