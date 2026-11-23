@@ -34,6 +34,10 @@ import { assertTestDatabase, resetDatabase } from '../support/db';
 import { fixtureDeps } from '../support/feeds';
 import { stubNetworkOff } from '../support/network-off';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S4.2 (T4.2.3), the writer: ACs 18 to 21, 24, 25 (the record), 26 to 34 (the products follow)
 // and 38 to 40 (guardrail 1). Called directly, as the actions do after the role check; the
 // actions' own refusals are in category-mapping-actions.test.ts. Nothing here runs an import
@@ -61,6 +65,14 @@ const remove = (feedId: number, feedCategory: string) => removeCategoryMapping(c
 function saved(result: CategoryWrite) {
   expect(result.status).toBe('saved');
   return result as Extract<CategoryWrite, { status: 'saved' }>;
+}
+
+/** True while a backend of this database waits on a lock: a blocked row lock shows as wait_event_type Lock. */
+async function lockWaitSeen(): Promise<boolean> {
+  const result = await getDb().execute<{ waiting: number }>(
+    sql`select count(*)::int as waiting from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`,
+  );
+  return (result.rows[0]?.waiting ?? 0) > 0;
 }
 
 describe('setting, changing, marking and removing a record (AC 18 to 21)', () => {
@@ -258,11 +270,20 @@ describe('two submissions at the same moment (AC 25)', () => {
       done = true;
       return result;
     });
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(done, 'the save went through while an import held the feed').toBe(false);
-    expect(await recordsOf(feedId)).toEqual([]);
-
-    release();
+    try {
+      // Wait for the save to be blocked on the lock, not for a fixed time (0006, rule 3):
+      // this database's own backend waiting on a lock can only be the save, because the
+      // importer holds its lock and waits on nothing. A save that finished instead of
+      // waiting ends the loop and fails the assertion below. Only the test timeout
+      // bounds the wait.
+      while (!done && !(await lockWaitSeen())) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(done, 'the save went through while an import held the feed').toBe(false);
+      expect(await recordsOf(feedId)).toEqual([]);
+    } finally {
+      release();
+    }
     await importer;
     expect((await save).status).toBe('saved');
     expect(await recordsOf(feedId)).toHaveLength(1);

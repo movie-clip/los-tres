@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
 import { adminSessions, adminVerifications } from '@/db/schema';
@@ -18,6 +18,10 @@ import {
 } from '../support/admin';
 import { resetDatabase } from '../support/db';
 import { pgErrorOf } from '../support/pg-error';
+
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
 
 // AC 4-7 and guardrail 5 in the admin tables: what is stored for an account and
 // a session, and what is never stored.
@@ -205,7 +209,7 @@ describe('no IP address and no user agent on a session (guardrail 5)', () => {
           id: `s-${Math.random()}`,
           token: `t-${Math.random()}`,
           userId,
-          expiresAt: new Date(Date.now() + 3600_000),
+          expiresAt: new Date('2100-01-01T00:00:00Z'),
           ...extra,
         });
 

@@ -22,6 +22,7 @@ afterAll(async () => {
 
 describe('counted click (S1.1)', () => {
   it('writes exactly one row with the offer, shop, product and a time, and nothing else', async () => {
+    // eslint-disable-next-line no-restricted-syntax -- clock: the click time is stored, and it is checked only within a 60 s window of the present
     const before = Date.now();
     const { offerId, shop, product, url } = await insertGoOffer();
     const response = await callGo(offerId);
@@ -46,6 +47,7 @@ describe('counted click (S1.1)', () => {
     });
     const at = rows[0].createdAt.getTime();
     expect(at).toBeGreaterThan(before - 60_000);
+    // eslint-disable-next-line no-restricted-syntax -- clock: the upper end of the same 60 s window; no load can move a stored time that far
     expect(at).toBeLessThan(Date.now() + 60_000);
   });
 

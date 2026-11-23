@@ -83,4 +83,31 @@ export default defineConfig([
       globals: { process: 'readonly', console: 'readonly' },
     },
   },
+  {
+    // Time in tests (decision 0006, rules 1 and 2): the gate's result must not
+    // depend on how fast or how loaded the machine is, so a unit, integration
+    // or support file reads no clock. tests/timing and tests/e2e are outside
+    // this block on purpose: a real timing belongs in tests/timing, and the e2e
+    // project is not covered by the rule. Member selectors, not call selectors,
+    // so `const now = Date.now` is caught too. The only escape is the
+    // next-line directive with a `clock:` reason, which
+    // tests/unit/gate-determinism.test.ts holds to that exact form.
+    files: ['tests/unit/**/*.ts', 'tests/integration/**/*.ts', 'tests/support/**/*.ts'],
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...[
+          "MemberExpression[object.name='Date'][property.name='now']",
+          "MemberExpression[object.name='performance'][property.name='now']",
+          "MemberExpression[object.name='process'][property.name=/^(hrtime|uptime)$/]",
+          "NewExpression[callee.name='Date'][arguments.length=0]",
+        ].map((selector) => ({
+          selector,
+          message:
+            'Time in tests (0006, rule 1): a unit or integration test does not read the clock. Use a fixed instant or fake timers; a real timing belongs in tests/timing. To compare a stored time with the present, mark the line: // eslint-disable-next-line no-restricted-syntax -- clock: <why load cannot reach it>',
+        })),
+      ],
+    },
+  },
 ]);

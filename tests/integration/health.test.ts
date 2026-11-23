@@ -23,17 +23,16 @@ describe('GET /api/health (C-6)', () => {
     expect(await response.json()).toEqual({ status: 'ok', db: 'up' });
   });
 
-  it('answers 503 with the exact degraded body within 5 s when the database is unreachable', async () => {
+  // The 2 s bound on a database that hangs is proved with fake timers in
+  // tests/unit/health-timeout.test.ts; a closed port fails at once.
+  it('answers 503 with the exact degraded body when the database is unreachable', async () => {
     const port = await unusedPort();
     await closeDb();
     vi.stubEnv('DATABASE_URL', `postgres://nobody:${PASSWORD}@127.0.0.1:${port}/nothing`);
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const started = Date.now();
     const response = await GET();
-    const elapsed = Date.now() - started;
 
-    expect(elapsed).toBeLessThan(5000);
     expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('set-cookie')).toBeNull();

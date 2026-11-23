@@ -20,6 +20,10 @@ import {
 import { resetDatabase } from '../support/db';
 import { nextRequest, redirectOf, startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // AC 8-16: the sign-in and sign-out actions, called as Next calls them, with the
 // request headers and the cookie store replaced by the recording stand-ins in
 // tests/support/next-request.ts. Every refusal is asserted to set no cookie.

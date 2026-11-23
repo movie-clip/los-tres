@@ -53,24 +53,30 @@ describe('the importer holds FOR SHARE on its feed row (S4.2, D-16)', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let parkedNow: () => void = () => undefined;
+    const parked = new Promise<void>((resolve) => {
+      parkedNow = resolve;
+    });
     // The header is read before the transaction opens; the row is pulled inside it.
+    // The second pull is the importer asking for the row, so the transaction is
+    // open and holds the feed row: the source says so, then waits on the gate.
     async function* source(): FeedBytes {
       yield new TextEncoder().encode(CSV_HEADER);
+      parkedNow();
       await gate;
       yield new TextEncoder().encode(CSV_ROW);
     }
 
     const running = importFeeds(getDb(), { feedId, deps: { readSource: async () => source() } });
     try {
-      // The import is parked on the gate, in its transaction: poll until the lock shows.
-      let state = 'free';
-      const deadline = Date.now() + 5000;
-      while (state === 'free' && Date.now() < deadline) {
-        state = await tryFeedSaveLock(feedId);
-        if (state === 'free') await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      expect(state, 'a save could take the feed row while the import was running').toBe('55P03');
-      // Still held a moment later, not a passing blip.
+      // No clock and no poll (0006, rules 1 and 3): wait for the import to say it is
+      // parked. An import that ends first never parks, so the race lets it fail the
+      // assertion below instead of waiting for the test timeout.
+      await Promise.race([parked, running]);
+      expect(await tryFeedSaveLock(feedId), 'a save could take the feed row while the import was running').toBe(
+        '55P03',
+      );
+      // Still held on a second try, not a passing blip.
       expect(await tryFeedSaveLock(feedId)).toBe('55P03');
     } finally {
       release();

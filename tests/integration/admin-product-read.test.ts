@@ -13,6 +13,10 @@ import { consoleMethods } from '../support/admin';
 import { insertFeed, insertOffer, insertProduct, insertShop } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S2.4 (T2.4.1), the admin product reads against the test database: ACs 8 to 10, 12 to 21 and 22 to
 // 25 (the data), 18 and 57 (nothing of the term in a log), 24 (no address anywhere in the output).
 // "Public now" is compared with the public product page for the same slug (AC 10).

@@ -12,6 +12,10 @@ import { allClicks, callGo } from '../support/go';
 import { allRows } from '../support/hide';
 import { startAdminRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // US-2.4 AC 62: opening either admin product screen writes nothing and changes no public page, sitemap
 // file or /go answer. The two pages are the real page modules, rendered as a signed-in admin.
 

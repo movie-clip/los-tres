@@ -47,7 +47,7 @@ describe('money columns (guardrail 4)', () => {
         externalId: 'zero',
         priceCents: price,
         url: 'https://affiliate.example/x',
-        priceUpdatedAt: new Date(),
+        priceUpdatedAt: new Date('2026-01-01T00:00:00Z'),
       }),
     );
     expect(error).toEqual({ code: '23514', constraint: 'offers_price_cents_positive' });
@@ -71,7 +71,7 @@ describe('default-deny (guardrail 1)', () => {
         externalId: 'e',
         priceCents: 100,
         url: 'https://affiliate.example/x',
-        priceUpdatedAt: new Date(),
+        priceUpdatedAt: new Date('2026-01-01T00:00:00Z'),
       })
       .returning();
 
@@ -114,7 +114,7 @@ describe('integrity constraints', () => {
       externalId: 'same',
       priceCents: 100,
       url: 'https://affiliate.example/x',
-      priceUpdatedAt: new Date(),
+      priceUpdatedAt: new Date('2026-01-01T00:00:00Z'),
     };
     await getDb().insert(offers).values(row);
     const error = await pgErrorOf(getDb().insert(offers).values(row));

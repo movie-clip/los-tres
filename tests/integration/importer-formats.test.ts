@@ -20,6 +20,10 @@ import {
 } from '../support/feeds';
 import { stubNetworkOff } from '../support/network-off';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // XML and gzip feeds through the whole importer (issue #29): the same data in
 // four encodings reports the same, a failure part-way writes nothing, and the
 // source is released and read lazily. No network: every source is a local one.
@@ -280,7 +284,6 @@ describe('a large feed streams', () => {
       }
     }
 
-    const started = Date.now();
     const report = await importFeeds(getDb(), { deps: { readSource: async () => source() } });
     expect(report.feeds[0]).toMatchObject({
       feedId,
@@ -299,6 +302,7 @@ describe('a large feed streams', () => {
     expect(sequenceAtPull[0]).toBe(0);
     expect(sequenceAtPull[middle]).toBeGreaterThan(0);
     expect(sequenceAtPull[middle]).toBeLessThan(ROWS);
-    expect(Date.now() - started).toBeLessThan(25_000);
-  }, 30_000);
+    // A hang guard, not a speed requirement (0006, rule 4): the import takes about
+    // 8 s here (10 s in the duration scan), so the timeout is over ten times that.
+  }, 120_000);
 });

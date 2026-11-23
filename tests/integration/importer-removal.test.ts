@@ -34,6 +34,10 @@ import { allRows } from '../support/hide';
 import { EAN, MAPPED, aFeedOf, importRows, keyRow, mapFeed } from '../support/matching';
 import { stubNetworkOff } from '../support/network-off';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // S3.3 (T3.3.2): the removal pass of the importer. An offer of a feed that an import no longer lists is
 // flagged `is_removed` and leaves every public surface; one that is listed again comes back. The guard
 // skips a pass that looks like a broken file, and `allowLargeRemoval` lifts only its small-import half.

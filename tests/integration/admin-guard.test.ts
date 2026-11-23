@@ -27,6 +27,10 @@ import {
 import { resetDatabase } from '../support/db';
 import { nextRequest, redirectOf, startAdminRequest, startRequest } from '../support/next-request';
 
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
+
 // Guardrail 3 at the guard (AC 14, 17-21): every kind of cookie that is not a
 // live session is treated exactly as no cookie, a live one is accepted, and a
 // store that cannot be reached refuses. Run on a page check, an action check
@@ -311,7 +315,9 @@ describe('the session lifetime (D-9, AC 14)', () => {
     await createAdmin();
     const { token } = await signInForCookie();
     const [row] = await getDb().select().from(adminSessions).where(eq(adminSessions.token, token));
-    expect(row.expiresAt.getTime()).toBeGreaterThan(Date.now() + 7.9 * 3600_000);
-    expect(row.expiresAt.getTime()).toBeLessThan(Date.now() + 8.1 * 3600_000);
+    // eslint-disable-next-line no-restricted-syntax -- clock: a real sign-in stores its end, checked within a 6 minute window of the present
+    const now = Date.now();
+    expect(row.expiresAt.getTime()).toBeGreaterThan(now + 7.9 * 3600_000);
+    expect(row.expiresAt.getTime()).toBeLessThan(now + 8.1 * 3600_000);
   });
 });

@@ -1,12 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb } from '@/db/client';
 
 import { ADMIN_EMAIL, ADMIN_PASSWORD, accountRows, sessionRows, signInForCookie, userRows } from '../support/admin';
 import { resetDatabase } from '../support/db';
+
+// A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
+// default of 5 s is not.
+vi.setConfig({ testTimeout: 30_000 });
 
 // The create-admin command (AC 2-5, AC 28), run as the image runs it: the
 // compiled dist/cli/create-admin.js under node with the react-server condition,
