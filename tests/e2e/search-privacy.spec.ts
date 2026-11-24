@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
+import { unusedPort } from '../support/net';
 
 // US-5.4 ACs 31 and 32 (guardrail 5, D-3): the search term is never logged and never stored.
 // Proved against the running Compose stack with a marker nobody else types:
@@ -97,22 +98,31 @@ test.describe('the search term is never logged or stored (AC 31, 32)', () => {
 
   test('a failing search shows the generic error page and logs only a fixed code', async ({ browser }) => {
     const name = `los-tres-e2e-search-fail-${marker}`;
+    // #361: the server shares the host's network (`--network host`), so starting and removing it creates
+    // and removes no network interface, which would cancel the page loads of a browser waiting on a
+    // socket. The image is the Compose app's, run with its own port and a database nobody listens on.
+    const image = spawnSync('docker', ['compose', 'config', '--images'], { encoding: 'utf8', timeout: 60_000 })
+      .stdout.split(/\s+/)
+      .find((entry) => entry !== '' && !entry.startsWith('postgres'));
+    expect(image, 'the app image name from compose config').toBeTruthy();
+    const siteName = process.env.SITE_NAME?.trim();
+    expect(siteName, 'SITE_NAME is set in .env').toBeTruthy();
+    const port = await unusedPort();
+    const origin = `http://127.0.0.1:${port}`;
     const run = docker(
       [
-        'compose', 'run', '-d', '--no-deps', '--name', name, '-p', '127.0.0.1::3000',
+        'run', '-d', '--name', name, '--network', 'host',
         '--entrypoint', 'node',
+        '-e', `PORT=${port}`,
+        '-e', 'HOSTNAME=127.0.0.1',
+        '-e', `SITE_NAME=${siteName}`,
         '-e', 'DATABASE_URL=postgres://x:x@127.0.0.1:1/x',
-        'app', 'server.js',
+        image!, 'server.js',
       ],
       { timeout: 120_000 },
     );
     try {
       expect(run.status, run.out).toBe(0);
-
-      const mapping = docker(['port', name, '3000/tcp']).out.trim().split(/\r?\n/)[0] ?? '';
-      const port = /:(\d+)$/.exec(mapping)?.[1];
-      expect(port, `docker port said: ${mapping}`).toBeDefined();
-      const origin = `http://127.0.0.1:${port}`;
 
       // Wait for the server: robots.txt needs no database.
       let ready = false;
@@ -137,11 +147,7 @@ test.describe('the search term is never logged or stored (AC 31, 32)', () => {
       const response = await page.goto(`${origin}/buscar?q=${marker}`);
       expect(response?.status()).toBe(500);
       const error = page.getByTestId('public-error');
-      // #361: the boundary is a client component, so it appears only once React hydrates Next's
-      // empty 500 shell. On a loaded CI runner (two workers, two app containers) the default 5 s
-      // expect timeout was not enough once. The wait is for the observable state, with a longer
-      // timeout local to this assertion; no retry, no sleep (0006 rules 3 and 6).
-      await expect(error).toBeVisible({ timeout: 30_000 });
+      await expect(error).toBeVisible();
       await expect(error).toContainText(messages.Error.heading);
       await expect(error).toContainText(messages.Error.body);
       expectNoSecret((await page.locator('body').innerText()).trim(), 'the visible error page');

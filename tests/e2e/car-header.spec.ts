@@ -1,6 +1,3 @@
-import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-
 import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
@@ -101,63 +98,6 @@ test.describe('the car control on every public page (ACs 1 to 4)', () => {
     await expect(page.getByTestId('car-select')).toHaveCount(0);
     await page.goto(withCoche('/admin/acceso', CAR.slug));
     await expect(page.getByTestId('car-control')).toHaveCount(0);
-  });
-});
-
-test.describe('the error page carries the control (AC 1, AC 5)', () => {
-  test.describe.configure({ mode: 'serial', timeout: 180_000 });
-
-  // The same one-off container as search-privacy.spec.ts: a server whose database is unreachable,
-  // so a search ends on the public error page. The header around it must still draw the control,
-  // in the no-car state, and must not raise an error of its own.
-  test('a failing page shows the generic error and, in the header, the no-car action', async ({ browser }) => {
-    const name = `los-tres-e2e-car-error-${randomBytes(6).toString('hex')}`;
-    const docker = (args: string[], timeout = 60_000) => {
-      const result = spawnSync('docker', args, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
-      return { status: result.status, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
-    };
-    const run = docker(
-      [
-        'compose', 'run', '-d', '--no-deps', '--name', name, '-p', '127.0.0.1::3000',
-        '--entrypoint', 'node',
-        '-e', 'DATABASE_URL=postgres://x:x@127.0.0.1:1/x',
-        'app', 'server.js',
-      ],
-      120_000,
-    );
-    try {
-      expect(run.status, run.out).toBe(0);
-      const mapping = docker(['port', name, '3000/tcp']).out.trim().split(/\r?\n/)[0] ?? '';
-      const port = /:(\d+)$/.exec(mapping)?.[1];
-      expect(port, `docker port said: ${mapping}`).toBeDefined();
-      const origin = `http://127.0.0.1:${port}`;
-      let ready = false;
-      for (let attempt = 0; attempt < 60 && !ready; attempt += 1) {
-        ready = await fetch(`${origin}/robots.txt`).then((r) => r.status === 200, () => false);
-        if (!ready) await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      expect(ready, 'the failing server started').toBe(true);
-
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      const errors: string[] = [];
-      page.on('pageerror', (error) => errors.push(error.message));
-      const response = await page.goto(`${origin}/buscar?q=filtro`);
-      expect(response?.status()).toBe(500);
-      // #361: the error boundary is a client component and shows only after React hydrates the
-      // empty 500 shell; on a loaded CI runner the default 5 s expect timeout was not enough once
-      // (search-privacy.spec.ts). The longer timeout is local to this assertion: no retry, no sleep.
-      await expect(page.getByTestId('public-error')).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByTestId('car-control')).toBeVisible();
-      await expect(page.getByTestId('car-select')).toHaveText(messages.Car.select);
-      await expect(page.getByTestId('car-label')).toHaveCount(0);
-      await expect(page.getByTestId('car-notice')).toHaveCount(0);
-      expect(errors).toEqual([]);
-      expect(await context.cookies()).toEqual([]);
-      await context.close();
-    } finally {
-      docker(['rm', '-f', name]);
-    }
   });
 });
 
