@@ -1,7 +1,8 @@
 # 0006 — Quality gate: ESLint, tsc, Vitest, Playwright
 
 Status: accepted, 2026-10-12. Revised 2026-10-16 for the price-comparison
-scope. Amended 2026-11-23: time in tests (the last section).
+scope. Amended 2026-11-23: time in tests (below). Amended 2026-11-24: test
+levels, the fast check and budgets (the last section).
 
 ## Decision
 
@@ -11,11 +12,9 @@ The gate every slice must pass:
 - **`tsc --noEmit`** for types
 - **Vitest** for unit and integration tests, integration tests against a real
   PostgreSQL
-- **Playwright** for the key flows end to end:
-  - search → product page → offers sorted by price → the `/go/<offer>`
-    redirect logs the click and lands on the affiliate URL;
-  - an admin approves a feed, runs "Import now" and reads the import report;
-  - an admin resolves a matching-queue item and uploads a product image.
+- **Playwright** for what only a browser or the built server can show, as the
+  2026-11-24 amendment lists (rule 12); it replaces the key flows first listed
+  here.
 
 The first slice that adds code puts the exact commands in `CLAUDE.md` §
 Commands.
@@ -148,3 +147,128 @@ requests, not to test files, and no pin reads it.
 negatives (aliased or computed access such as `Date['now']` or
 `const { now } = Date`, SQL time functions such as `now()`, and sleeps); the
 integration review covers them.
+
+## Amendment 2026-11-24: test levels, the fast check and budgets
+
+Owner rulings of 2026-11-22 (the body of issue #338), 2026-11-23 (the comment
+"growth control") and 2026-11-23 (the comment "UI test rule"); issue #338. The
+rules continue the numbering of the amendment above.
+
+8. **The fast check.** `npm run check` runs `lint`, `typecheck`, `db:up` and
+   all of Vitest (`npm test`, both projects, every file): no image build, no
+   Playwright, no changed-files subset. Build lanes verify with it while they
+   build. The full `npm run gate` runs at the integration review, before every
+   pull request and in CI, and decides "done". `gate` and `gate:ci` start with
+   `npm run check`, so the shared steps have one definition. The scripts read:
+   `"check": "npm run lint && npm run typecheck && npm run db:up && npm test"`,
+   `"gate": "npm run check && npm run stack:up && npm run test:e2e"` and
+   `"gate:ci": "npm run check && npm run stack:up && npm run test:e2e:ci"`.
+9. **The test level.** A behaviour is tested at the lowest level that can
+   observe it.
+   - Unit: pure logic, static renders and repository scans.
+   - Integration: anything observable by calling a page, handler, action or CLI
+     in-process against PostgreSQL.
+   - E2E: what needs a browser, or the built server or image: headers from
+     `next.config.ts`, proxy rewrites, Set-Cookie on the wire, entrypoint
+     verbs.
+10. **One test per behaviour.** A behaviour has one level. An acceptance
+    criterion is proved once, at the lowest level rule 9 allows; a second test
+    of it at a higher level needs a reason written in the story's test report.
+    The standing exception is one smoke e2e per page family (rule 11).
+11. **UI tests assert behaviour and structure, not presentation.** The site is
+    an MVP whose look will change often: a UI test fails only when a visitor or
+    admin would lose something, never because a page was restyled or
+    rearranged. An e2e test may be:
+    - a smoke test, one per page family: the page loads with the right status,
+      the ARIA snapshot (`toMatchAriaSnapshot`) of its main region matches, and
+      the browser console has no error. A snapshot covers one region, never the
+      whole page, and uses patterns for values that change (prices, counts,
+      dates). The page families are home, category, product, search, car
+      picker, legal pages, 404, admin sign-in, admin shops and feeds, admin
+      products and admin categories;
+    - a journey (rule 12);
+    - a built-server check, as rule 9 describes;
+    - a guardrail e2e, frozen: `admin.spec.ts`, `search-privacy.spec.ts` and the
+      unapproved-feed mapping test of `admin-categories.spec.ts` (issue #339);
+    - one reflow check per public page family: no sideways scroll at 390 px.
+      It is the only geometry assertion allowed.
+
+    An e2e test may not be a pixel or geometry assertion (a height, width,
+    position, line count or same-row check); a test of one element's presence,
+    label or text, which the ARIA snapshot of its region covers; or a second
+    copy of behaviour a lower level already proves. Locators go by role and
+    accessible name first; `data-testid` only where no role or name identifies
+    the element. Message text that is logic (plurals, formatting) stays tested
+    at unit level. Outside this rule, for a later owner call: screenshot
+    comparison, until the design settles, and an automated accessibility scan
+    (axe), because it is a new dependency. Existing specs are brought under the
+    rule by issue #339. Until then no new `@layout` test is written, and the
+    existing tag and `test:e2e:ci` stay.
+12. **The journeys.** The e2e journeys are the list below, 12 entries; a new
+    journey is added by a story that names it. This list corrects the key flows
+    the Decision first named: it keeps the first, corrects the second and
+    removes two entries whose features are deferred.
+13. **Budgets.** On the dev machine, the one where `npm run gate` is the gate:
+    `check` 90 s, integration 60 s, e2e 90 s, full gate 4 min. Each is measured
+    with `time` on the command alone, in that order after the build is final,
+    on a warm Docker and database: `npm run check`, `npm run test:integration`,
+    `npm run gate`, then `npm run test:e2e` against the stack the gate left up.
+    Nothing else heavy runs during a measurement, and the report records the CPU
+    count and `INTEGRATION_WORKERS`. The e2e and full-gate budgets are
+    provisional until issue #363 lands: they are reported, and rule 14 applies
+    to them from that merge, when both are measured again.
+14. **Budgets are checked.** The integration review reports the measured
+    `check`, integration, e2e and full-gate times next to the budgets. A story
+    that takes a step over its budget trims in the same pull request or stops
+    for an owner ruling; it is not merged over budget silently.
+15. **Counts per story.** The integration review states the tests added and
+    removed per level (unit, integration, e2e). Runner totals at HEAD come from
+    the `Tests` lines of `npm run test:unit` and `npm run test:integration` and
+    from `npx playwright test --list`. Added and removed come from the
+    declarations in the diff against `main`, which undercount parametrised
+    tests; the report says so beside the numbers.
+
+### Journeys
+
+Each entry names the spec that holds it today.
+
+| # | Journey | Today in |
+|---|---|---|
+| J1 | search, product page, offers sorted by price, `/go/<offer>` logs the click and redirects | `search.spec.ts`, `product.spec.ts`, `go.spec.ts` |
+| J2 | home, category, product through the category tree | `home.spec.ts`, `category.spec.ts`, `product.spec.ts` |
+| J3 | header search from a public page to `/buscar` | `header-search.spec.ts` |
+| J4 | car selection in the dialog, by mouse and keyboard, then a listing for that car | `car-dialog.spec.ts`, `category-car.spec.ts` |
+| J5 | car selection with JavaScript off through `/mi-coche` and back | `car-picker-nojs.spec.ts` |
+| J6 | the stored car restored on a later visit, and removed | `car-storage.spec.ts` |
+| J7 | with a car: listing to product with its fit banner, `coche` kept on links and through the click-out | `car-links.spec.ts`, `product-fit.spec.ts`, `car-cross-cutting.spec.ts` |
+| J8 | admin sign-in, a refused sign-in, sign-out (also a guardrail e2e) | `admin.spec.ts` |
+| J9 | an admin registers a shop and a feed through the forms and approves them | `admin-feeds.spec.ts`, `admin-sources.spec.ts`, `collected-admin.spec.ts` |
+| J10 | an admin maps a feed category | `admin-categories.spec.ts` |
+| J11 | an admin hides and unhides a product, and the public page follows | `admin-products.spec.ts` |
+| J12 | catalogue file: file placed, feed registered, two approvals, `import-feeds`, mapping, public product, removal | `catalogue-file-flow.spec.ts` |
+
+J9 corrects the earlier second flow: approving a feed is live, but "Import now"
+and the stored import report are deferred (`CLAUDE.md` § Stack, data source;
+`docs/product/mvp.md`, S3.2); the import is the `import-feeds` command.
+
+Two entries of the earlier key flows are removed because their features are
+deferred:
+
+- "an admin resolves a matching-queue item": the review queue is deferred (0008;
+  `docs/product/mvp.md`, S7.2).
+- "an admin uploads a product image": product images are deferred
+  (`docs/product/mvp.md`, S8.1).
+
+**Not weakened.** Each of the five guardrails keeps its failing-if-broken tests
+at their current levels. The guardrails, money, visibility, import and matching
+keep their tests at integration level, and message text that is logic stays at
+unit level. `gate` keeps every step it has today.
+
+**What enforces them.**
+
+| Rule | Checked by |
+|---|---|
+| 8 (the steps) | `tests/unit/gate-determinism.test.ts`, pinned: `check` expands to `lint`, `typecheck`, `db:up`, `test` in order; nothing reached from it, hooks included, is `stack:up`, an e2e run, `build`, `dev` or text with `playwright` or `--build`; `scripts.test` is `vitest run`; `gate` and `gate:ci` expand to the steps of `check` plus `stack:up` and `test:e2e` (`test:e2e:ci`); each of the three is bare npm calls joined by `&&`. The walk of rule 5 now also starts from `check`, so no timing run is reachable from it. A change to the gate's step list updates those literals on purpose. |
+| 8 (lanes verify with it) | The work orders and the integration review. Nothing machine-checks which command a lane ran. |
+| 9, 10, 11, 12 | The integration review only. Nothing machine-checks the level of a test, its locators or the journey list. |
+| 13, 14, 15 | The integration review only. Nothing machine-checks a time or a count; the numbers are measured by the commands rule 13 names. |
