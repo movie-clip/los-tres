@@ -119,8 +119,7 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
 
 - [ ] Every guardrail above checked against your diff, with any tension named
       in `risks`
-- [ ] Lint and test commands from `CLAUDE.md` § Commands run and passing, or
-      their absence reported
+- [ ] `npm run check` run and passing (0006 rule 8); the full `npm run gate` runs at the integration review
 - [ ] Contract notes emitted for every field the frontend will consume
 - [ ] A change to feeds or the importer is verified with a real import on a scratch database, not the dev volume (create db, set `DATABASE_URL`, migrate, seed, import, drop)
 - [ ] Compose logs checked for no feed URL, database URL or `.example` host

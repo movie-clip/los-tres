@@ -54,10 +54,10 @@ function tsFilesUnder(dir: string): string[] {
     .sort();
 }
 
-// The scripts the gate runs directly, and the lifecycle scripts `npm ci` runs on the
+// The scripts the gate and the fast check run directly, and the lifecycle scripts `npm ci` runs on the
 // way in. A script reached from any of them, by a call or by an npm pre or post hook,
 // runs inside the gate.
-const GATE_SCRIPTS = ['test', 'test:unit', 'test:integration', 'gate', 'gate:ci'];
+const GATE_SCRIPTS = ['test', 'test:unit', 'test:integration', 'check', 'gate', 'gate:ci'];
 const GATE_ENTRIES = [...GATE_SCRIPTS, 'preinstall', 'install', 'postinstall', 'prepare'];
 const TIMING_TEXT = /test:timing|vitest\.timing|tests\/timing|\.timing\.test/;
 
@@ -219,8 +219,91 @@ describe('the script check is not vacuous', () => {
 
   it('finds nothing in scripts that never reach it, even when test:timing exists', () => {
     expect(timingRuns(clean, scriptsReached(clean, GATE_ENTRIES))).toEqual([]);
-    const unreached = { ...clean, check: 'npm run test:timing', pretiming: 'npm run lint' };
+    const unreached = { ...clean, bench: 'npm run test:timing', pretiming: 'npm run lint' };
     expect(timingRuns(unreached, scriptsReached(unreached, GATE_ENTRIES))).toEqual([]);
+  });
+});
+
+/**
+ * The leaf scripts a script runs, in order: every `npm run <name>` and `npm test` call
+ * expanded depth first, a script with no npm call being a leaf. A cycle, or a call to a
+ * script that does not exist, throws.
+ */
+function steps(scripts: Record<string, string>, name: string, trail: string[] = []): string[] {
+  if (trail.includes(name)) throw new Error(`script cycle: ${[...trail, name].join(' -> ')}`);
+  const text = scripts[name];
+  if (text === undefined) throw new Error(`no script named ${name}`);
+  const called = npmCalls(text);
+  if (called.length === 0) return [name];
+  return called.flatMap((next) => steps(scripts, next, [...trail, name]));
+}
+
+/** One `&&` segment that is an npm call and nothing else: `npm run <name>` or `npm test`. */
+const NPM_ONLY_SEGMENT = /^npm (?:run [A-Za-z0-9:_.-]+|test)$/;
+
+/** The `&&` segments of a script text that are not a bare npm call; any `;`, `||`, `|` or newline lands inside one. */
+function nonNpmSegments(text: string): string[] {
+  return text.split('&&').map((segment) => segment.trim()).filter((segment) => !NPM_ONLY_SEGMENT.test(segment));
+}
+
+describe('npm run check is the first part of the gate (0006 rule 8, issue #338)', () => {
+  const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
+  const checkSteps = ['lint', 'typecheck', 'db:up', 'test'];
+
+  it('runs lint, typecheck, db:up and test, in that order', () => {
+    expect(steps(scripts, 'check')).toEqual(checkSteps);
+  });
+
+  it('reaches no image build, no e2e run, no server and no Playwright, even through a hook', () => {
+    const reached = scriptsReached(scripts, ['check']);
+    for (const name of ['stack:up', 'test:e2e', 'test:e2e:ci', 'test:e2e:install', 'build', 'dev']) {
+      expect(reached.has(name), name).toBe(false);
+    }
+    for (const name of reached) {
+      expect(scripts[name] ?? '', name).not.toMatch(/playwright|--build/);
+    }
+    // Nothing else is reached either: a pre or post hook added to a step would run in the check.
+    expect([...reached].sort()).toEqual(['check', ...checkSteps].sort());
+  });
+
+  it('runs all of Vitest: test is `vitest run`, with no project, filter or changed-files flag', () => {
+    expect(scripts.test).toBe('vitest run');
+  });
+
+  it('is what gate and gate:ci start with, and they keep every step they had, in order', () => {
+    expect(steps(scripts, 'gate')).toEqual([...steps(scripts, 'check'), 'stack:up', 'test:e2e']);
+    expect(steps(scripts, 'gate:ci')).toEqual([...steps(scripts, 'check'), 'stack:up', 'test:e2e:ci']);
+    // The comparison holds real steps, or two empty lists would pass.
+    expect(steps(scripts, 'gate').length).toBe(6);
+    expect(steps(scripts, 'gate:ci').length).toBe(6);
+  });
+
+  it.each(['check', 'gate', 'gate:ci'])('%s joins its steps with && and nothing else, each an npm call', (name) => {
+    expect(scripts[name], name).toBeDefined();
+    expect(nonNpmSegments(scripts[name])).toEqual([]);
+  });
+});
+
+describe('the check-step helpers are not vacuous', () => {
+  const synthetic: Record<string, string> = { a: 'npm run b && npm test', b: 'eslint .', test: 'vitest run' };
+
+  it('steps expands calls depth first into leaves', () => {
+    expect(steps(synthetic, 'a')).toEqual(['b', 'test']);
+    expect(steps({ ...synthetic, c: 'npm run a && npm run b' }, 'c')).toEqual(['b', 'test', 'b']);
+  });
+
+  it('steps throws on a cycle and on a call to a missing script', () => {
+    expect(() => steps({ ...synthetic, b: 'npm run b' }, 'a')).toThrow(/cycle/);
+    expect(() => steps({ ...synthetic, b: 'npm run c' }, 'a')).toThrow(/cycle|no script named c/);
+    expect(() => steps({ ...synthetic, a: 'npm run missing' }, 'a')).toThrow(/no script named missing/);
+  });
+
+  it('nonNpmSegments accepts a chain of npm calls and finds a raw command, a semicolon, an or and a pipe', () => {
+    expect(nonNpmSegments('npm run lint && npm run db:up && npm test')).toEqual([]);
+    expect(nonNpmSegments('npm run lint && docker compose up')).toEqual(['docker compose up']);
+    expect(nonNpmSegments('npm run lint; npm run db:up && npm test')).toEqual(['npm run lint; npm run db:up']);
+    expect(nonNpmSegments('npm run lint || npm test')).toEqual(['npm run lint || npm test']);
+    expect(nonNpmSegments('npm run lint && npm test | tee out')).toEqual(['npm test | tee out']);
   });
 });
 

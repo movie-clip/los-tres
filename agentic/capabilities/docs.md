@@ -43,6 +43,8 @@ owner did not approve. A stack decision produces a `docs/decisions/` file
 **and** the matching `CLAUDE.md` § Stack line, both in the same order. Change
 nothing else in `CLAUDE.md`.
 
+Skills: before you edit `CLAUDE.md` (agent-facing text every lane loads), call the Skill tool for `writing-for-agents`; before you write or amend a file in `docs/decisions/`, call it for `domain-modeling`. Record each call, or why it was not made, in `skill_calls`.
+
 ## Recording the design system
 
 When the run's UX spec says `direction: new` or `direction: changed` and

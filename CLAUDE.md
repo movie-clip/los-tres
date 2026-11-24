@@ -73,8 +73,10 @@ line here is the owner's call: propose it and stop.
 
 ## Commands
 
-npm and Node 22 (`.nvmrc`). **`npm run gate` is the gate**: every lane and the
-integration check run it. A story is not done until it exits 0.
+npm and Node 22 (`.nvmrc`). **`npm run gate` is the gate**: the
+integration review runs it, it runs before every pull request and in CI, and a
+story is not done until it exits 0. Build lanes verify with `npm run check`
+while they build (0006 rule 8).
 
 First run on a fresh clone: `npm ci`, `npm run env:init`,
 `npm run test:e2e:install`. The gate also needs Docker running and a free host
@@ -273,11 +275,12 @@ deploy it must be the public https origin**, or all of them point at
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
 | e2e | `npm run test:e2e` (`playwright test`; its setup runs `docker compose run --rm -T --no-deps app import-feeds`) | `npm run stack:up` with `SEED_DEMO_DATA=true`, Playwright browser |
 | e2e (CI) | `npm run test:e2e:ci` (`playwright test --grep-invert @layout`: `test:e2e` without the specs tagged `@layout`) | as `test:e2e` |
+| check | `npm run check` (`lint`, `typecheck`, `db:up`, `test`: all of Vitest; no image build, no Playwright; budget 90 s, 0006 rule 13) | Docker running, `.env` |
 | **gate** | `npm run gate` | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
 | gate (CI) | `npm run gate:ci` (`gate` with `test:e2e:ci` as its last step; what CI runs) | as `gate` |
 
-`npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
-in that order. It rebuilds the app image and runs the e2e against the Compose
+`npm run gate` is `npm run check` (`lint`, `typecheck`, `db:up`, `test`), then
+`stack:up` and `test:e2e`, in that order. It rebuilds the app image and runs the e2e against the Compose
 stack, so it takes minutes, and it leaves the stack running. Playwright has three
 projects, `chromium`, then `containers` (the specs that start a container) on one
 worker, then `catalogue-file` (#361). `typecheck` in the
@@ -296,6 +299,11 @@ files run in parallel, one per worker. The default worker count is
 the shell (Bash: `INTEGRATION_WORKERS=2 npm run test:integration`; PowerShell:
 `$env:INTEGRATION_WORKERS=2; npm run test:integration`) sets it; `.env` is
 not read for it. A value that is not a positive whole number fails the run.
+
+Budgets on the dev machine (0006 rules 13 to 15): `check` 90 s, integration
+60 s, e2e 90 s, full gate 4 min; the integration review reports the measured
+times and the tests added and removed per level. The e2e and full-gate budgets
+are provisional until #363.
 
 **Time in tests (0006, § Amendment 2026-11-23).** The unit, integration and
 support test files do not use `Date.now()`, `performance.now()`,
