@@ -156,6 +156,13 @@ exists. `phases.md`'s `verify` rows are what `check_report.py` reads.
 
 - **The gate is `npm run gate`** (`CLAUDE.md` § Commands): lint, typecheck,
   tests and e2e against the Compose stack.
+- **Build lanes verify with `npm run check`** while they build (decision 0006
+  rule 8): lint, typecheck and all of Vitest, no image build, no Playwright.
+  The full gate still decides "done".
 - **`integration` cannot pass a build until the gate exits 0**
   (`architecture.md` § Integration review).
+- **`integration` reports times and counts** (decision 0006 rules 13 to 15):
+  the measured `check`, integration, e2e and full-gate times next to their
+  budgets, and the tests added and removed per level. A step over its budget
+  is trimmed in the same pull request or stops for an owner ruling.
 - **Git and GitHub:** `CLAUDE.md` § Git and tickets.
