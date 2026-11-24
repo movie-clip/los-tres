@@ -63,7 +63,7 @@ function quoted(name: string): string {
  * migrations apply from nothing and never carries a stale schema. The clones
  * stay after the run for inspection and the next run drops them. The drop
  * matches `isIntegrationDatabase` only, so it never touches the development
- * database or the throwaway databases `startIsolatedApp` creates. On failure
+ * database or the e2e project's database. On failure
  * the message names host, port and the fix, never the URL or the password.
  */
 export default async function setup(project: TestProject): Promise<void> {

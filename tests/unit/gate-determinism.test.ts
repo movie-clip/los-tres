@@ -1179,11 +1179,6 @@ describe('the ref, input, permission and strategy checks are not vacuous', () =>
 // text: it cannot import from tests/, and nothing here imports it.
 
 const CONFIG_FILE = 'playwright.config.ts';
-/**
- * A support file the specs no longer use, whose `git rm` no lane can run (#363, T2 hand-off): nothing may import
- * it, and the scans below skip it while the file is still on disk. Once it is removed the constant is dead.
- */
-const SUPERSEDED_HELPER = 'tests/support/isolated-app.ts';
 const SERIAL_DEFINITION =
   "const SERIAL = new RegExp(`(^|[\\\\\\\\/])(${SERIAL_SPECS.join('|')})\\\\.spec\\\\.ts$`);";
 /** A spec that writes a database: SQL through `psql`, a verb inside the app, or the create-admin command. */
@@ -1290,13 +1285,11 @@ const COMPOSE_IDENTITY_FLAG = /['"](?:-p|--project-name|-f|--file)['"]/;
 const DOCKER_PROCESS = /\b(?:spawn|exec|execFile)(?:Sync)?\(\s*['"]docker\b/;
 /**
  * A source that builds, starts, stops or removes a container or a network: a lifecycle verb of `docker` or
- * `docker compose` as a quoted argument of an argument list, `startIsolatedApp(`, or `--network`. `exec` is not
+ * `docker compose` as a quoted argument of an argument list, or `--network`. `exec` is not
  * one: it runs a process inside a container that is already up.
  */
 const LIFECYCLE =
-  /[[,]\s*['"](?:run|rm|create|start|stop|kill|restart|up|down|build|pause|unpause)['"]\s*[,\]]|\bstartIsolatedApp\(|--network/;
-/** An import of the superseded isolated-app helper, or a call of its one function. */
-const ISOLATED_APP_IMPORT = /from\s+['"][^'"]*\/isolated-app['"]|\bstartIsolatedApp\(/;
+  /[[,]\s*['"](?:run|rm|create|start|stop|kill|restart|up|down|build|pause|unpause)['"]\s*[,\]]|--network/;
 
 /** The paths of `files` (path to text) whose text matches `pattern`, sorted. */
 const filesMatching = (files: Record<string, string>, pattern: RegExp): string[] =>
@@ -1305,11 +1298,9 @@ const filesMatching = (files: Record<string, string>, pattern: RegExp): string[]
     .map(([file]) => file)
     .sort();
 
-/** Every ts file of tests/e2e and tests/support, path to text, but the superseded helper that is waiting for its `git rm`. */
+/** Every ts file of tests/e2e and tests/support, path to text, with no exemption. */
 const e2eAndSupportFiles = (): Record<string, string> =>
-  Object.fromEntries(
-    [...tsFilesUnder('tests/e2e'), ...tsFilesUnder('tests/support')].filter((file) => file !== SUPERSEDED_HELPER).map((file) => [file, read(file)]),
-  );
+  Object.fromEntries([...tsFilesUnder('tests/e2e'), ...tsFilesUnder('tests/support')].map((file) => [file, read(file)]));
 
 describe('the e2e run owns its stack: one project, set in the config (#363)', () => {
   const config = read(CONFIG_FILE);
@@ -1377,9 +1368,7 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
     }
   });
 
-  it('(g) nothing imports isolated-app.ts, and the create-admin command has one call site: its own test in admin.spec.ts', () => {
-    expect(filesMatching(e2eAndSupportFiles(), ISOLATED_APP_IMPORT)).toEqual([]);
-
+  it('(g) the create-admin command has one call site: its own test in admin.spec.ts', () => {
     const calls = Object.entries(e2eSpecs())
       .map(([file, text]) => [file, [...text.matchAll(/\bcreateAdminWithCommand\(/g)].length] as const)
       .filter(([, count]) => count > 0);
@@ -1439,13 +1428,13 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
   });
 
   it('the checks of (d) to (g) can fail', () => {
-    // (d) a lifecycle verb as a quoted argument of an argument list, either quote, any spacing, or the old helper or a network flag.
+    // (d) a lifecycle verb as a quoted argument of an argument list, either quote, any spacing, or a network flag.
     for (const verbName of ['run', 'rm', 'create', 'start', 'stop', 'kill', 'restart', 'up', 'down', 'build', 'pause', 'unpause']) {
       expect(LIFECYCLE.test(`spawnSync('docker', ['compose', '${verbName}', 'app'])`), verbName).toBe(true);
       expect(LIFECYCLE.test(`compose(["${verbName}"])`), verbName).toBe(true);
       expect(LIFECYCLE.test(`compose([ '${verbName}' , '-d'])`), verbName).toBe(true);
     }
-    for (const source of ['const app = await startIsolatedApp(spec);', "['--network', 'host']", "'run', '-d', '--network host'"]) {
+    for (const source of ["['--network', 'host']", "'run', '-d', '--network host'"]) {
       expect(LIFECYCLE.test(source), source).toBe(true);
     }
     for (const source of [
@@ -1494,13 +1483,5 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
     expect(projectBlock(sample, 'two')).not.toContain("'one'");
     expect(projectBlock(sample, 'three')).toBeNull();
     expect(projectBlock("{ use: { a: 1 }, name: 'x' }", 'x')).toBeNull();
-
-    // (g) an import of the old helper, by any path, and a call of its function.
-    for (const source of ["import { startIsolatedApp } from '../support/isolated-app';", 'import x from "./isolated-app"', 'await startIsolatedApp(spec)']) {
-      expect(ISOLATED_APP_IMPORT.test(source), source).toBe(true);
-    }
-    for (const source of ["import { signInAsAdmin } from '../support/admin-e2e';", "import { origin } from '../support/e2e-stack';"]) {
-      expect(ISOLATED_APP_IMPORT.test(source), source).toBe(false);
-    }
   });
 });
