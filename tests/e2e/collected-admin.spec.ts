@@ -2,21 +2,19 @@ import { expect, test, type Browser, type Page, type Request } from '@playwright
 
 import messages from '../../messages/es-ES.json';
 import { CATALOGUE_FILE_KINDS, CATALOGUE_FILE_NAME_MAX } from '../../src/server/catalogue-file-name';
-import { signInAs } from '../support/admin-e2e';
-import { startIsolatedApp, type IsolatedApp } from '../support/isolated-app';
+import { signInAsAdmin } from '../support/admin-e2e';
+import { origin, psql, psqlScalar } from '../support/e2e-stack';
 import { expectNoSetCookie, stripScripts } from '../support/page-checks';
 
 // S12.2 T-12.2.4 (decision 0017), ACs 1, 4 to 8, 50 and 04-ux § Checks 1 to 24 in a browser, on the admin
 // screens: the third source of the feed form, a collected feed in both lists, the edit page with its warning
 // and its rename confirm, and no sign of it on a public page. Desktop width only, function and copy (admin
 // screens are not checked at phone width). The writers and the actions with no session or another origin are
-// collected-feed-admin.test.ts; this spec is what the browser adds. It runs on an app container and a
-// database of its own (tests/support/isolated-app.ts), so the feeds it registers and approves can never be
-// counted by a spec that reads the development database in parallel, and nothing is left behind.
+// collected-feed-admin.test.ts; this spec is what the browser adds. It runs in the `serial` project on the e2e
+// stack's own `app` and database (#363), alone, so the feeds it registers and approves can never be counted
+// by a spec that reads the database in parallel; `afterAll` leaves its shop and every feed it made unapproved.
+// It signs in as the e2e admin the global setup created.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
-
-const EMAIL = 'e2e-collected-admin@example.test';
-const PASSWORD = 'e2e-collected-password-1';
 
 const form = messages.Admin.Form;
 const feedCopy = form.Feed;
@@ -29,32 +27,33 @@ const NAME = 'precios-e2e.csv';
 const RENAMED = 'precios-e2e-b.csv';
 const HAND = 'escrito-e2e.csv';
 
-let app: IsolatedApp;
 let shopId = 0;
 let feedId = 0;
 
-test.beforeAll(async () => {
-  test.setTimeout(300_000);
-  app = await startIsolatedApp('collected-admin.spec.ts');
-  app.createAdmin(EMAIL, PASSWORD);
-  app.psql(`insert into shops (slug, name, is_approved) values ('${SHOP.slug}', '${SHOP.name}', true)`);
-  shopId = Number(app.psqlScalar(`select id from shops where slug = '${SHOP.slug}'`));
+/** The e2e `app`: what a context made with `browser.newContext` must be given as its base URL. */
+const appOrigin = (): string => origin('app');
+
+test.beforeAll(() => {
+  psql(`insert into shops (slug, name, is_approved) values ('${SHOP.slug}', '${SHOP.name}', true)`);
+  shopId = Number(psqlScalar(`select id from shops where slug = '${SHOP.slug}'`));
   // A hand-written file feed beside it, so the two kinds are read side by side (UX check 14).
-  app.psql(`insert into feeds (shop_id, source_type, url, is_approved, is_demo) values (${shopId}, 'catalogue_file', '${HAND}', false, false)`);
+  psql(`insert into feeds (shop_id, source_type, url, is_approved, is_demo) values (${shopId}, 'catalogue_file', '${HAND}', false, false)`);
 });
 test.afterAll(() => {
-  app?.stop();
+  // The shop was inserted approved and a test approves a feed: end with nothing of this spec approved.
+  psql(`update feeds set is_approved = false where shop_id = ${shopId}`);
+  psql(`update shops set is_approved = false where id = ${shopId}`);
 });
 
 const feedRow = (feed: number): string =>
-  app.psqlScalar(`select source_type || '|' || url || '|' || is_approved || '|' || coalesce(network_id::text, '') || '|' || is_demo from feeds where id = ${feed}`);
-const handId = (): number => Number(app.psqlScalar(`select id from feeds where url = '${HAND}'`));
+  psqlScalar(`select source_type || '|' || url || '|' || is_approved || '|' || coalesce(network_id::text, '') || '|' || is_demo from feeds where id = ${feed}`);
+const handId = (): number => Number(psqlScalar(`select id from feeds where url = '${HAND}'`));
 
-/** A signed-in page of its own context, whose base URL is the isolated app (the config's base URL is the Compose one). */
+/** A signed-in page of its own context, whose base URL is the e2e app (a context from `browser.newContext` gets no config base URL). */
 async function signedIn(browser: Browser): Promise<Page> {
-  const context = await browser.newContext({ baseURL: app.origin });
+  const context = await browser.newContext({ baseURL: appOrigin() });
   const page = await context.newPage();
-  await signInAs(page, EMAIL, PASSWORD);
+  await signInAsAdmin(page);
   return page;
 }
 
@@ -141,7 +140,7 @@ test.describe('the feed form: a third source (UX checks 1 to 11)', () => {
       await expect(origin, typed).toHaveValue('collected_file');
       if (typed.length < 60) expect(stripScripts(await page.content()), `the page repeats ${typed}`).not.toContain(typed);
     }
-    expect(app.psqlScalar(`select count(*) from feeds where source_type = 'collected_file'`)).toBe('0');
+    expect(psqlScalar(`select count(*) from feeds where source_type = 'collected_file'`)).toBe('0');
   });
 
   test('a valid name creates an unapproved, non-demo feed with no network and shows it as a collected file (checks 12, 13, 14)', async ({ browser }) => {
@@ -154,7 +153,7 @@ test.describe('the feed form: a third source (UX checks 1 to 11)', () => {
 
     await expect(page).toHaveURL(/\/admin\/tiendas\?aviso=feed-creado$/);
     await expect(page.getByTestId('admin-notice')).toHaveText(sources.noticeFeedCreated);
-    feedId = Number(app.psqlScalar(`select id from feeds where url = '${NAME}'`));
+    feedId = Number(psqlScalar(`select id from feeds where url = '${NAME}'`));
     expect(feedId).toBeGreaterThan(0);
     expect(feedRow(feedId)).toBe(`collected_file|${NAME}|false||false`);
 
@@ -183,7 +182,7 @@ test.describe('the feed form: a third source (UX checks 1 to 11)', () => {
       await expect(message, name).toHaveText(errors.fileDuplicate);
       expect(await message.innerText()).not.toContain(name);
     }
-    expect(app.psqlScalar(`select count(*) from feeds where shop_id = ${shopId}`)).toBe('2');
+    expect(psqlScalar(`select count(*) from feeds where shop_id = ${shopId}`)).toBe('2');
   });
 });
 
@@ -204,7 +203,7 @@ test.describe('the edit page and a changed file name (UX checks 16 to 19; ACs 5,
   });
 
   test('an approved feed warns before anything is typed; the same name saves with no panel and stays approved (check 17)', async ({ browser }) => {
-    app.psql(`update feeds set is_approved = true where id = ${feedId}`);
+    psql(`update feeds set is_approved = true where id = ${feedId}`);
     const page = await signedIn(browser);
     await page.goto(`/admin/tiendas/feed/${feedId}/editar`);
     await page.waitForLoadState('networkidle');
@@ -270,21 +269,21 @@ test.describe('the category screen and the paused state (UX checks 20 to 23)', (
   });
 
   test('an approved collected feed under an unapproved shop reads "Aprobado, en pausa" with the existing controls (check 22)', async ({ browser }) => {
-    app.psql(`update feeds set is_approved = true where id = ${feedId}`);
-    app.psql(`update shops set is_approved = false where id = ${shopId}`);
+    psql(`update feeds set is_approved = true where id = ${feedId}`);
+    psql(`update shops set is_approved = false where id = ${shopId}`);
     const page = await signedIn(browser);
     await page.goto('/admin/tiendas');
 
     const row = page.getByTestId(`source-feed-${feedId}`);
     await expect(row.getByTestId('source-tag')).toHaveText(sources.feedPaused);
     await expect(row.getByTestId('source-disable')).toHaveCount(1);
-    app.psql(`update feeds set is_approved = false where id = ${feedId}`);
-    app.psql(`update shops set is_approved = true where id = ${shopId}`);
+    psql(`update feeds set is_approved = false where id = ${feedId}`);
+    psql(`update shops set is_approved = true where id = ${shopId}`);
   });
 
   test('no admin screen shows a folder, a path or the flag name (check 15), a 100-character name wraps inside the box (check 23)', async ({ browser }) => {
     const long = `${'a'.repeat(CATALOGUE_FILE_NAME_MAX - 4)}.csv`;
-    app.psql(`insert into feeds (shop_id, source_type, url, is_approved, is_demo) values (${shopId}, 'collected_file', '${long}', false, false)`);
+    psql(`insert into feeds (shop_id, source_type, url, is_approved, is_demo) values (${shopId}, 'collected_file', '${long}', false, false)`);
     const page = await signedIn(browser);
     for (const path of ['/admin/tiendas', '/admin/categorias', `/admin/tiendas/feed/${feedId}/editar`, newFeedUrl()]) {
       await page.goto(path);
@@ -301,10 +300,10 @@ test.describe('the category screen and the paused state (UX checks 20 to 23)', (
 
 test.describe('nothing public changes (UX check 24, AC 50, guardrail 3)', () => {
   test('the home, a category, search and a product page say nothing about collected files or a local flag, and set no cookie', async ({ playwright }) => {
-    const request = await playwright.request.newContext({ baseURL: app.origin });
+    const request = await playwright.request.newContext({ baseURL: appOrigin() });
     try {
-      const productSlug = app.psqlScalar('select slug from products order by id limit 1');
-      const categorySlug = app.psqlScalar('select slug from categories where parent_id is not null order by position, id limit 1');
+      const productSlug = psqlScalar('select slug from products order by id limit 1');
+      const categorySlug = psqlScalar('select slug from categories where parent_id is not null order by position, id limit 1');
       for (const path of ['/', `/producto/${productSlug}`, `/categoria/${categorySlug}`, '/buscar?q=filtro']) {
         const response = await request.get(path);
         expect(response.status(), path).toBe(200);
@@ -317,7 +316,7 @@ test.describe('nothing public changes (UX check 24, AC 50, guardrail 3)', () => 
   });
 
   test('an anonymous request for the edit page of a collected feed is sent to sign-in, with nothing from the page', async ({ playwright }) => {
-    const request = await playwright.request.newContext({ baseURL: app.origin });
+    const request = await playwright.request.newContext({ baseURL: appOrigin() });
     try {
       const response = await request.get(`/admin/tiendas/feed/${feedId}/editar`, { maxRedirects: 0 });
       expect(response.status()).toBeGreaterThanOrEqual(300);

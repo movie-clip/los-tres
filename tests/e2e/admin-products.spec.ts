@@ -1,11 +1,9 @@
-import { spawnSync } from 'node:child_process';
-
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_FEED_URLS, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
-import { signInAs } from '../support/admin-e2e';
-import { startIsolatedApp, type IsolatedApp } from '../support/isolated-app';
+import { signInAsAdmin } from '../support/admin-e2e';
+import { E2E_ADMIN, origin, psql, psqlScalar, serviceLogs } from '../support/e2e-stack';
 import { expectNoSetCookie, expectServerRenderedNotFound } from '../support/page-checks';
 
 // US-2.4 from sign-in to a product and an offer hidden and unhidden through the screens, with what
@@ -13,16 +11,14 @@ import { expectNoSetCookie, expectServerRenderedNotFound } from '../support/page
 // line, and the app output holding no feed address and no search term (guardrail 5). Desktop width
 // only: admin screens are not checked at phone width.
 //
-// The demo product is hidden for real, so the spec runs against an app container of its own on a
-// database of its own (tests/support/isolated-app.ts: the same image, the demo data seeded and
-// imported, removed at the end). Hiding it on the Compose app would change the counts and pages that
-// the other specs read in parallel, and a row added there changes `admin-categories.spec.ts`'s demo
-// fingerprint. The development database is never written: nothing is left to restore. It owns its own
-// admin account, on that database.
+// The demo product is hidden for real, on the e2e stack's own `app` and database (#363). Hiding it
+// would change the counts and pages that the other specs read in parallel, so the spec runs in the
+// `serial` project, alone, and leaves the product and both offers not hidden when it ends (`afterAll`
+// puts them back even after a failure). It signs in as the e2e admin the global setup created.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
-const EMAIL = 'e2e-hide-admin@example.test';
-const PASSWORD = 'e2e-hide-password-1';
+const EMAIL = E2E_ADMIN.email;
+const PASSWORD = E2E_ADMIN.password;
 
 const copy = messages.Admin.Products;
 const detail = messages.Admin.Products.Detail;
@@ -33,32 +29,32 @@ const TITLE = DEMO_SHARED.title;
 const TERM = DEMO_SHARED.ean; // an exact EAN finds this product alone, in the admin list and in the public search
 const [CHEAPER, DEARER] = DEMO_SHARED.offers; // Tienda Demo Dos (11,49), Tienda Demo Uno (12,99)
 
-let app: IsolatedApp;
+/** The e2e `app`: what a context made with `browser.newContext` must be given as its base URL. */
+const appOrigin = (): string => origin('app');
 
-test.beforeAll(async () => {
-  test.setTimeout(300_000);
-  app = await startIsolatedApp('admin-products.spec.ts');
-  app.createAdmin(EMAIL, PASSWORD);
-});
+/** Leaves the demo product and its offers not hidden, whatever a failed test left. */
+function restoreHidden(): void {
+  psql(`update products set is_hidden = false where slug = '${SLUG}'`);
+  psql(`update offers set is_hidden = false where product_id in (select id from products where slug = '${SLUG}')`);
+}
 
-test.afterAll(() => {
-  app?.stop();
-});
+test.beforeAll(restoreHidden);
+test.afterAll(restoreHidden);
 
 async function signedIn(browser: Browser): Promise<Page> {
-  const context = await browser.newContext({ baseURL: app.origin });
+  const context = await browser.newContext({ baseURL: appOrigin() });
   const page = await context.newPage();
-  await signInAs(page, EMAIL, PASSWORD);
+  await signInAsAdmin(page);
   return page;
 }
 
-const productId = (): number => Number(app.psqlScalar(`select id from products where slug = '${SLUG}'`));
-const productHidden = (): boolean => app.psqlScalar(`select is_hidden from products where slug = '${SLUG}'`) === 't';
+const productId = (): number => Number(psqlScalar(`select id from products where slug = '${SLUG}'`));
+const productHidden = (): boolean => psqlScalar(`select is_hidden from products where slug = '${SLUG}'`) === 't';
 
 const offerWhere = (shop: string): string =>
   `from offers o join products p on p.id = o.product_id join feeds f on f.id = o.feed_id join shops s on s.id = f.shop_id where p.slug = '${SLUG}' and s.name = '${shop}'`;
-const offerId = (shop: string): number => Number(app.psqlScalar(`select o.id ${offerWhere(shop)}`));
-const offerHidden = (shop: string): boolean => app.psqlScalar(`select o.is_hidden ${offerWhere(shop)}`) === 't';
+const offerId = (shop: string): number => Number(psqlScalar(`select o.id ${offerWhere(shop)}`));
+const offerHidden = (shop: string): boolean => psqlScalar(`select o.is_hidden ${offerWhere(shop)}`) === 't';
 
 /** What the public site answers for the product page, `/go` of each offer (cheaper first) and a search for the term. */
 async function publicState(request: APIRequestContext) {
@@ -75,22 +71,13 @@ async function publicState(request: APIRequestContext) {
   return { page: page.status(), pageHtml: await page.text(), go, searchHtml: await search.text() };
 }
 
-const composeAppLogs = (): string => {
-  const result = spawnSync('docker', ['compose', 'logs', 'app', '--no-log-prefix'], {
-    encoding: 'utf8',
-    timeout: 60_000,
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  return `${result.stdout ?? ''}${result.stderr ?? ''}`;
-};
-
 const offerRow = (page: Page, shop: string) => page.getByTestId('offer-row').filter({ hasText: shop });
 
 test.describe('hide and unhide from the admin screens (US-2.4)', () => {
   let publicRequest: APIRequestContext;
 
   test.beforeAll(async ({ playwright }) => {
-    publicRequest = await playwright.request.newContext({ baseURL: app.origin });
+    publicRequest = await playwright.request.newContext({ baseURL: appOrigin() });
   });
   test.afterAll(async () => {
     await publicRequest?.dispose();
@@ -255,7 +242,7 @@ test.describe('hide and unhide from the admin screens (US-2.4)', () => {
   test('the app output holds no feed address, no shop host, no search term and no credential after all of it (guardrail 5)', async ({
     browser,
   }) => {
-    // One more search, hide and unhide, then read the output of the isolated app and of the Compose app.
+    // One more search, hide and unhide, then read the output of the app.
     const page = await signedIn(browser);
     await page.goto(`/admin/productos?q=${TERM}`);
     await page.goto(`/admin/productos/${productId()}?q=${TERM}`);
@@ -265,14 +252,10 @@ test.describe('hide and unhide from the admin screens (US-2.4)', () => {
     await expect(page.getByTestId('product-done')).toHaveText(detail.doneProductUnhidden);
     expect(productHidden()).toBe(false);
 
-    for (const [where, logs] of [
-      ['the isolated app', app.logs()],
-      ['the Compose app', composeAppLogs()],
-    ] as const) {
-      expect(logs, `${where} answered`).toContain('Ready');
-      for (const forbidden of [TERM, SLUG, ...DEMO_FEED_URLS, ...DEMO_SHOP_HOSTS, EMAIL, PASSWORD]) {
-        expect(logs.includes(forbidden), `${where} output holds ${forbidden === PASSWORD ? 'the password' : forbidden}`).toBe(false);
-      }
+    const logs = serviceLogs('app');
+    expect(logs, 'the app answered').toContain('Ready');
+    for (const forbidden of [TERM, SLUG, ...DEMO_FEED_URLS, ...DEMO_SHOP_HOSTS, EMAIL, PASSWORD]) {
+      expect(logs.includes(forbidden), `the app output holds ${forbidden === PASSWORD ? 'the password' : forbidden}`).toBe(false);
     }
   });
 
@@ -303,7 +286,7 @@ test.describe('a toggle keeps its accessible name while it is saving', () => {
   }
 
   const offerName = (shop: string): string =>
-    detail.hideOfferName.replace('{shop}', shop).replace('{id}', app.psqlScalar(`select o.feed_id ${offerWhere(shop)}`));
+    detail.hideOfferName.replace('{shop}', shop).replace('{id}', psqlScalar(`select o.feed_id ${offerWhere(shop)}`));
 
   test('offer and product toggles held pending keep their accessible names, and the text says they are saving', async ({
     browser,

@@ -1,10 +1,10 @@
-import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 import { DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
 import { CAR, CONTROL_PAGES, UNKNOWN_SLUG, ownerIdentityConfigured, scriptedControl, selectedText } from '../support/car';
+import { serviceLogs } from '../support/e2e-stack';
 import { expectNoForeignOrigin, expectNoSetCookie, openRawHtml } from '../support/page-checks';
 
 // US-5.7 (T5.7.4, L4) against the Compose stack: what holds across every page once a car is
@@ -181,14 +181,7 @@ test.describe('the selected slug is in no application log (AC 56)', () => {
 
   const marker = `zq${[...randomBytes(10)].map((byte) => String.fromCharCode(97 + (byte % 26))).join('')}`;
 
-  const logs = (): string => {
-    const result = spawnSync('docker', ['compose', 'logs', 'app', '--no-log-prefix'], {
-      encoding: 'utf8',
-      timeout: 60_000,
-      maxBuffer: 256 * 1024 * 1024,
-    });
-    return `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  };
+  const logs = (): string => serviceLogs('app');
 
   test('selecting a car and browsing leaves its slug, an unknown slug and coche= out of the output', async ({
     page,

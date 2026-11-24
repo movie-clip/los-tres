@@ -1,16 +1,15 @@
-import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
-import { unusedPort } from '../support/net';
+import { execIn, origin, serviceLogs } from '../support/e2e-stack';
 
 // US-5.4 ACs 31 and 32 (guardrail 5, D-3): the search term is never logged and never stored.
-// Proved against the running Compose stack with a marker nobody else types:
-//   - the app container's output after a successful search and a no-result search,
-//   - the output of a one-off container whose database is unreachable, and its error page,
+// Proved against the running e2e stack (#363) with a marker nobody else types:
+//   - the `app` service's output after a successful search and a no-result search,
+//   - the output of the `app-no-db` service, whose database is unreachable, and its error page,
 //   - a full data-only pg_dump after a click-through from the results to a shop.
 // Every assertion is "absent" or "contains"; the failing search logs its fixed line several times
 // per request (proxy, metadata, page), so no count is pinned.
@@ -35,17 +34,7 @@ const spellings = (term: string): string[] => [
 ];
 const forbidden = secrets.flatMap(spellings);
 
-function docker(args: string[], options: { input?: string; timeout?: number } = {}) {
-  const result = spawnSync('docker', args, {
-    encoding: 'utf8',
-    timeout: options.timeout ?? 60_000,
-    maxBuffer: 256 * 1024 * 1024,
-    input: options.input,
-  });
-  return { status: result.status, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
-}
-
-const appLogs = () => docker(['compose', 'logs', 'app', '--no-log-prefix']).out;
+const appLogs = () => serviceLogs('app');
 
 function expectNoSecret(text: string, where: string): void {
   for (const spelling of forbidden) {
@@ -97,81 +86,43 @@ test.describe('the search term is never logged or stored (AC 31, 32)', () => {
   });
 
   test('a failing search shows the generic error page and logs only a fixed code', async ({ browser }) => {
-    const name = `los-tres-e2e-search-fail-${marker}`;
-    // #361: the server shares the host's network (`--network host`), so starting and removing it creates
-    // and removes no network interface, which would cancel the page loads of a browser waiting on a
-    // socket. The image is the Compose app's, run with its own port and a database nobody listens on.
-    const image = spawnSync('docker', ['compose', 'config', '--images'], { encoding: 'utf8', timeout: 60_000 })
-      .stdout.split(/\s+/)
-      .find((entry) => entry !== '' && !entry.startsWith('postgres'));
-    expect(image, 'the app image name from compose config').toBeTruthy();
-    const siteName = process.env.SITE_NAME?.trim();
-    expect(siteName, 'SITE_NAME is set in .env').toBeTruthy();
-    const port = await unusedPort();
-    const origin = `http://127.0.0.1:${port}`;
-    const run = docker(
-      [
-        'run', '-d', '--name', name, '--network', 'host',
-        '--entrypoint', 'node',
-        '-e', `PORT=${port}`,
-        '-e', 'HOSTNAME=127.0.0.1',
-        '-e', `SITE_NAME=${siteName}`,
-        '-e', 'DATABASE_URL=postgres://x:x@127.0.0.1:1/x',
-        image!, 'server.js',
-      ],
-      { timeout: 120_000 },
-    );
-    try {
-      expect(run.status, run.out).toBe(0);
-
-      // Wait for the server: robots.txt needs no database.
-      let ready = false;
-      for (let attempt = 0; attempt < 60 && !ready; attempt += 1) {
-        ready = await fetch(`${origin}/robots.txt`).then((r) => r.status === 200, () => false);
-        if (!ready) await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      expect(ready, 'the failing server started').toBe(true);
-
-      // HTTP level: a 500 (the body is Next's empty error shell until the page hydrates).
-      for (const term of secrets) {
-        const response = await fetch(`${origin}/buscar?q=${encodeURIComponent(term)}`);
-        expect(response.status, term).toBe(500);
-        expect(response.headers.get('set-cookie')).toBeNull();
-        const markup = (await response.text()).replace(/<script\b[\s\S]*?<\/script>/gi, '');
-        expectNoSecret(markup, 'the error response outside script');
-      }
-
-      // Browser level: the site's generic error page, not the framework's English default.
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      const response = await page.goto(`${origin}/buscar?q=${marker}`);
-      expect(response?.status()).toBe(500);
-      const error = page.getByTestId('public-error');
-      await expect(error).toBeVisible();
-      await expect(error).toContainText(messages.Error.heading);
-      await expect(error).toContainText(messages.Error.body);
-      expectNoSecret((await page.locator('body').innerText()).trim(), 'the visible error page');
-      expect(await context.cookies()).toEqual([]);
-      await context.close();
-
-      const logs = docker(['logs', name]).out;
-      expect(logs, 'the failure is logged as a code').toContain('search: failed (');
-      expectNoSecret(logs, 'the failing container output');
-      expect(logs, 'the connection string reached the log').not.toContain('postgres://');
-      expect(logs).not.toMatch(/\b(GET|POST|HEAD)\s+\//);
-    } finally {
-      docker(['rm', '-f', name]);
+    // The `app-no-db` service is the Compose app's image with its own port and a database nobody listens on,
+    // started by the global setup; it already runs, so this test starts and removes nothing.
+    const failing = origin('app-no-db');
+    // HTTP level: a 500 (the body is Next's empty error shell until the page hydrates).
+    for (const term of secrets) {
+      const response = await fetch(`${failing}/buscar?q=${encodeURIComponent(term)}`);
+      expect(response.status, term).toBe(500);
+      expect(response.headers.get('set-cookie')).toBeNull();
+      const markup = (await response.text()).replace(/<script\b[\s\S]*?<\/script>/gi, '');
+      expectNoSecret(markup, 'the error response outside script');
     }
+
+    // Browser level: the site's generic error page, not the framework's English default.
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const response = await page.goto(`${failing}/buscar?q=${marker}`);
+    expect(response?.status()).toBe(500);
+    const error = page.getByTestId('public-error');
+    await expect(error).toBeVisible();
+    await expect(error).toContainText(messages.Error.heading);
+    await expect(error).toContainText(messages.Error.body);
+    expectNoSecret((await page.locator('body').innerText()).trim(), 'the visible error page');
+    expect(await context.cookies()).toEqual([]);
+    await context.close();
+
+    const logs = serviceLogs('app-no-db');
+    expect(logs, 'the failure is logged as a code').toContain('search: failed (');
+    expectNoSecret(logs, 'the failing container output');
+    expect(logs, 'the connection string reached the log').not.toContain('postgres://');
+    expect(logs).not.toMatch(/\b(GET|POST|HEAD)\s+\//);
   });
 
   test('no database row holds the term after the searches and the click-through (AC 32)', async () => {
-    const dump = docker(
-      ['compose', 'exec', '-T', 'db', 'sh', '-c', 'pg_dump --data-only -U "$POSTGRES_USER" "$POSTGRES_DB"'],
-      { timeout: 120_000 },
-    );
-    expect(dump.status, dump.out.slice(0, 300)).toBe(0);
+    const dump = execIn('db', ['sh', '-c', 'pg_dump --data-only -U "$POSTGRES_USER" "$POSTGRES_DB"'], { timeout: 120_000 });
+    expect(dump.status, dump.stderr.slice(0, 300)).toBe(0);
     // The dump is real: it holds the demo catalogue, so an empty answer cannot pass this test.
-    expect(dump.out).toContain(DEMO_SHARED.title);
-    expectNoSecret(dump.out, 'the database dump');
+    expect(dump.stdout).toContain(DEMO_SHARED.title);
+    expectNoSecret(dump.stdout, 'the database dump');
   });
 });

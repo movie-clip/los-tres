@@ -3,20 +3,21 @@ import { expect, test, type APIRequestContext, type APIResponse } from '@playwri
 import messages from '../../messages/es-ES.json';
 import { DEMO_COUNTS } from '../fixtures/demo';
 import { CAR } from '../support/car';
-import { startIsolatedApp, type IsolatedApp } from '../support/isolated-app';
+import { variant, type E2EVariant, type Variant } from '../support/e2e-stack';
 import { icuPlural, normaliseSpaces } from '../support/messages';
 import { expectNoSetCookie, expectServerRenderedNotFound, openRawHtml, stripScripts } from '../support/page-checks';
 
 // S12.2 (decision 0017), ACs 13 to 27 and 36 on the REAL app: marked rows (rows of a collected feed) are on no
 // public page with the local flag off, are shown only with the flag on beside a loopback SITE_URL, and are
-// never indexed, listed or counted either way. Two app containers of their own, on databases of their own
-// (tests/support/isolated-app.ts, one per flag state), each seeded the same way with invented rows written by
-// psql: a collected file may never be placed in the owner's folder, so the rows are what an import of one
-// would leave (the importer's marking is collected-import.test.ts, the sweep over every reader is
-// collected-public-sweep.test.ts). The development database is never touched.
+// never indexed, listed or counted either way. Two variant apps of the e2e stack, on databases of their own
+// (`app-flag-off` and `app-flag-on` of tests/e2e/compose.e2e.yaml, started and imported by the global setup,
+// #363), each seeded the same way with invented rows written by psql: a collected file may never be placed in
+// the owner's folder, so the rows are what an import of one would leave (the importer's marking is
+// collected-import.test.ts, the sweep over every reader is collected-public-sweep.test.ts). The main e2e
+// database is never touched.
 //
 //   off  LOCAL_COLLECTED_DATA=false beside a PUBLIC https SITE_URL: the state of a deploy (AC 36: it starts)
-//   on   LOCAL_COLLECTED_DATA=true beside the loopback SITE_URL the harness gives: the owner's local stack
+//   on   LOCAL_COLLECTED_DATA=true beside the loopback SITE_URL of its own port: the owner's local stack
 //
 // The app refuses to start with the flag on beside a public SITE_URL, so that combination (the backstop,
 // AC 37) is not a live case: collected-public-sweep.test.ts runs it over the readers, and
@@ -31,7 +32,7 @@ const U = { slug: 'e2e-escrito', title: 'Filtro Pelicano E2E escrito', term: 'Pe
 
 type World = { cm: string; cu: string; offerM: number; offerUMarked: number; offerUHand: number };
 
-function seed(app: IsolatedApp): World {
+function seed(app: Variant): World {
   const scalar = (sql: string) => app.psqlScalar(sql);
   // An empty child category for M alone, and a child that already holds demo products for U.
   const cm = scalar(
@@ -63,7 +64,7 @@ function seed(app: IsolatedApp): World {
   return { cm, cu, offerM: id(M.slug, 'm-1'), offerUMarked: id(U.slug, 'u-2'), offerUHand: id(U.slug, 'u-1') };
 }
 
-const clicks = (app: IsolatedApp): number => Number(app.psqlScalar('select count(*) from clicks'));
+const clicks = (app: Variant): number => Number(app.psqlScalar('select count(*) from clicks'));
 
 async function get(request: APIRequestContext, path: string, options: { redirects?: boolean } = {}): Promise<APIResponse> {
   const response = await request.get(path, { maxRedirects: options.redirects === false ? 0 : undefined });
@@ -75,22 +76,20 @@ const offerLinks = (html: string): number => (html.match(/data-testid="offer-go"
 
 function describeFlagState(
   label: string,
-  o: { env: Record<string, string>; shown: boolean; origin: (app: IsolatedApp) => string },
+  o: { service: E2EVariant; shown: boolean; origin: (app: Variant) => string },
 ) {
   test.describe(label, () => {
-    let app: IsolatedApp;
+    let app: Variant;
     let world: World;
     let request: APIRequestContext;
 
     test.beforeAll(async ({ playwright }) => {
-      test.setTimeout(300_000);
-      app = await startIsolatedApp(`collected-public.spec.ts (${label})`, { env: o.env });
+      app = variant(o.service);
       world = seed(app);
       request = await playwright.request.newContext({ baseURL: app.origin });
     });
     test.afterAll(async () => {
       await request?.dispose();
-      app?.stop();
     });
 
     test('starts and is healthy (AC 36), and never printed the refusal', async () => {
@@ -233,13 +232,13 @@ function describeFlagState(
 }
 
 describeFlagState('flag off beside a public SITE_URL (a deploy)', {
-  env: { LOCAL_COLLECTED_DATA: 'false', SITE_URL: PUBLIC_ORIGIN },
+  service: 'app-flag-off',
   shown: false,
   origin: () => PUBLIC_ORIGIN,
 });
 
 describeFlagState('flag on beside a loopback SITE_URL (the owner\'s local stack)', {
-  env: { LOCAL_COLLECTED_DATA: 'true' },
+  service: 'app-flag-on',
   shown: true,
   origin: (app) => app.origin,
 });

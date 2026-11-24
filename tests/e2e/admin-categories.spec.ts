@@ -3,10 +3,11 @@ import { createTranslator } from 'use-intl/core';
 
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import messages from '../../messages/es-ES.json';
-import { createAdminWithCommand, psql, psqlScalar, signInAs } from '../support/admin-e2e';
+import { signInAsAdmin } from '../support/admin-e2e';
+import { psql, psqlScalar } from '../support/e2e-stack';
 import { expectNoSetCookie, stripScripts } from '../support/page-checks';
 
-// US-4.2 against the Compose stack, at desktop width only (admin screens are not checked at phone
+// US-4.2 against the e2e stack, at desktop width only (admin screens are not checked at phone
 // width): from sign-in to a mapping saved, changed, marked outside scope and removed, with the notice
 // before a removal, the success and refusal lines, the keyboard and the labels.
 //
@@ -18,11 +19,8 @@ import { expectNoSetCookie, stripScripts } from '../support/page-checks';
 // count in a parallel worker. That makes the public side of guardrail 1 the thing this spec shows
 // end to end (a mapping on an unapproved feed publishes nothing). That a removal takes an approved
 // feed's product off every public reader at once is proved in integration, with the real readers
-// (category-mapping-writer.test.ts, AC 31). It owns its own admin account.
+// (category-mapping-writer.test.ts, AC 31). It signs in as the e2e admin the global setup created.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
-
-const EMAIL = 'e2e-categories-admin@example.test';
-const PASSWORD = 'e2e-categories-password-1';
 
 const copy = messages.Admin.Categories;
 const t = createTranslator({ locale: 'es-ES', messages, namespace: 'Admin.Categories' });
@@ -98,7 +96,6 @@ let mainId = 0;
 let emptyId = 0;
 
 test.beforeAll(() => {
-  createAdminWithCommand(EMAIL, PASSWORD, 'admin categories e2e');
   releaseRows();
   resetRows();
   mainId = feedIdOf(URL_MAIN);
@@ -150,7 +147,7 @@ test.describe('anonymous visitors (AC 1)', () => {
 
 test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   test('the nav entry links to it and marks it current; it is noindex and no-store, sets no cookie and has a title', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     const link = page.getByTestId('admin-nav').getByRole('link', { name: messages.Admin.Nav.categories });
     await expect(link).toHaveAttribute('href', SCREEN);
     await link.click();
@@ -171,7 +168,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('says the three rules in order, and names no more of the feed address than its host (AC 10)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     const response = await page.goto(SCREEN);
     const html = (await response?.text()) ?? '';
 
@@ -190,7 +187,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('lists each category with its distinct products and state, not reviewed first, "Filtros" and "filtros" apart (AC 11 to 15)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const section = feedSection(page);
 
@@ -213,7 +210,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('a feed never imported says so and has no group and no control (AC 16)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const empty = page.getByTestId(`category-feed-${emptyId}`);
     await expect(empty.getByTestId('category-feed-statement')).toHaveText(copy.feedNeverImported);
@@ -222,7 +219,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('a not-reviewed row offers a select of the five categories, never the root, with its two buttons', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const pending = row(page, UNO);
 
@@ -237,7 +234,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('offers no control that approves, disables or hides, anywhere on the screen (AC 41)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const main = page.getByRole('main');
     const ids = await main.getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
@@ -249,7 +246,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('every select has a visible label and a name of its own, made of the label and its category (AC 48)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const section = feedSection(page);
 
@@ -263,7 +260,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
   });
 
   test('every control of a row is reached by Tab in order: the select, then each button (AC 48)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const pending = row(page, ACEITES);
 
@@ -283,7 +280,7 @@ test.describe('the screen (AC 1, 9, 10, 11 to 17, 41, 48)', () => {
 
 test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   test('pressing Asignar with the prompt chosen refuses beside the select and saves nothing (AC 48, 49)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const pending = row(page, UNO);
 
@@ -299,7 +296,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('assigning moves the row to Revisadas, says what was done and how many products followed, and moves them with no import', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const section = feedSection(page);
     const pending = row(page, UNO);
@@ -339,7 +336,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('changing the target saves with no confirm and moves the products; the same target says nothing changed (AC 19, 24, 28)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
 
     await row(page, UNO).getByRole('combobox').selectOption({ label: FILTRO_AIRE });
@@ -359,7 +356,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('marking an assigned row outside scope asks first, says products stop being public, and Cancelar and Escape change nothing (AC 22)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const assigned = row(page, UNO);
 
@@ -390,7 +387,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('confirming outside scope clears the products of the old target and says so; the row reads Fuera del catálogo (AC 20, 30)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
 
     await row(page, UNO).getByTestId('category-mark-outside').click();
@@ -408,7 +405,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('removing an outside-scope mark returns the row to not reviewed with no confirm and no product count (AC 21, 33)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
 
     await row(page, UNO).getByTestId('category-unmark').click();
@@ -421,7 +418,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('marking a not-reviewed row outside scope needs no confirm, and an outside-scope row can be assigned (AC 18, 20)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
 
     await row(page, ACEITES).getByTestId('category-mark-outside').click();
@@ -438,7 +435,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('removing an assigned row asks first, then clears its products and returns it to not reviewed (AC 21, 22, 30)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
 
     await row(page, ACEITES).getByTestId('category-remove').click();
@@ -454,7 +451,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
   });
 
   test('a failed save shows the error block under the row, keeps the row as it was and saves nothing (AC 45, 49)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     await page.route('**/admin/categorias', async (route) => {
       if (route.request().method() === 'POST' && route.request().headers()['next-action']) {
@@ -479,7 +476,7 @@ test.describe('saving (AC 18 to 22, 24, 26 to 33, 40, 49)', () => {
 
 test.describe('the rest of the site is left as it was (AC 23, 50, 51)', () => {
   test('the demo feeds are listed with their mark and note, and nothing this spec did changed a demo mapping or product', async ({ page, request }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await openScreen(page);
     const demoFeed = page.locator('[data-testid^="category-feed-"]').filter({ hasText: copy.demoNote }).first();
     await expect(demoFeed).toContainText(sources.demoMark);

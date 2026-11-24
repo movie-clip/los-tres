@@ -1170,26 +1170,28 @@ describe('the ref, input, permission and strategy checks are not vacuous', () =>
   });
 });
 
-// The container specs run apart from the browser specs (#361, design: run 2026-11-23-361-repeat-9-red,
-// 03-design § Pins). A container's start or stop changes a network interface, and Chromium cancels the
-// page loads waiting on a socket when one changes, so a spec that creates or removes a container runs
-// in the Playwright project `containers`, on one worker, after `chromium`. `playwright.config.ts` lists
-// those specs in CONTAINER_SPECS; this pin keeps the list and the specs in step, in both directions. The
-// config is read as text: it cannot import from tests/, and nothing here imports it.
+// The e2e run's projects (#363, replacing the #361 container pin of run 2026-11-23-361-repeat-9-red). No
+// spec starts, stops or removes a container while the browser tests run: the stack is up before the first
+// test (tests/e2e/global-setup.ts), so no network interface changes under a page load (#361) and no spec
+// needs a project of its own for it. `playwright.config.ts` has two projects: `chromium` (parallel, specs
+// that only read) and `serial` (one worker, after `chromium`, the specs that write a database), and lists
+// the serial specs in SERIAL_SPECS; this pin keeps the list and the specs in step. The config is read as
+// text: it cannot import from tests/, and nothing here imports it.
 
 const CONFIG_FILE = 'playwright.config.ts';
-/** The one container spec that is not in CONTAINER_SPECS: the catalogue flow has a project of its own. */
-const CATALOGUE_FLOW_STEM = 'catalogue-file-flow';
-/** A source that starts or removes a container: a docker `run` or `rm`, the isolated app, or the admin helper that runs `create-admin`. */
-const CONTAINER_VERB = /['"](?:run|rm)['"]|\bstartIsolatedApp\(|\bcreateAdminWithCommand\(/;
-/** A support file that spawns a docker `run` or `rm`: the helpers a spec reaches a container through. */
-const DOCKER_SPAWN = /['"](?:run|rm)['"]/;
-const CONTAINERS_DEFINITION =
-  "const CONTAINERS = new RegExp(`(^|[\\\\\\\\/])(${CONTAINER_SPECS.join('|')})\\\\.spec\\\\.ts$`);";
+/**
+ * A support file the specs no longer use, whose `git rm` no lane can run (#363, T2 hand-off): nothing may import
+ * it, and the scans below skip it while the file is still on disk. Once it is removed the constant is dead.
+ */
+const SUPERSEDED_HELPER = 'tests/support/isolated-app.ts';
+const SERIAL_DEFINITION =
+  "const SERIAL = new RegExp(`(^|[\\\\\\\\/])(${SERIAL_SPECS.join('|')})\\\\.spec\\\\.ts$`);";
+/** A spec that writes a database: SQL through `psql`, a verb inside the app, or the create-admin command. */
+const DATABASE_WRITER = /\b(?:psql|verb|createAdminWithCommand)\(/;
 
-/** The stems in the `CONTAINER_SPECS` array literal of the config text, or null when the literal is missing or holds anything but single-quoted stems. */
-function containerSpecsOf(config: string): string[] | null {
-  const literal = /const CONTAINER_SPECS = \[([^\]]*)\];/.exec(config);
+/** The stems in the `SERIAL_SPECS` array literal of the config text, or null when the literal is missing or holds anything but single-quoted stems. */
+function serialSpecsOf(config: string): string[] | null {
+  const literal = /const SERIAL_SPECS = \[([^\]]*)\];/.exec(config);
   if (!literal) return null;
   const body = literal[1] ?? '';
   const stems = [...body.matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1] ?? '');
@@ -1214,23 +1216,8 @@ function projectBlock(config: string, name: string): string | null {
   return null;
 }
 
-/** The file stems (`name.spec.ts` gives `name`) of the specs in `files` whose text starts or removes a container. */
-function containerSpecStems(files: Record<string, string>): string[] {
-  return Object.entries(files)
-    .filter(([, source]) => CONTAINER_VERB.test(source))
-    .map(([file]) => path.basename(file).replace(/\.spec\.ts$/, ''))
-    .sort();
-}
-
-/** The differences between the stems the config lists (plus the catalogue flow) and the stems the specs show. */
-function containerListProblems(listed: string[], shown: string[]): string[] {
-  const expected = [...listed, CATALOGUE_FLOW_STEM];
-  return [
-    ...shown.filter((stem) => !expected.includes(stem)).map((stem) => `${stem}: starts a container, not in CONTAINER_SPECS`),
-    ...expected.filter((stem) => !shown.includes(stem)).map((stem) => `${stem}: expected in CONTAINER_SPECS, starts no container`),
-    ...listed.filter((stem, index) => listed.indexOf(stem) !== index).map((stem) => `${stem}: listed twice`),
-  ];
-}
+/** The names of the projects of the config text, in order (`name: '<name>'`). */
+const projectNames = (config: string): string[] => [...config.matchAll(/\bname: '([^']*)'/g)].map((match) => match[1] ?? '');
 
 const e2eSpecs = (): Record<string, string> =>
   Object.fromEntries(
@@ -1239,92 +1226,26 @@ const e2eSpecs = (): Record<string, string> =>
       .map((file) => [file, read(file)]),
   );
 
-describe('a spec that starts or removes a container runs in the containers project (#361)', () => {
-  it('CONTAINER_SPECS is a literal list of single-quoted file stems in playwright.config.ts', () => {
-    const listed = containerSpecsOf(read(CONFIG_FILE));
-    expect(listed, 'the literal is missing or not made of plain stems').not.toBeNull();
-    expect((listed ?? []).length).toBeGreaterThan(5);
-  });
-
-  it('every e2e spec that starts or removes a container is in CONTAINER_SPECS (or is the catalogue flow), and every entry is such a spec', () => {
-    const specs = e2eSpecs();
-    // The scan sees the specs, or an empty directory would pass.
-    expect(Object.keys(specs).length).toBeGreaterThan(20);
-    const shown = containerSpecStems(specs);
-    expect(shown).toContain(CATALOGUE_FLOW_STEM);
-    expect(containerListProblems(containerSpecsOf(read(CONFIG_FILE)) ?? [], shown)).toEqual([]);
-  });
-
-  it('the support helpers that spawn a docker run or rm are the two the detector knows by name', () => {
-    const helpers = tsFilesUnder('tests/support').filter((file) => DOCKER_SPAWN.test(read(file)));
-    // A new helper that starts a container needs its function name in CONTAINER_VERB first.
-    expect(helpers).toEqual(['tests/support/admin-e2e.ts', 'tests/support/isolated-app.ts']);
-  });
-
-  it('chromium holds neither the container specs nor the catalogue flow, containers runs after it on one worker, and the flow runs last', () => {
-    const config = read(CONFIG_FILE);
-    expect(config).toContain(CONTAINERS_DEFINITION);
-
-    const chromium = projectBlock(config, 'chromium') ?? '';
-    expect(chromium).toMatch(/testIgnore: \[CATALOGUE_FLOW, CONTAINERS\]/);
-    expect(chromium).toMatch(/grepInvert: cliGrepInvert\(\)/);
-    expect(chromium).not.toMatch(/\bdependencies\b|\bworkers\b/);
-
-    const containers = projectBlock(config, 'containers') ?? '';
-    expect(containers).toMatch(/testMatch: CONTAINERS\b/);
-    expect(containers).toMatch(/dependencies: \['chromium'\]/);
-    expect(containers).toMatch(/\bworkers: 1\b/);
-    expect(containers).toMatch(/grepInvert: cliGrepInvert\(\)/);
-
-    const flow = projectBlock(config, 'catalogue-file') ?? '';
-    expect(flow).toMatch(/testMatch: CATALOGUE_FLOW\b/);
-    expect(flow).toMatch(/dependencies: \['containers'\]/);
-    expect(flow).toMatch(/\bworkers: 1\b/);
-
-    // No global worker count: the two `workers` above are the only ones.
-    expect([...config.matchAll(/\bworkers\s*:/g)]).toHaveLength(2);
-  });
-
-  it('the checks above can fail', () => {
-    expect(containerSpecsOf("const CONTAINER_SPECS = [\n  'a', 'b-c',\n  'd1',\n];")).toEqual(['a', 'b-c', 'd1']);
-    expect(containerSpecsOf('const OTHER = [];')).toBeNull();
-    expect(containerSpecsOf("const CONTAINER_SPECS = ['a', ...MORE];")).toBeNull();
-    expect(containerSpecsOf("const CONTAINER_SPECS = ['a', /* b */ 'c'];")).toBeNull();
-    expect(containerSpecsOf("const CONTAINER_SPECS = ['A'];")).toBeNull();
-
-    const config = "projects: [\n  {\n    name: 'one',\n    use: { x: 1 },\n  },\n  {\n    name: 'two',\n    workers: 1,\n  },\n]";
-    expect(projectBlock(config, 'one')).toBe("{\n    name: 'one',\n    use: { x: 1 },\n  }");
-    expect(projectBlock(config, 'two')).toContain('workers: 1');
-    expect(projectBlock(config, 'two')).not.toContain("'one'");
-    expect(projectBlock(config, 'three')).toBeNull();
-    expect(projectBlock("{ use: { a: 1 }, name: 'x' }", 'x')).toBeNull();
-
-    for (const source of [
-      "spawnSync('docker', ['compose', 'run', '--rm', 'app'])",
-      'spawnSync("docker", ["rm", "-f", name])',
-      'const app = await startIsolatedApp(spec);',
-      'createAdminWithCommand(email, password);',
-    ]) {
-      expect(containerSpecStems({ 'tests/e2e/a.spec.ts': source }), source).toEqual(['a']);
-    }
-    for (const source of ["spawnSync('docker', ['compose', 'logs', 'app'])", "await expect(page).toHaveURL('/run/x')", 'const running = 1;']) {
-      expect(containerSpecStems({ 'tests/e2e/a.spec.ts': source }), source).toEqual([]);
-    }
-    expect(containerSpecStems({ 'tests/e2e/b.spec.ts': 'startIsolatedApp(', 'tests/e2e/a.spec.ts': 'startIsolatedApp(', 'tests/e2e/c.spec.ts': '' })).toEqual(['a', 'b']);
-
-    expect(containerListProblems(['a', 'b'], ['a', 'b', CATALOGUE_FLOW_STEM])).toEqual([]);
-    expect(containerListProblems(['a'], ['a', 'b', CATALOGUE_FLOW_STEM])).toEqual(['b: starts a container, not in CONTAINER_SPECS']);
-    expect(containerListProblems(['a', 'b'], ['a', CATALOGUE_FLOW_STEM])).toEqual(['b: expected in CONTAINER_SPECS, starts no container']);
-    expect(containerListProblems(['a', 'a'], ['a', CATALOGUE_FLOW_STEM])).toEqual(['a: listed twice']);
-    expect(containerListProblems(['a'], ['a'])).toEqual([`${CATALOGUE_FLOW_STEM}: expected in CONTAINER_SPECS, starts no container`]);
-  });
-});
+/** What is wrong between the listed serial stems and the specs: a duplicate, a stem with no spec, a spec that writes a database and is not listed. */
+function serialListProblems(listed: string[], specs: Record<string, string>): string[] {
+  const stems = Object.keys(specs).map((file) => path.basename(file).replace(/\.spec\.ts$/, ''));
+  const writers = Object.entries(specs)
+    .filter(([, source]) => DATABASE_WRITER.test(source))
+    .map(([file]) => path.basename(file).replace(/\.spec\.ts$/, ''))
+    .sort();
+  return [
+    ...listed.filter((stem, index) => listed.indexOf(stem) !== index).map((stem) => `${stem}: listed twice`),
+    ...listed.filter((stem) => !stems.includes(stem)).map((stem) => `${stem}: listed, but no such spec`),
+    ...writers.filter((stem) => !listed.includes(stem)).map((stem) => `${stem}: writes a database, not in SERIAL_SPECS`),
+  ];
+}
 
 // The e2e run owns its stack (#363, run 2026-11-24-363-e2e-own-stack, 03-design § Scripts and pins, items a to c).
 // `playwright test` builds, starts and removes the Compose project `los-tres-e2e` itself (global setup and teardown);
 // the project identity is written once, by playwright.config.ts, and every docker call a spec or helper makes
-// inherits it, through tests/support/e2e-stack.ts. The config is read as text, as the #361 pin above does.
-// Items d to h (the lifecycle detector, the serial list, the project blocks) arrive with the specs' change.
+// inherits it, through tests/support/e2e-stack.ts. The config is read as text, as the pin above does.
+// Items a to c: the stack identity and the one docker caller. Items d to h: no spec or helper builds, starts or
+// stops a container, the serial list, the two project blocks, and the one call of the create-admin command.
 
 const GLOBAL_SETUP_LINE = "globalSetup: './tests/e2e/global-setup.ts'";
 const GLOBAL_TEARDOWN_LINE = "globalTeardown: './tests/e2e/global-teardown.ts'";
@@ -1366,7 +1287,16 @@ const COMPOSE_IDENTITY_WRITE = /COMPOSE_(?:PROJECT_NAME|FILE)['"\]]*\s*[:=](?!=)
 /** A source that passes the project or the file list on a docker command line instead of inheriting them. */
 const COMPOSE_IDENTITY_FLAG = /['"](?:-p|--project-name|-f|--file)['"]/;
 /** A source that starts a docker process itself. */
-const DOCKER_PROCESS = /\bspawn(?:Sync)?\(\s*['"]docker['"]/;
+const DOCKER_PROCESS = /\b(?:spawn|exec|execFile)(?:Sync)?\(\s*['"]docker\b/;
+/**
+ * A source that builds, starts, stops or removes a container or a network: a lifecycle verb of `docker` or
+ * `docker compose` as a quoted argument of an argument list, `startIsolatedApp(`, or `--network`. `exec` is not
+ * one: it runs a process inside a container that is already up.
+ */
+const LIFECYCLE =
+  /[[,]\s*['"](?:run|rm|create|start|stop|kill|restart|up|down|build|pause|unpause)['"]\s*[,\]]|\bstartIsolatedApp\(|--network/;
+/** An import of the superseded isolated-app helper, or a call of its one function. */
+const ISOLATED_APP_IMPORT = /from\s+['"][^'"]*\/isolated-app['"]|\bstartIsolatedApp\(/;
 
 /** The paths of `files` (path to text) whose text matches `pattern`, sorted. */
 const filesMatching = (files: Record<string, string>, pattern: RegExp): string[] =>
@@ -1375,32 +1305,11 @@ const filesMatching = (files: Record<string, string>, pattern: RegExp): string[]
     .map(([file]) => file)
     .sort();
 
+/** Every ts file of tests/e2e and tests/support, path to text, but the superseded helper that is waiting for its `git rm`. */
 const e2eAndSupportFiles = (): Record<string, string> =>
-  Object.fromEntries([...tsFilesUnder('tests/e2e'), ...tsFilesUnder('tests/support')].map((file) => [file, read(file)]));
-
-// Files that still start docker themselves, or pass the project flags, until the specs move onto
-// tests/support/e2e-stack.ts (#363, lane T2). T2 empties both lists; the pins below compare in both directions,
-// so a file that has moved but is still listed fails here, and a new file that is not listed fails too.
-const DOCKER_PROCESS_UNTIL_SPECS_MOVE = [
-  'tests/e2e/admin-products.spec.ts',
-  'tests/e2e/admin-sources.spec.ts',
-  'tests/e2e/admin.spec.ts',
-  'tests/e2e/car-cross-cutting.spec.ts',
-  'tests/e2e/car-header-error.spec.ts',
-  'tests/e2e/catalogue-file-flow.spec.ts',
-  'tests/e2e/category-car.spec.ts',
-  'tests/e2e/collected-start.spec.ts',
-  'tests/e2e/entrypoint.spec.ts',
-  'tests/e2e/search-car.spec.ts',
-  'tests/e2e/search-privacy.spec.ts',
-  'tests/support/admin-e2e.ts',
-  'tests/support/isolated-app.ts',
-];
-const IDENTITY_FLAG_UNTIL_SPECS_MOVE = [
-  'tests/e2e/car-header-error.spec.ts',
-  'tests/e2e/search-privacy.spec.ts',
-  'tests/support/isolated-app.ts',
-];
+  Object.fromEntries(
+    [...tsFilesUnder('tests/e2e'), ...tsFilesUnder('tests/support')].filter((file) => file !== SUPERSEDED_HELPER).map((file) => [file, read(file)]),
+  );
 
 describe('the e2e run owns its stack: one project, set in the config (#363)', () => {
   const config = read(CONFIG_FILE);
@@ -1424,10 +1333,57 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
 
     expect(filesMatching(files, COMPOSE_IDENTITY_WRITE)).toEqual([]);
     expect(filesMatching(files, /E2E_BASE_URL/)).toEqual([]);
-    expect(filesMatching(files, COMPOSE_IDENTITY_FLAG)).toEqual(IDENTITY_FLAG_UNTIL_SPECS_MOVE);
+    expect(filesMatching(files, COMPOSE_IDENTITY_FLAG)).toEqual([]);
     expect(filesMatching(files, /COMPOSE_PROJECT_NAME/)).toEqual([E2E_STACK_FILE]);
-    expect(filesMatching(files, DOCKER_PROCESS).filter((file) => file !== E2E_STACK_FILE)).toEqual(DOCKER_PROCESS_UNTIL_SPECS_MOVE);
-    expect(filesMatching(files, DOCKER_PROCESS)).toContain(E2E_STACK_FILE);
+    expect(filesMatching(files, DOCKER_PROCESS)).toEqual([E2E_STACK_FILE]);
+  });
+
+  it('(d) only the global setup and the global teardown build, start, stop or remove a container', () => {
+    const files = e2eAndSupportFiles();
+    expect(Object.keys(files).length).toBeGreaterThan(30);
+    // The lifecycle is the two files that own it; a spec, a helper or e2e-stack.ts that matches fails by name.
+    expect(filesMatching(files, LIFECYCLE)).toEqual(['tests/e2e/global-setup.ts', 'tests/e2e/global-teardown.ts']);
+  });
+
+  it('(e) SERIAL_SPECS is a literal list of existing specs, with no duplicate, and holds every spec that writes a database', () => {
+    const listed = serialSpecsOf(read(CONFIG_FILE));
+    expect(listed, 'the literal is missing or not made of plain stems').not.toBeNull();
+    expect((listed ?? []).length).toBeGreaterThan(5);
+    const specs = e2eSpecs();
+    // The scan sees the specs, or an empty directory would pass.
+    expect(Object.keys(specs).length).toBeGreaterThan(20);
+    expect(serialListProblems(listed ?? [], specs)).toEqual([]);
+  });
+
+  it('(f) the config has the two projects, chromium in parallel and serial after it on one worker, and none of the old ones', () => {
+    expect(config).toContain(SERIAL_DEFINITION);
+    expect(projectNames(config)).toEqual(['chromium', 'serial']);
+
+    const chromium = projectBlock(config, 'chromium') ?? '';
+    expect(chromium).toMatch(/testIgnore: SERIAL\b/);
+    expect(chromium).toMatch(/grepInvert: cliGrepInvert\(\)/);
+    expect(chromium).not.toMatch(/\bdependencies\b|\bworkers\b/);
+
+    const serial = projectBlock(config, 'serial') ?? '';
+    expect(serial).toMatch(/testMatch: SERIAL\b/);
+    expect(serial).toMatch(/dependencies: \['chromium'\]/);
+    expect(serial).toMatch(/\bworkers: 1\b/);
+    expect(serial).toMatch(/grepInvert: cliGrepInvert\(\)/);
+
+    // No global worker count: the one `workers` above is the only one.
+    expect([...config.matchAll(/\bworkers\s*:/g)]).toHaveLength(1);
+    for (const gone of ['CONTAINER_SPECS', 'CONTAINERS', 'CATALOGUE_FLOW', "'containers'", "'catalogue-file'", '--network']) {
+      expect(config, gone).not.toContain(gone);
+    }
+  });
+
+  it('(g) nothing imports isolated-app.ts, and the create-admin command has one call site: its own test in admin.spec.ts', () => {
+    expect(filesMatching(e2eAndSupportFiles(), ISOLATED_APP_IMPORT)).toEqual([]);
+
+    const calls = Object.entries(e2eSpecs())
+      .map(([file, text]) => [file, [...text.matchAll(/\bcreateAdminWithCommand\(/g)].length] as const)
+      .filter(([, count]) => count > 0);
+    expect(calls).toEqual([['tests/e2e/admin.spec.ts', 1]]);
   });
 
   it('the checks above can fail', () => {
@@ -1480,5 +1436,71 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
 
     expect(filesMatching({ 'b.ts': 'x y', 'a.ts': 'x', 'c.ts': 'z' }, /x/)).toEqual(['a.ts', 'b.ts']);
     expect(filesMatching({}, /x/)).toEqual([]);
+  });
+
+  it('the checks of (d) to (g) can fail', () => {
+    // (d) a lifecycle verb as a quoted argument of an argument list, either quote, any spacing, or the old helper or a network flag.
+    for (const verbName of ['run', 'rm', 'create', 'start', 'stop', 'kill', 'restart', 'up', 'down', 'build', 'pause', 'unpause']) {
+      expect(LIFECYCLE.test(`spawnSync('docker', ['compose', '${verbName}', 'app'])`), verbName).toBe(true);
+      expect(LIFECYCLE.test(`compose(["${verbName}"])`), verbName).toBe(true);
+      expect(LIFECYCLE.test(`compose([ '${verbName}' , '-d'])`), verbName).toBe(true);
+    }
+    for (const source of ['const app = await startIsolatedApp(spec);', "['--network', 'host']", "'run', '-d', '--network host'"]) {
+      expect(LIFECYCLE.test(source), source).toBe(true);
+    }
+    for (const source of [
+      "compose(['exec', '-T', 'db', 'sh'])",
+      "compose(['logs', '--no-color', 'app'])",
+      "expect(await response.json()).toEqual({ status: 'ok', db: 'up' })",
+      "await page.goto('/run/x')",
+      "phase('build', () => {})",
+      "const word = 'start';",
+      "getByRole('button', { name: 'stop' })",
+    ]) {
+      expect(LIFECYCLE.test(source), source).toBe(false);
+    }
+    // The process detector sees an exec of a docker command line too, and still not a call inside a container.
+    for (const source of ["execSync('docker compose run app')", "execFileSync('docker', args)", "spawn('docker', args)"]) {
+      expect(DOCKER_PROCESS.test(source), source).toBe(true);
+    }
+    expect(DOCKER_PROCESS.test("execIn('app', ['sh'])")).toBe(false);
+
+    // (e) the serial list: a literal of plain stems, and the three ways it can be out of step with the specs.
+    expect(serialSpecsOf("const SERIAL_SPECS = [\n  'a', 'b-c',\n  'd1',\n];")).toEqual(['a', 'b-c', 'd1']);
+    expect(serialSpecsOf('const OTHER = [];')).toBeNull();
+    expect(serialSpecsOf("const SERIAL_SPECS = ['a', ...MORE];")).toBeNull();
+    expect(serialSpecsOf("const SERIAL_SPECS = ['a', /* b */ 'c'];")).toBeNull();
+    expect(serialSpecsOf("const SERIAL_SPECS = ['A'];")).toBeNull();
+    for (const source of ['psql("select 1")', 'app.psql(`x`)', "verb('app', ['seed'])", 'createAdminWithCommand(a, b, c);']) {
+      expect(DATABASE_WRITER.test(source), source).toBe(true);
+    }
+    for (const source of ["psqlScalar('select 1')", "execIn('db', ['sh'])", 'const verbose = 1;', 'serviceLogs(`app`)']) {
+      expect(DATABASE_WRITER.test(source), source).toBe(false);
+    }
+    const specs = { 'tests/e2e/a.spec.ts': 'psql("x")', 'tests/e2e/b.spec.ts': "verb('app', [])", 'tests/e2e/c.spec.ts': 'const x = 1;' };
+    expect(serialListProblems(['a', 'b'], specs)).toEqual([]);
+    expect(serialListProblems(['a'], specs)).toEqual(['b: writes a database, not in SERIAL_SPECS']);
+    expect(serialListProblems(['a', 'b', 'z'], specs)).toEqual(['z: listed, but no such spec']);
+    expect(serialListProblems(['a', 'a', 'b'], specs)).toEqual(['a: listed twice']);
+    expect(serialListProblems(['c', 'a', 'b'], specs)).toEqual([]);
+
+    // (f) the project parsers: names in order, and a block that reads only its own text.
+    expect(projectNames("projects: [{ name: 'chromium' }, {\n name: 'serial',\n workers: 1 }]")).toEqual(['chromium', 'serial']);
+    expect(projectNames("projects: [{ name: 'chromium' }, { name: 'containers' }, { name: 'serial' }]")).toEqual(['chromium', 'containers', 'serial']);
+    expect(projectNames('const x = { id: 1 };')).toEqual([]);
+    const sample = "projects: [\n  {\n    name: 'one',\n    use: { x: 1 },\n  },\n  {\n    name: 'two',\n    workers: 1,\n  },\n]";
+    expect(projectBlock(sample, 'one')).toBe("{\n    name: 'one',\n    use: { x: 1 },\n  }");
+    expect(projectBlock(sample, 'two')).toContain('workers: 1');
+    expect(projectBlock(sample, 'two')).not.toContain("'one'");
+    expect(projectBlock(sample, 'three')).toBeNull();
+    expect(projectBlock("{ use: { a: 1 }, name: 'x' }", 'x')).toBeNull();
+
+    // (g) an import of the old helper, by any path, and a call of its function.
+    for (const source of ["import { startIsolatedApp } from '../support/isolated-app';", 'import x from "./isolated-app"', 'await startIsolatedApp(spec)']) {
+      expect(ISOLATED_APP_IMPORT.test(source), source).toBe(true);
+    }
+    for (const source of ["import { signInAsAdmin } from '../support/admin-e2e';", "import { origin } from '../support/e2e-stack';"]) {
+      expect(ISOLATED_APP_IMPORT.test(source), source).toBe(false);
+    }
   });
 });

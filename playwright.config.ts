@@ -40,10 +40,9 @@ process.env.E2E_FLAG_OFF_PORT = String(e2ePorts[2]);
 process.env.E2E_FLAG_ON_PORT = String(e2ePorts[3]);
 const baseURL = `http://127.0.0.1:${e2ePorts[0]}`;
 
-// Playwright runs the projects another project depends on in full: the CLI
-// --grep-invert (test:e2e:ci) is not applied to them, so `chromium` and `containers`, the
-// dependencies of `catalogue-file`, would run every @layout test. The same
-// pattern is passed to those projects here, read from the command line.
+// Playwright runs the projects another project depends on in full: the CLI --grep-invert (test:e2e:ci)
+// is not applied to them, so `chromium`, the dependency of `serial`, would run every @layout test. The
+// same pattern is passed to it here, read from the command line.
 function cliGrepInvert(): RegExp | undefined {
   const args = process.argv;
   const i = args.findIndex((a) => a === '--grep-invert' || a === '-gv');
@@ -56,18 +55,17 @@ function cliGrepInvert(): RegExp | undefined {
   return value ? new RegExp(value) : undefined;
 }
 
-const CATALOGUE_FLOW = /catalogue-file-flow\.spec\.ts$/;
-// Specs that create or remove a container (docker/compose run, docker rm, startIsolatedApp,
-// createAdminWithCommand). They run in `containers`, one worker, after `chromium` (#361): a container's
-// start or stop changes a network interface, and Chromium cancels the page loads waiting on a socket
-// when that happens, so no browser test may load a page beside one. tests/unit/gate-determinism.test.ts
-// keeps this list and the specs that start containers in step.
-const CONTAINER_SPECS = [
-  'admin', 'admin-categories', 'admin-feeds', 'admin-products', 'admin-sources',
-  'car-header-error', 'collected-admin', 'collected-public', 'collected-start',
-  'entrypoint', 'search-privacy',
+// The specs that write a database (#363): SQL through `psql`, a verb that writes (`import-feeds`,
+// `create-admin`, `seed`, `migrate`), or an admin form that saves. They run in `serial`, one worker, after
+// every `chromium` spec has finished, so nothing reads the e2e database beside a write. Rule: a spec that
+// writes any database is serial, and leaves the database as it found it in what the other specs read (no
+// approved feed or shop it created, no hidden demo item, no changed demo mapping). tests/unit/gate-determinism.test.ts
+// keeps this list and the specs in step.
+const SERIAL_SPECS = [
+  'admin', 'admin-categories', 'admin-feeds', 'admin-products', 'catalogue-file-flow',
+  'collected-admin', 'collected-public', 'collected-start', 'entrypoint',
 ];
-const CONTAINERS = new RegExp(`(^|[\\\\/])(${CONTAINER_SPECS.join('|')})\\.spec\\.ts$`);
+const SERIAL = new RegExp(`(^|[\\\\/])(${SERIAL_SPECS.join('|')})\\.spec\\.ts$`);
 
 // No webServer: the e2e Compose project is the server under test, started by the global setup.
 export default defineConfig({
@@ -84,32 +82,24 @@ export default defineConfig({
   // the CI workflows upload that folder when the gate fails. A passing test keeps nothing. Retries
   // stay at their default of 0 (0006 rule 6).
   use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
-  // Three projects, one after the other (#361). `chromium` holds every spec that starts no container.
-  // `containers` holds the specs that create or remove one, on a single worker, so a container's start
-  // or stop never lands beside another test's page load. The catalogue-file flow (S3.7) approves a feed
-  // of its own and imports it, so it runs last, in a project that starts only after every other spec has
-  // finished: an `import-feeds` of `entrypoint.spec.ts`, or a spec that counts feeds or public
-  // products, would otherwise see that approved feed. It leaves its feed and shop unapproved when it ends.
+  // Two projects, one after the other (#363). `chromium` holds every spec that only reads, in parallel.
+  // `serial` holds the specs that write a database, on a single worker, after `chromium`: an approved feed or
+  // a hidden demo product would otherwise be counted by a spec that reads the database in parallel, and
+  // `entrypoint.spec.ts` asserts the demo feed totals. No spec starts or stops a container (the stack is up
+  // before the first test), so nothing changes a network interface under a page load.
   projects: [
     {
       name: 'chromium',
-      testIgnore: [CATALOGUE_FLOW, CONTAINERS],
+      testIgnore: SERIAL,
       grepInvert: cliGrepInvert(),
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'containers',
-      testMatch: CONTAINERS,
+      name: 'serial',
+      testMatch: SERIAL,
       dependencies: ['chromium'],
       workers: 1,
       grepInvert: cliGrepInvert(),
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'catalogue-file',
-      testMatch: CATALOGUE_FLOW,
-      dependencies: ['containers'],
-      workers: 1,
       use: { ...devices['Desktop Chrome'] },
     },
   ],

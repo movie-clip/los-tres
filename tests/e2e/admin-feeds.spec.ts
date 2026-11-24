@@ -1,27 +1,26 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { createAdminWithCommand, psql, psqlScalar, signInAs } from '../support/admin-e2e';
+import { signInAsAdmin } from '../support/admin-e2e';
+import { psql, psqlScalar } from '../support/e2e-stack';
 import { loadEnv } from '../support/env';
 import { expectNoSetCookie, reflowProblems, stripScripts } from '../support/page-checks';
 
-// US-3.1 against the Compose stack: the admin registers a network, a shop and a feed through
+// US-3.1 against the e2e stack: the admin registers a network, a shop and a feed through
 // the forms, from sign-in to the feed (ACs 37 to 43), and the pages and forms keep their
 // promises in a browser.
 //
-// This spec writes to the development database, which admin-sources.spec.ts (S2.3, read-only)
-// never does, so it is bounded: it uses two FIXED, test-only sets of rows (a network, a shop and a
+// This spec writes to the e2e database, which admin-sources.spec.ts (S2.3, read-only)
+// never does, so it is bounded and runs in the `serial` project: it uses two FIXED, test-only sets of rows (a network, a shop and a
 // feed each, identified by a stable slug and a stable host), created through the forms the first
 // time and found again on every later run, so repeated runs never add a row (S3.1 follow-up,
 // #295). `resetRows()` puts a found set back in the state the creation leaves (names, the feed's
 // address and network, nothing approved). The one feed it approves is un-approved again by the
 // spec itself (that is what AC 20 shows) and, as a safety net, by `releaseRows()` before and
 // after the run, so an approved e2e feed with an https address never reaches the next
-// `import-feeds`. There is no delete verb. It owns its own admin account.
+// `import-feeds`. There is no delete verb. It signs in as the e2e admin the global setup created.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
-const EMAIL = 'e2e-feeds-admin@example.test';
-const PASSWORD = 'e2e-feeds-password-1';
 /** A fixed token, not a run id: the rows of this spec are reused from run to run. */
 const RUN = 'fixed';
 
@@ -81,7 +80,6 @@ function resetRows(): void {
 }
 
 test.beforeAll(() => {
-  createAdminWithCommand(EMAIL, PASSWORD, 'admin feeds e2e');
   releaseRows();
   resetRows();
 });
@@ -169,7 +167,7 @@ test.describe('anonymous visitors (AC 3)', () => {
 
 test.describe('the form routes, signed in (AC 3, 37)', () => {
   test('each is noindex and no-store, sets no cookie, keeps the nav item current and adds no nav link', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     const hrefs = async (name: RegExp) => (await page.getByRole('link', { name }).first().getAttribute('href'))!;
     const routes: [string, string][] = [
@@ -202,7 +200,7 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
   });
 
   test('a malformed or unknown id is the admin not-found screen, inside the shell', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     for (const path of [
       '/admin/tiendas/red/2000000000/editar',
       '/admin/tiendas/tienda/abc/editar',
@@ -220,7 +218,7 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
     loadEnv();
     const siteName = (process.env.SITE_NAME ?? '').trim();
     const notFoundTitle = messages.Admin.Meta.notFoundTitle.replace('{siteName}', siteName);
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     const titles: Record<string, string> = {};
     for (const path of [
       '/admin/tiendas/feed/999999/editar',
@@ -253,7 +251,7 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
   });
 
   test('the list offers no delete control and no field mapping choice anywhere (AC 18, 34)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     for (const path of [SOURCES, '/admin/tiendas/feed/nuevo', '/admin/tiendas/red/nueva', '/admin/tiendas/tienda/nueva']) {
       await page.goto(path);
       const text = (await page.locator('main').innerText()).toLowerCase();
@@ -265,7 +263,7 @@ test.describe('the form routes, signed in (AC 3, 37)', () => {
 
 test.describe('refusals come back next to the field, never with the address (AC 8, 12, 15, 16, 27, 41, 46)', () => {
   test('the network form refuses an empty form, a bad slug and the reserved slug demo, and writes nothing', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas/red/nueva');
 
     await page.getByTestId('form-submit').click();
@@ -295,7 +293,7 @@ test.describe('refusals come back next to the field, never with the address (AC 
   });
 
   test('the shop form refuses the reserved prefix tienda-demo-, accepts nothing half-written, and a name that is too long', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas/tienda/nueva');
     await page.getByLabel(form.nameLabel, { exact: true }).fill('x'.repeat(121));
     await page.getByLabel(form.slugLabel, { exact: true }).fill('tienda-demo-x');
@@ -308,7 +306,7 @@ test.describe('refusals come back next to the field, never with the address (AC 
   });
 
   test('a failed write keeps the typed name and shows the error block above the fields', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     await page.getByRole('link', { name: /^Editar red /, includeHidden: false }).first().click();
     await expect(page.getByTestId('source-form')).toBeVisible();
@@ -343,7 +341,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
     };
 
     // Sign in, then reach the page through the nav, as an admin would.
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     const link = page.getByTestId('admin-nav').getByRole('link', { name: messages.Admin.Nav.feeds });
     await link.click();
     await expect(page).toHaveURL(/\/admin\/tiendas\/?$/);
@@ -411,7 +409,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
   });
 
   test('the feed edit form opens with an empty address, the warning appears for an approved feed, and an empty save changes nothing', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     // Approve the shop and the feed (the S2.3 controls, unchanged); the result line makes no promise of offers.
     const row = shopGroup(page, SHOP.name);
@@ -455,7 +453,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
   });
 
   test('typing a new address on an approved feed asks first, Cancelar returns focus, and confirming leaves the feed unapproved', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(`${SOURCES}/feed/${feedId}/editar`);
     const address = page.getByLabel(form.Feed.urlLabelEdit, { exact: true });
     await address.fill(URL_SECOND);
@@ -492,7 +490,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
   });
 
   test('the feed form refuses each bad address next to its field, leaves it empty and repeats nothing', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(`${SOURCES}/feed/nuevo`);
     const submit = page.getByTestId('form-submit');
     const address = page.getByLabel(form.Feed.urlLabelNew, { exact: true });
@@ -543,7 +541,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
   });
 
   test('a demo feed shows no address field and keeps its network editable; a demo shop and network carry the Demo mark (AC 22, 35)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     const demoFeed = page.getByTestId(/^source-feed-/).filter({ has: page.getByTestId('demo-mark') }).first();
     await expect(demoFeed.getByTestId('source-value')).toContainText(copy.domainNone);
@@ -580,7 +578,7 @@ test.describe('from sign-in to a registered feed (AC 6 to 14, 19 to 21, 23 to 27
   });
 
   test('the shop this spec approved is disabled again, so no e2e shop is left approved', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     const row = shopGroup(page, SHOP.name).getByTestId(/^source-shop-/);
     await row.getByTestId('source-disable').click();
@@ -596,7 +594,7 @@ test.describe('the longest values the validation accepts reflow at 390 and 1280 
   const routes: Record<string, string> = {};
 
   test('creates a 120-character network and shop, a 64-character slug and a feed on a 253-character host', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     // Found on a later run (and reset in beforeAll); created through the forms only when missing.
     if (!networkExists(LONG_NETWORK_SLUG)) await createNetwork(page, LONG_NAME, LONG_NETWORK_SLUG);
     if (!shopExists(LONG_SHOP_SLUG)) await createShop(page, LONG_NAME, LONG_SHOP_SLUG);
@@ -618,7 +616,7 @@ test.describe('the longest values the validation accepts reflow at 390 and 1280 
   for (const width of widths) {
     test(`the list and the six forms show no sideways scroll and no cut text at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
-      await signInAs(page, EMAIL, PASSWORD);
+      await signInAsAdmin(page);
       const pages = [SOURCES, `${SOURCES}/red/nueva`, `${SOURCES}/tienda/nueva`, routes.newFeed, routes.network, routes.shop, routes.feed];
       for (const path of pages) {
         await page.goto(path);
@@ -630,7 +628,7 @@ test.describe('the longest values the validation accepts reflow at 390 and 1280 
 
   test('every link, field and select of the forms is at least 44px tall at 390', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     for (const path of [`${SOURCES}/feed/nuevo`, routes.network, routes.feed]) {
       await page.goto(path);
       const small = await page
@@ -649,7 +647,7 @@ test.describe('the longest values the validation accepts reflow at 390 and 1280 
 // UX spec says a refusal keeps (05-ux § 6 "Refused", check 25), which the form does not keep yet.
 test.describe('the choices stay after a refusal (05-ux § 6, check 25)', () => {
   test('the shop and network selects keep what was chosen, and the typed name stays', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(`${SOURCES}/feed/nuevo`);
     await page.getByLabel(form.Feed.shopLabel, { exact: true }).selectOption({ label: SHOP.name });
     await page.getByLabel(form.Feed.networkLabel, { exact: true }).selectOption({ label: NETWORK.name });
