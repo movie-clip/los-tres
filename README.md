@@ -102,5 +102,7 @@ sign-in, and run it with `npm run dev -- -p <port>` if 3000 is taken.
 
 ## Checks
 
-`npm run gate` runs lint, types, unit/integration tests and Playwright e2e. See
-`CLAUDE.md` for the full command reference.
+`npm run gate` runs lint, types, unit/integration tests and Playwright e2e. The
+e2e run builds and removes a Compose stack of its own, so it does not need the
+stack above and does not touch its database. See `CLAUDE.md` for the full
+command reference.
