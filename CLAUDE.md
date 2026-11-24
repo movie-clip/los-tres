@@ -278,7 +278,9 @@ deploy it must be the public https origin**, or all of them point at
 
 `npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
 in that order. It rebuilds the app image and runs the e2e against the Compose
-stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
+stack, so it takes minutes, and it leaves the stack running. Playwright has three
+projects, `chromium`, then `containers` (the specs that start a container) on one
+worker, then `catalogue-file` (#361). `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
 (`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
 instead of a time, and their timings run on demand with `npm run test:timing`,
