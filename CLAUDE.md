@@ -278,7 +278,9 @@ deploy it must be the public https origin**, or all of them point at
 
 `npm run gate` is `lint`, `typecheck`, `db:up`, `test`, `stack:up`, `test:e2e`,
 in that order. It rebuilds the app image and runs the e2e against the Compose
-stack, so it takes minutes, and it leaves the stack running. `typecheck` in the
+stack, so it takes minutes, and it leaves the stack running. Playwright has three
+projects, `chromium`, then `containers` (the specs that start a container) on one
+worker, then `catalogue-file` (#361). `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
 (`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
 instead of a time, and their timings run on demand with `npm run test:timing`,
@@ -310,7 +312,12 @@ pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
 `gate` except that its e2e step skips the tests tagged `@layout`: pixel
 geometry written against Windows system-ui font metrics, which fails on the
 Linux runner. The local `npm run gate` stays the gate and runs everything,
-`@layout` included; a story is still not done until it exits 0.
+`@layout` included; a story is still not done until it exits 0. When a gate run
+fails, `gate.yml` uploads `test-results/` (the trace and screenshot of each
+failing test, which `playwright.config.ts` keeps on failure only) as a workflow
+artifact for 7 days; `gate-repeat.yml` does the same from an identical step
+(#361). A trace may hold the ephemeral CI admin session and test credentials, in
+a public repository's artifacts (#361).
 
 **Repeat run (`gate-repeat`, 0006 rule 7).** `.github/workflows/gate-repeat.yml`
 starts only by hand (its one trigger is `workflow_dispatch`): on GitHub, Actions,
@@ -328,7 +335,8 @@ runs, in parallel on separate runners:
 
 - **`runs` copies**, named `repeat <n>`, each the steps of the `gate` job of
   `gate.yml` (checkout, Node, `npm ci`, `env:init`, Playwright chromium,
-  `npm run gate:ci`, Compose logs on failure, Compose down), with the same 45
+  `npm run gate:ci`, Compose logs on failure, Playwright output upload on
+  failure, Compose down), with the same 45
   minute timeout. One red copy does not stop the others. A pin in
   `tests/unit/gate-determinism.test.ts` fails when a copy and the `gate` job
   drift apart.
