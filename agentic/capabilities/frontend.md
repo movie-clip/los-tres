@@ -142,7 +142,6 @@ Working-copy files are CRLF on Windows (autocrlf): edit existing files with the 
 
 - [ ] Every guardrail above checked against your diff
 - [ ] Types mirror the backend contract notes exactly
-- [ ] Lint and test commands from `CLAUDE.md` § Commands run and passing, or
-      their absence reported
+- [ ] `npm run check` run and passing (0006 rule 8); the full `npm run gate` runs at the integration review
 - [ ] Any convention you established written as a `pack_corrections` entry for
       this file

@@ -93,9 +93,7 @@ frontend, then test. Name which lane owns what.
 
 ## Integration review: the checks only you can make
 
-1. **A gate command exists.** `CLAUDE.md` § Commands lists a lint and a test
-   command, and you ran both. If it lists none, the result is `BLOCKING`: "no
-   mechanical gate exists". Do not pass a build with no gate.
+1. **The gate ran and exited 0.** You ran `npm run gate` (`CLAUDE.md` § Commands), and integration cannot pass unless it exits 0. Build lanes verify with `npm run check` only (0006 rule 8), so this is the first full gate run on the work. If § Commands lists no gate, the result is `BLOCKING`: "no mechanical gate exists".
 2. **Field-by-field contract alignment** between server and client types.
 3. **Guardrails, by seam.** Check that a public read cannot return an offer
    from an unapproved feed or a hidden item, and that nothing fetches a shop's
@@ -119,12 +117,13 @@ frontend, then test. Name which lane owns what.
      `new`, `vi.getRealSystemTime()`, SQL `now()` compared in an assert.
    - A change to a query the timing tests measure ran `npm run test:timing`
      and records the table in its report.
+8. **Budgets and counts** (0006 rules 13 to 15). After the gate passes, run with Bash `time`, in this order: `npm run check`, `npm run test:integration`, `npm run gate`, then `npm run test:e2e` against the stack the gate left up. Write a `## Budgets and counts` section: each time beside its budget (check 90 s, integration 60 s, e2e 90 s, gate 4 min; e2e and gate provisional until #363), the CPU count and `INTEGRATION_WORKERS`; start `verification.detail` with the four times. Give runner totals per level at HEAD (the `Tests` lines of `npm run test:unit` and `npm run test:integration`, `npx playwright test --list`) and the tests added and removed per level from declarations `^[+-]\s*(it|test)(\.\w+)*\(` in `git diff main...HEAD -U0`, saying that it undercounts parametrised tests. Judge each new test against rules 9 to 11: the lowest level that observes it, one test per acceptance criterion, no presentation assertion in an e2e.
 
 ## Severity calls
 
 `BLOCKING`: guardrail violation; contract mismatch across lanes; no gate
 command; a second public-visibility filter or a second writer of products,
-offers or clicks; a type error.
+offers or clicks; a type error; a step over a non-provisional budget (0006 rule 14) with no trim in the same pull request, which is escalated to the owner for a ruling rather than passed.
 
 `SHOULD_FIX`: naming inconsistent with neighbours; thin but not wrong tests; a
 missed reuse that does not duplicate logic.

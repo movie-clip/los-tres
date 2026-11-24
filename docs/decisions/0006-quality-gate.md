@@ -210,9 +210,10 @@ rules continue the numbering of the amendment above.
     removes two entries whose features are deferred.
 13. **Budgets.** On the dev machine, the one where `npm run gate` is the gate:
     `check` 90 s, integration 60 s, e2e 90 s, full gate 4 min. Each is measured
-    with `time` on the command alone, in that order after the build is final,
-    on a warm Docker and database: `npm run check`, `npm run test:integration`,
-    `npm run gate`, then `npm run test:e2e` against the stack the gate left up.
+    with `time` on the command alone, after the build is final, on a warm
+    Docker and database, in this order: `npm run check`,
+    `npm run test:integration`, `npm run gate`, then `npm run test:e2e` against
+    the stack the gate left up.
     Nothing else heavy runs during a measurement, and the report records the CPU
     count and `INTEGRATION_WORKERS`. The e2e and full-gate budgets are
     provisional until issue #363 lands: they are reported, and rule 14 applies
