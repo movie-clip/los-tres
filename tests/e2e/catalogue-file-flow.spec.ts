@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -8,29 +7,27 @@ import { createTranslator } from 'use-intl/core';
 import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
 import { CATALOGUE_FILE_KINDS, CATALOGUE_FILE_NAME_MAX } from '../../src/server/catalogue-file-name';
 import messages from '../../messages/es-ES.json';
-import { createAdminWithCommand, psql, psqlScalar, signInAs } from '../support/admin-e2e';
+import { signInAsAdmin } from '../support/admin-e2e';
+import { execIn, psql, psqlScalar, verb } from '../support/e2e-stack';
 import { normaliseSpaces } from '../support/messages';
 import { expectNoSetCookie, stripScripts } from '../support/page-checks';
 
 // S3.7 (T3.7.4), the one flow from sign-in to a public product made from a catalogue file: the
-// admin registers a shop and a file feed through the forms, approves both, the Compose import reads
+// admin registers a shop and a file feed through the forms, approves both, the import in the e2e `app` reads
 // the fixed invented file through the bind mount, the admin maps the file's category, and the product
 // is on its public page with a link that goes to the shop through /go.
 //
-// Ordering (03-design § Risks detail): this spec runs in its own Playwright project, after every
-// other spec (`dependencies` in playwright.config.ts). Its feed is approved for a while, and an
-// approved feed would be read by an `import-feeds` of `entrypoint.spec.ts` and counted by the
-// specs that count feeds and public products.
+// Ordering: this spec runs in the `serial` project (#363), one worker, after the `chromium` project,
+// so nothing reads the database beside it. Its feed is approved for a while, and an approved feed
+// would be read by an `import-feeds` of `entrypoint.spec.ts`, so it unapproves its feed and shop in
+// the spec and `cleanRows()` does it again, before and after the run.
 //
 // What it leaves behind: the FIXED shop and feed rows (unapproved), nothing else. The file is
 // written into the repo's catalogue-files/ under one fixed invented name and removed again, before
 // and after the run; no other file of that folder is read or touched. Its offers, product, click rows
 // and category records are deleted by `cleanRows()` before and after, so a repeated run adds no row.
-// It owns its own admin account.
+// It signs in as the e2e admin the global setup created.
 test.describe.configure({ mode: 'serial', timeout: 180_000 });
-
-const EMAIL = 'e2e-catalogo-admin@example.test';
-const PASSWORD = 'e2e-catalogo-password-1';
 
 const copy = messages.Admin.Sources;
 const form = messages.Admin.Form;
@@ -110,17 +107,13 @@ function cleanRows(): void {
   );
 }
 
-/** The Compose import, on the one feed: the same command the e2e setup runs, with `--feed`. */
+/** The import in the e2e `app`, on the one feed: the same verb the e2e setup runs, with `--feed`. */
 function composeImport(feedId: number): { status: number | null; out: string } {
-  const result = spawnSync('docker', ['compose', 'run', '--rm', '-T', '--no-deps', 'app', 'import-feeds', '--feed', String(feedId)], {
-    encoding: 'utf8',
-    timeout: 150_000,
-  });
-  return { status: result.status, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
+  const result = verb('app', ['import-feeds', '--feed', String(feedId)], { timeout: 150_000 });
+  return { status: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
 test.beforeAll(() => {
-  createAdminWithCommand(EMAIL, PASSWORD, 'catalogue file e2e');
   cleanRows();
 });
 test.afterAll(() => {
@@ -140,25 +133,18 @@ const shopRow = (page: Page): Locator => shopGroup(page).getByTestId(/^source-sh
 
 /** A signed-in admin page on the list. */
 async function openList(page: Page): Promise<void> {
-  await signInAs(page, EMAIL, PASSWORD);
+  await signInAsAdmin(page);
   await page.goto(SOURCES);
 }
 
 test.describe('the image holds no catalogue file (AC 31)', () => {
   test('the built app image has no catalogue-files folder, and the owner folder is only mounted', () => {
-    const images = spawnSync('docker', ['compose', 'config', '--images'], { encoding: 'utf8', timeout: 60_000 });
-    const appImage = (images.stdout ?? '')
-      .split(/\s+/)
-      .map((name) => name.trim())
-      .find((name) => name !== '' && !name.startsWith('postgres'));
-    expect(appImage, 'the app image name from compose config').toBeTruthy();
-
-    // Run from the image alone, with no mount: nothing of the folder may be baked in.
-    const probe = spawnSync('docker', ['run', '--rm', '--entrypoint', 'sh', appImage!, '-c', 'test ! -e /app/catalogue-files && echo absent'], {
-      encoding: 'utf8',
-      timeout: 90_000,
-    });
-    expect(probe.stdout.trim(), probe.stderr).toBe('absent');
+    // `app-no-db` runs the same image as `app` with no mount: nothing of the folder may be baked in.
+    const absent = execIn('app-no-db', ['sh', '-c', 'test ! -e /app/catalogue-files && echo absent'], { timeout: 90_000 });
+    expect(absent.stdout.trim(), absent.stderr).toBe('absent');
+    // And the same folder is there, mounted, in `app`.
+    const mounted = execIn('app', ['sh', '-c', 'test -d /app/catalogue-files && echo mounted'], { timeout: 90_000 });
+    expect(mounted.stdout.trim(), mounted.stderr).toBe('mounted');
   });
 });
 
@@ -333,7 +319,7 @@ test.describe('a shop and a file feed, registered through the forms (AC 1, 2, 9,
   });
 
   test('the category screen names the unimported file feed by its file name and says how it is imported (AC 10)', async ({ page }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto('/admin/categorias');
     const section = page.getByTestId(`category-feed-${sql.feedId()}`);
     await expect(section.getByTestId('category-feed-domain')).toHaveText(`${copy.fileLabel} ${FILE}`);
@@ -362,7 +348,7 @@ test.describe('the two approvals, and a changed file name (AC 11, 12, 14)', () =
 
   test('an approved file feed warns before anything is typed; the same name saves without a panel and stays approved', async ({ page }) => {
     const feedId = sql.feedId();
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(`${SOURCES}/feed/${feedId}/editar`);
     await page.waitForLoadState('networkidle');
 
@@ -383,7 +369,7 @@ test.describe('the two approvals, and a changed file name (AC 11, 12, 14)', () =
 
   test('a new name opens the panel, Cancelar writes nothing, and confirming leaves the feed unapproved with the new name', async ({ page }) => {
     const feedId = sql.feedId();
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(`${SOURCES}/feed/${feedId}/editar`);
     await page.waitForLoadState('networkidle');
     await page.locator('#source-file').fill(FILE_RENAMED);
@@ -449,7 +435,7 @@ test.describe('from the file to a public product (AC 18, 19, 26 to 29, 42)', () 
   });
 
   test('the file feed category is listed as not reviewed and the product is still not public (AC 28, 29)', async ({ page, request }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto('/admin/categorias');
     const section = page.getByTestId(`category-feed-${feedId}`);
     await expect(section.getByTestId('category-name')).toHaveText([FEED_CATEGORY]);
@@ -462,7 +448,7 @@ test.describe('from the file to a public product (AC 18, 19, 26 to 29, 42)', () 
   });
 
   test('mapping the category publishes the product on the next request, with no second import', async ({ page, request }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto('/admin/categorias');
     await page.waitForLoadState('networkidle');
     const row = page.getByTestId(`category-feed-${feedId}`).getByTestId('category-row');
@@ -543,7 +529,7 @@ test.describe('from the file to a public product (AC 18, 19, 26 to 29, 42)', () 
   });
 
   test('unapproving the feed takes the product off every public reader at once, and the import then skips it without a file (AC 15)', async ({ page, request }) => {
-    await signInAs(page, EMAIL, PASSWORD);
+    await signInAsAdmin(page);
     await page.goto(SOURCES);
     await page.waitForLoadState('networkidle');
     await feedRow(page, feedId).getByTestId('source-disable').click();

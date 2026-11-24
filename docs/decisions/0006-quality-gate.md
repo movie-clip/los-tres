@@ -2,7 +2,11 @@
 
 Status: accepted, 2026-10-12. Revised 2026-10-16 for the price-comparison
 scope. Amended 2026-11-23: time in tests (below). Amended 2026-11-24: test
-levels, the fast check and budgets (the last section).
+levels, the fast check and budgets (the last section). Amended 2026-11-24
+(issue #363, owner rulings D-3 to D-6, D-9 to D-11 of run
+2026-11-24-363-e2e-own-stack): the e2e run builds, starts and removes a Compose
+project of its own, and the gate is `check` then the e2e run, with no
+`stack:up` step (rules 7, 8 and 13, and the closing section).
 
 ## Decision
 
@@ -94,8 +98,10 @@ requests, not to test files, and no pin reads it.
    until it passes. "How tests execute" means `vitest.config.mts`,
    `vitest.timing.config.mts`, `playwright.config.ts`,
    `tests/support/global-setup.ts`, `tests/support/test-database-env.ts`,
-   `tests/support/env.ts`, `tests/support/db.ts`, `tests/support/isolated-app.ts`,
-   `tests/e2e/global-setup.ts`, any file in `.github/workflows/`, the `test*`,
+   `tests/support/env.ts`, `tests/support/db.ts`, `tests/support/e2e-stack.ts`,
+   `tests/e2e/global-setup.ts`, `tests/e2e/global-teardown.ts`,
+   `tests/e2e/compose.e2e.yaml`, the files in `tests/e2e/db-init/`, any file in
+   `.github/workflows/`, the `test*`,
    `gate*`, `check*`, `db:*` and `stack:*` scripts in `package.json`, and the `db` service
    in `compose.yaml`. Nothing enforces rule 7 by machine: the owner checks it
    before merging and the integration review checks it, and no pin reads a pull
@@ -161,8 +167,10 @@ rules continue the numbering of the amendment above.
    pull request and in CI, and decides "done". `gate` and `gate:ci` start with
    `npm run check`, so the shared steps have one definition. The scripts read:
    `"check": "npm run lint && npm run typecheck && npm run db:up && npm test"`,
-   `"gate": "npm run check && npm run stack:up && npm run test:e2e"` and
-   `"gate:ci": "npm run check && npm run stack:up && npm run test:e2e:ci"`.
+   `"gate": "npm run check && npm run test:e2e"` and
+   `"gate:ci": "npm run check && npm run test:e2e:ci"`. There is no
+   `stack:up` step (#363): the e2e run's global setup builds the app image and
+   starts its own Compose project, and its global teardown removes it.
 9. **The test level.** A behaviour is tested at the lowest level that can
    observe it.
    - Unit: pure logic, static renders and repository scans.
@@ -212,8 +220,9 @@ rules continue the numbering of the amendment above.
     `check` 90 s, integration 60 s, e2e 90 s, full gate 4 min. Each is measured
     with `time` on the command alone, after the build is final, on a warm
     Docker and database, in this order: `npm run check`,
-    `npm run test:integration`, `npm run gate`, then `npm run test:e2e` against
-    the stack the gate left up.
+    `npm run test:integration`, `npm run gate`, then `npm run test:e2e` alone
+    (it builds and removes its own stack, so it needs nothing left up by the
+    gate; the image build is cached by then).
     Nothing else heavy runs during a measurement, and the report records the CPU
     count and `INTEGRATION_WORKERS`. The e2e and full-gate budgets are
     provisional until issue #363 lands: they are reported, and rule 14 applies
@@ -263,13 +272,16 @@ deferred:
 **Not weakened.** Each of the five guardrails keeps its failing-if-broken tests
 at their current levels. The guardrails, money, visibility, import and matching
 keep their tests at integration level, and message text that is logic stays at
-unit level. `gate` keeps every step it has today.
+unit level. `gate` keeps every step it has today except `stack:up` (#363, owner
+ruling D-4): the app image build moved into the e2e global setup, and the gate
+no longer starts, refreshes or leaves up the development app.
 
 **What enforces them.**
 
 | Rule | Checked by |
 |---|---|
-| 8 (the steps) | `tests/unit/gate-determinism.test.ts`, pinned: `check` expands to `lint`, `typecheck`, `db:up`, `test` in order; nothing reached from it, hooks included, is `stack:up`, an e2e run, `build`, `dev` or text with `playwright` or `--build`; `scripts.test` is `vitest run`; `gate` and `gate:ci` expand to the steps of `check` plus `stack:up` and `test:e2e` (`test:e2e:ci`); each of the three is bare npm calls joined by `&&`. The walk of rule 5 now also starts from `check`, so no timing run is reachable from it. A change to the gate's step list updates those literals on purpose. |
+| 8 (the steps) | `tests/unit/gate-determinism.test.ts`, pinned: `check` expands to `lint`, `typecheck`, `db:up`, `test` in order; nothing reached from it, hooks included, is `stack:up`, an e2e run, `build`, `dev` or text with `playwright` or `--build`; `scripts.test` is `vitest run`; `gate` and `gate:ci` expand to the steps of `check` plus `test:e2e` (`test:e2e:ci`), 5 steps each; each of the three is bare npm calls joined by `&&`; neither gate script reaches `stack:up` or `stack:down`, and `test:e2e` and `test:e2e:ci` are `playwright test` and `playwright test --grep-invert @layout` and nothing more. The walk of rule 5 now also starts from `check`, so no timing run is reachable from it. A change to the gate's step list updates those literals on purpose. |
+| 7, 8 (the e2e stack, #363) | `tests/unit/gate-determinism.test.ts`, pinned, describe "the e2e run owns its stack: one project, set in the config (#363)", items (a) to (g): `playwright.config.ts` has one `globalSetup` and one `globalTeardown`, both files existing, and assigns `COMPOSE_PROJECT_NAME` once (a name other than the `name:` of `compose.yaml`, equal to the `image:` prefix of `tests/e2e/compose.e2e.yaml`) and `COMPOSE_FILE` naming `compose.yaml` and the override; no file in `tests/e2e` or `tests/support` assigns those variables, names `E2E_BASE_URL` or passes `-p`, `--project-name`, `-f` or `--file`, and only `tests/support/e2e-stack.ts` reads the project name or spawns `docker`; the files holding a lifecycle command (`run`, `rm`, `create`, `start`, `stop`, `kill`, `restart`, `up`, `down`, `build`, `pause`, `unpause`, or `--network`) are exactly `global-setup.ts` and `global-teardown.ts`, so no spec starts or stops a container; `SERIAL_SPECS` is a literal list of existing spec stems, with every spec that calls `psql`, `verb` or `createAdminWithCommand` in it; the projects are exactly `chromium` (`testIgnore: SERIAL`, no `dependencies`, no `workers`) and `serial` (`testMatch: SERIAL`, `dependencies: ['chromium']`, `workers: 1`); `tests/support/isolated-app.ts` does not exist and `createAdminWithCommand(` is called once in the specs, in `admin.spec.ts`. Review, not pinned: that a lifecycle command built from a variable or joined string, or a `compose exec` that changes a container's state, is not seen (the `docker events` check of the integration review covers it). |
 | 8 (lanes verify with it) | The work orders and the integration review. Nothing machine-checks which command a lane ran. |
 | 9, 10, 11, 12 | The integration review only. Nothing machine-checks the level of a test, its locators or the journey list. |
 | 13, 14, 15 | The integration review only. Nothing machine-checks a time or a count; the numbers are measured by the commands rule 13 names. |

@@ -80,8 +80,18 @@ while they build (0006 rule 8).
 
 First run on a fresh clone: `npm ci`, `npm run env:init`,
 `npm run test:e2e:install`. The gate also needs Docker running and a free host
-port for each published service (app on 3010, db on 5433); if one is taken, set
-`APP_PORT` or `DB_HOST_PORT` in `.env` (and `SITE_URL` to match `APP_PORT`) to change the host port.
+port for the database `npm run check` starts with `db:up` (db on 5433); if it is
+taken, set `DB_HOST_PORT` in `.env` to change it. The gate does not start the
+development app, so it does not need `APP_PORT` (3010) free; `APP_PORT` and
+`SITE_URL` matter for `npm run stack:up` only.
+The e2e run builds its own stack (see the e2e row below) and needs four more
+free loopback ports: `E2E_APP_PORT` and the next three, 3020 to 3023 by default.
+Set `E2E_APP_PORT` in `.env` to move them (a whole number from 1024 to 65532;
+the other three are always `E2E_APP_PORT` plus 1, 2 and 3 and cannot be set).
+The run stops with one line, before it starts anything, if one of the four equals
+`APP_PORT` or `DB_HOST_PORT`. `E2E_BASE_URL` is retired: a non-blank value stops
+the run with `e2e config: E2E_BASE_URL is no longer read; the e2e run starts its
+own stack (#363). Remove it from .env`.
 
 After `npm run env:init`, fill in the owner identity in `.env` for the legal
 pages: `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS` and `CONTACT_EMAIL` are
@@ -109,10 +119,11 @@ notice, and a footer linking the three legal pages), continue with:
 writes it. Compose defaults it to `false` when unset, so a server that omits it
 shows no demo data. A `.env` created before slice B lacks the line and
 `env:init` will not touch it: add `SEED_DEMO_DATA=true` by hand and run
-`docker compose up -d` to recreate `app`. Without it, the gate's e2e setup
+`docker compose up -d` to recreate `app`. The e2e stack reads the same
+`SEED_DEMO_DATA` from `.env`; without it, the e2e setup (the gate's last step)
 fails with this message, on one line:
 
-> e2e setup: the import found no approved feed. Set SEED_DEMO_DATA=true in .env and run: docker compose up -d
+> e2e setup: the import found no approved feed. Set SEED_DEMO_DATA=true in .env and run the e2e again
 
 The migrate, seed, import and create-admin verbs also run inside the app image
 through Compose, against the Compose database: `docker compose run --rm app migrate`,
@@ -147,8 +158,11 @@ input), 1 on a failure (an error code only).
 `127.0.0.1`, not `localhost`; a different origin makes sign-in answer
 "unavailable". Without them the admin pages show the Unavailable screen and
 public pages are unaffected; the gate's e2e (`tests/e2e/admin.spec.ts`) fails
-until both are set. That e2e creates its admin, `e2e-admin@example.test`, in the
-development database through `create-admin`. **S2.1 is password-only: do not
+until `AUTH_SECRET` is set (its e2e app takes `SITE_URL` from `E2E_APP_PORT`, not
+from `.env`). The e2e setup creates one admin, `e2e-admin@example.test`, once, in
+the e2e stack's own database through `create-admin`; every admin spec signs in as it,
+and the one `create-admin` test of `admin.spec.ts` uses an email of its own. The
+development database gets no e2e admin. **S2.1 is password-only: do not
 deploy the admin area before S2.2 adds a second factor** (0012).
 
 **Catalogue file (S3.7).** The owner can add real products from a CSV or XML
@@ -273,17 +287,34 @@ deploy it must be the public https origin**, or all of them point at
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
-| e2e | `npm run test:e2e` (`playwright test`; its setup runs `docker compose run --rm -T --no-deps app import-feeds`) | `npm run stack:up` with `SEED_DEMO_DATA=true`, Playwright browser |
+| e2e | `npm run test:e2e` (`playwright test`; its global setup builds and starts its own Compose project, `los-tres-e2e`, and its teardown removes it; see below) | Docker running, `.env` with `SEED_DEMO_DATA=true`, four free loopback ports from `E2E_APP_PORT` (3020), Playwright browser; the development stack is not needed |
 | e2e (CI) | `npm run test:e2e:ci` (`playwright test --grep-invert @layout`: `test:e2e` without the specs tagged `@layout`) | as `test:e2e` |
 | check | `npm run check` (`lint`, `typecheck`, `db:up`, `test`: all of Vitest; no image build, no Playwright; budget 90 s, 0006 rule 13) | Docker running, `.env` |
-| **gate** | `npm run gate` | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
+| **gate** | `npm run gate` (`npm run check && npm run test:e2e`) | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
 | gate (CI) | `npm run gate:ci` (`gate` with `test:e2e:ci` as its last step; what CI runs) | as `gate` |
 
 `npm run gate` is `npm run check` (`lint`, `typecheck`, `db:up`, `test`), then
-`stack:up` and `test:e2e`, in that order. It rebuilds the app image and runs the e2e against the Compose
-stack, so it takes minutes, and it leaves the stack running. Playwright has three
-projects, `chromium`, then `containers` (the specs that start a container) on one
-worker, then `catalogue-file` (#361). `typecheck` in the
+`test:e2e`. It has no `stack:up` step: it neither starts, rebuilds nor leaves up
+the development app, and the development database is not read or written by the
+e2e (`check` still runs `db:up`, so the `db` service is up after it, for the
+integration tests below). The e2e global setup (#363) builds the app image
+`los-tres-e2e-app` (a cache hit when the development image is current), then
+starts the Compose project `los-tres-e2e` from `compose.yaml` plus
+`tests/e2e/compose.e2e.yaml`: a fresh database on a fresh volume (no host port),
+the app on `127.0.0.1:<E2E_APP_PORT>` and three variant apps on the next three
+ports (no database, local flag off, local flag on). It imports the demo feeds
+into each database that needs them and creates the one e2e admin. The global
+teardown writes `test-results/e2e-stack.log`, removes the project with its volume
+(`down --volumes --remove-orphans`) and fails if any container, volume or network
+of the project is left. It runs after a green run, a failed test, a setup that
+threw and Ctrl-C, so the run leaves nothing behind. After a run that was killed
+(a second Ctrl-C, a closed terminal) the next run's setup removes the leftovers
+first; by hand: `docker compose -p los-tres-e2e down --volumes --remove-orphans`.
+No spec starts or stops a container between the first and the last browser test:
+verbs and probes run by `docker compose exec` in the running stack, through
+`tests/support/e2e-stack.ts`. Playwright has two projects, `chromium` (the specs
+that only read, in parallel) and then `serial` (the specs that write a database,
+one worker; `SERIAL_SPECS` in `playwright.config.ts`). `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
 (`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
 instead of a time, and their timings run on demand with `npm run test:timing`,
@@ -322,7 +353,8 @@ geometry written against Windows system-ui font metrics, which fails on the
 Linux runner. The local `npm run gate` stays the gate and runs everything,
 `@layout` included; a story is still not done until it exits 0. When a gate run
 fails, `gate.yml` uploads `test-results/` (the trace and screenshot of each
-failing test, which `playwright.config.ts` keeps on failure only) as a workflow
+failing test, which `playwright.config.ts` keeps on failure only, and
+`e2e-stack.log`, the e2e stack's logs) as a workflow
 artifact for 7 days; `gate-repeat.yml` does the same from an identical step
 (#361). A trace may hold the ephemeral CI admin session and test credentials, in
 a public repository's artifacts (#361).

@@ -52,9 +52,14 @@ row as `not triggered (the delivery brief in <nn> is the specification)`, and
 
 ### What the gates run
 
-`integration` runs the lint and test commands `CLAUDE.md` § Commands lists. If
+Build lanes verify with `npm run check` while they build. `integration` runs
+the full gate, `npm run gate`, as `CLAUDE.md` § Commands lists it. If
 it lists none, that is a `BLOCKING` finding on any build, not a pass by default.
-`architecture.md` carries the rule. `ux-review` screenshots the running app at
+`integration` also reports the measured times next to their budgets and the
+tests added and removed per level (decision 0006 rules 13 to 15); the
+orchestrator copies that table into the pull request body. A step over its
+budget is a `BLOCKING` finding unless the owner ruled on it.
+`architecture.md` carries the rules. `ux-review` screenshots the running app at
 phone and desktop widths and checks the UX spec (`ux.md`), except admin screens, which get no phone width and no visual review; it runs after
 `integration` passes, because a screen that fails the gate is not worth
 looking at. `review` verifies the story's acceptance criteria one by one.

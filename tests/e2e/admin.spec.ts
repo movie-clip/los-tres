@@ -1,63 +1,42 @@
-import { spawnSync } from 'node:child_process';
-
 import { expect, test, type Page } from '@playwright/test';
 import { createTranslator } from 'use-intl/core';
 
 import messages from '../../messages/es-ES.json';
+import { createAdminWithCommand, signInAsAdmin } from '../support/admin-e2e';
+import { E2E_ADMIN } from '../support/e2e-stack';
 
-// US-2.1 against the Compose stack: create an admin with the command, sign in,
-// see the Spanish shell, sign out, and prove the cookie, header and refusal
-// rules (AC 9, 10, 12, 13, 15, 17, 23, 24, 25, 26, 27). The stack needs
-// AUTH_SECRET and SITE_URL in .env and `docker compose up -d`; SITE_URL must be
-// the address the browser opens (127.0.0.1, not localhost), or the Origin check
-// refuses the sign-in by design (D-16).
+// US-2.1 against the e2e stack: the create-admin command, sign in as the e2e admin the global setup
+// created, see the Spanish shell, sign out, and prove the cookie, header and refusal rules (AC 3, 9, 10, 12,
+// 13, 15, 17, 23, 24, 25, 26, 27, 28). The e2e `app` gets SITE_URL from the stack (the address the browser
+// opens, or the Origin check refuses the sign-in by design, D-16) and AUTH_SECRET from .env.
 //
-// Serial: creating the admin again ends that admin's open sessions (D-12), so
-// the account is made once, before the tests, and the tests share a worker.
+// Serial within the file, and in the `serial` project: the command test writes `users`. Only that one test
+// creates an account (its own email); creating the shared admin again would end its sessions (D-12).
 test.describe.configure({ mode: 'serial', timeout: 90_000 });
 
-const EMAIL = 'e2e-admin@example.test';
-const PASSWORD = 'e2e-password-1';
+const EMAIL = E2E_ADMIN.email;
+const PASSWORD = E2E_ADMIN.password;
 const COOKIE = 'admin.session_token';
 const UNAVAILABLE_HINT =
-  'admin e2e: the stack answered "unavailable". Set AUTH_SECRET (32+ characters) and SITE_URL=http://127.0.0.1:<APP_PORT> in .env, then run: docker compose up -d';
+  'admin e2e: the stack answered "unavailable". Set AUTH_SECRET (32+ characters) in .env and run the e2e again';
 
 const admin = messages.Admin;
 const signInT = createTranslator({ locale: 'es-ES', messages, namespace: 'Admin.SignIn' });
 
-function createAdminWithCommand(): void {
-  const result = spawnSync(
-    'docker',
-    ['compose', 'run', '--rm', '-T', '--no-deps', 'app', 'create-admin'],
-    { input: `${EMAIL}\n${PASSWORD}\n`, encoding: 'utf8', timeout: 80_000 },
-  );
-  const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  if (result.status !== 0) {
-    throw new Error(`admin e2e: create-admin exited ${result.status ?? 'none'}. Is the stack up with the new image? Run: npm run stack:up\n${out.trim()}`);
-  }
-  // The command never echoes what it was given (AC 3, AC 28).
-  expect(out).not.toContain(EMAIL);
-  expect(out).not.toContain(PASSWORD);
-  expect(out).toMatch(/create-admin: (created|updated, sessions ended)/);
-}
-
-test.beforeAll(() => {
-  createAdminWithCommand();
+test.describe('the create-admin command', () => {
+  test('creates an account and prints neither the email nor the password (AC 3, AC 28)', () => {
+    const email = 'e2e-create-admin@example.test';
+    const password = 'e2e-create-admin-password-1';
+    const out = createAdminWithCommand(email, password, 'admin e2e');
+    // The command never echoes what it was given.
+    expect(out).not.toContain(email);
+    expect(out).not.toContain(password);
+  });
 });
 
 async function fill(page: Page, email: string, password: string): Promise<void> {
   await page.locator('#admin-email').fill(email);
   await page.locator('#admin-password').fill(password);
-}
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto('/admin/acceso');
-  await fill(page, EMAIL, PASSWORD);
-  await page.getByTestId('sign-in-submit').click();
-  await expect(page.getByTestId('admin-identity')).toBeVisible({ timeout: 20_000 }).catch(async (error) => {
-    if (await page.getByText(admin.SignIn.unavailable).count()) throw new Error(UNAVAILABLE_HINT);
-    throw error;
-  });
 }
 
 test.describe('anonymous visitors', () => {
@@ -252,7 +231,7 @@ test.describe('signing in and out', () => {
     page,
     context,
   }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await expect(page).toHaveURL(/\/admin\/?$/);
 
     // The shell: header, identity, nav, heading, sign-out.
@@ -300,7 +279,7 @@ test.describe('signing in and out', () => {
   test('admin pages are noindex and no-store, and a signed-in visit to sign-in goes on to the shell (AC 23, 24)', async ({
     page,
   }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     const response = await page.goto('/admin');
     expect(response?.headers()['x-robots-tag']).toMatch(/noindex/);
     expect(response?.headers()['cache-control']).toMatch(/no-store/);
@@ -314,7 +293,7 @@ test.describe('signing in and out', () => {
   test('a signed-in visit to an unmatched /admin address shows the admin 404 with admin chrome and no public footer (AC 1)', async ({
     page,
   }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     for (const url of ['/admin/registro', '/admin/no-existe']) {
       const response = await page.goto(url);
       expect(response?.status(), url).toBe(404);
@@ -332,7 +311,7 @@ test.describe('signing in and out', () => {
     browser,
     baseURL,
   }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     const [live] = await context.cookies();
     expect(live.name).toBe(COOKIE);
 

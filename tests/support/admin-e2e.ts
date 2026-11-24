@@ -1,28 +1,32 @@
-import { spawnSync } from 'node:child_process';
-
 import { expect, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 
-// Sign-in for an e2e spec that owns its own admin account. Each spec uses its own email: creating
-// an admin again ends that admin's sessions, so two specs must never share one (admin.spec.ts owns
-// the first account). There is no delete verb, so an account stays in the development database.
+import { E2E_ADMIN, verb } from './e2e-stack';
+
+// Sign-in for the admin e2e specs (#363). The e2e run creates one admin, `E2E_ADMIN`, once, in its global
+// setup, on a database that is fresh for the run; every admin spec signs in as that account with
+// `signInAsAdmin`. No spec creates that email again: `create-admin` on an existing email ends that
+// admin's sessions, which would sign the other specs out. The one test whose subject is the command itself
+// (admin.spec.ts) creates an account of its own with `createAdminWithCommand`.
 
 const UNAVAILABLE_HINT =
-  'admin e2e: the stack answered "unavailable". Set AUTH_SECRET (32+ characters) and SITE_URL=http://127.0.0.1:<APP_PORT> in .env, then run: docker compose up -d';
+  'admin e2e: the stack answered "unavailable". Set AUTH_SECRET (32+ characters) in .env and run the e2e again';
 
-/** Creates, or resets the password of, an admin through the Compose `create-admin` command. */
-export function createAdminWithCommand(email: string, password: string, spec: string): void {
-  const result = spawnSync('docker', ['compose', 'run', '--rm', '-T', '--no-deps', 'app', 'create-admin'], {
-    input: `${email}\n${password}\n`,
-    encoding: 'utf8',
-    timeout: 80_000,
-  });
-  const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+/**
+ * Creates, or resets the password of, an admin through the `create-admin` verb inside the running e2e `app`
+ * service, and returns the command's output. Only the test of the command itself calls this: it must never be
+ * given `E2E_ADMIN`'s email, whose sessions the other specs hold.
+ */
+export function createAdminWithCommand(email: string, password: string, spec: string): string {
+  expect(email, `${spec}: createAdminWithCommand must not touch the shared e2e admin`).not.toBe(E2E_ADMIN.email);
+  const result = verb('app', ['create-admin'], { input: `${email}\n${password}\n`, timeout: 80_000 });
+  const out = `${result.stdout}${result.stderr}`;
   if (result.status !== 0) {
-    throw new Error(`${spec}: create-admin exited ${result.status ?? 'none'}. Is the stack up with the new image? Run: npm run stack:up\n${out.trim()}`);
+    throw new Error(`${spec}: create-admin exited ${result.status ?? 'none'}\n${out.trim()}`);
   }
   expect(out).toMatch(/create-admin: (created|updated, sessions ended)/);
+  return out;
 }
 
 /** Signs in through the sign-in form and waits for the admin identity. */
@@ -37,22 +41,7 @@ export async function signInAs(page: Page, email: string, password: string): Pro
   });
 }
 
-function runPsql(statement: string, flags: string): string {
-  const result = spawnSync(
-    'docker',
-    ['compose', 'exec', '-T', 'db', 'sh', '-c', `psql -U "$POSTGRES_USER" "$POSTGRES_DB" -v ON_ERROR_STOP=1 ${flags} -c "${statement.replace(/"/g, '\\"')}"`],
-    { encoding: 'utf8', timeout: 30_000 },
-  );
-  if (result.status !== 0) throw new Error(`psql failed (exit ${result.status ?? 'none'}): ${result.stderr?.trim() ?? ''}`);
-  return result.stdout ?? '';
-}
-
-/** Runs one SQL statement as the database owner inside the Compose `db` container. */
-export function psql(statement: string): string {
-  return runPsql(statement, '');
-}
-
-/** Runs one SQL query and returns its single value, trimmed (psql `-tA`). */
-export function psqlScalar(statement: string): string {
-  return runPsql(statement, '-tA').trim();
+/** Signs in as the one e2e admin the global setup created. */
+export async function signInAsAdmin(page: Page): Promise<void> {
+  await signInAs(page, E2E_ADMIN.email, E2E_ADMIN.password);
 }

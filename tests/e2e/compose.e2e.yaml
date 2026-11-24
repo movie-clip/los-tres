@@ -1,0 +1,105 @@
+# The e2e stack (#363): Compose project `los-tres-e2e`, compose.yaml plus this file. playwright.config.ts
+# sets COMPOSE_PROJECT_NAME, COMPOSE_FILE and the E2E_*_PORT names; tests/e2e/global-setup.ts builds and
+# starts it and tests/e2e/global-teardown.ts removes it with its volume. Nothing here is read by the
+# development stack. Every relative path, `extends.file` included, resolves against the project
+# directory (the repo root, where compose.yaml is), not against this file: `../../compose.yaml` would
+# look outside the repository.
+#
+# Host ports, all on loopback: E2E_APP_PORT for `app`, then +1 (app-no-db), +2 (app-flag-off), +3
+# (app-flag-on). The database publishes none: every database touch is `docker compose exec db`.
+services:
+  db:
+    restart: "no"
+    ports: !reset []
+    volumes:
+      # Creates the variants' databases on a fresh volume (every e2e run starts from a fresh volume).
+      - type: bind
+        source: ./tests/e2e/db-init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+    healthcheck:
+      # TCP, not the socket: the image's init server listens on the socket only, so a socket check can
+      # pass before the init script has run.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      start_period: 60s
+
+  app:
+    # The tag the build writes is the name the variants run, so `build app` builds all of them.
+    image: los-tres-e2e-app
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:${E2E_APP_PORT:?set by playwright.config.ts}:3000"
+    environment:
+      SITE_URL: http://127.0.0.1:${E2E_APP_PORT:?set by playwright.config.ts}
+      # The local flag is a decision of the owner's own .env for the dev stack; the e2e app is the
+      # public side, so the flag is off whatever .env says (the flag-on variant is the only one on).
+      LOCAL_COLLECTED_DATA: "false"
+    healthcheck:
+      interval: 2s
+      start_period: 120s
+
+  # The app with no database to reach: the public error pages, and the server verb's refusals.
+  app-no-db:
+    extends:
+      file: compose.yaml
+      service: app
+    build: !reset null
+    image: los-tres-e2e-app
+    pull_policy: never
+    restart: "no"
+    volumes: !reset []
+    depends_on: !reset {}
+    entrypoint: ["node", "server.js"]
+    ports: !override
+      - "127.0.0.1:${E2E_NO_DB_PORT:?set by playwright.config.ts}:3000"
+    environment:
+      DATABASE_URL: postgres://x:x@127.0.0.1:1/x
+      SITE_URL: http://127.0.0.1:${E2E_NO_DB_PORT:?set by playwright.config.ts}
+      LOCAL_COLLECTED_DATA: "false"
+    healthcheck:
+      # /api/health answers 503 with no database; robots.txt needs none.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/robots.txt"]
+      interval: 2s
+      start_period: 120s
+
+  # The local flag off beside a public SITE_URL, on a database of its own.
+  app-flag-off:
+    extends:
+      file: compose.yaml
+      service: app
+    build: !reset null
+    image: los-tres-e2e-app
+    pull_policy: never
+    restart: "no"
+    volumes: !reset []
+    ports: !override
+      - "127.0.0.1:${E2E_FLAG_OFF_PORT:?set by playwright.config.ts}:3000"
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/e2e_flag_off
+      SITE_URL: https://tienda-publica.example
+      LOCAL_COLLECTED_DATA: "false"
+    healthcheck:
+      interval: 2s
+      start_period: 120s
+
+  # The local flag on beside a loopback SITE_URL, on a database of its own. This file is under tests/,
+  # which the tracked-file scan for the flag leaves out; the origin is loopback, so the app starts.
+  app-flag-on:
+    extends:
+      file: compose.yaml
+      service: app
+    build: !reset null
+    image: los-tres-e2e-app
+    pull_policy: never
+    restart: "no"
+    volumes: !reset []
+    ports: !override
+      - "127.0.0.1:${E2E_FLAG_ON_PORT:?set by playwright.config.ts}:3000"
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-lostres}:${DB_PASSWORD:?run npm run env:init}@db:5432/e2e_flag_on
+      SITE_URL: http://127.0.0.1:${E2E_FLAG_ON_PORT:?set by playwright.config.ts}
+      LOCAL_COLLECTED_DATA: "true"
+    healthcheck:
+      interval: 2s
+      start_period: 120s

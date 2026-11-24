@@ -28,8 +28,8 @@
     "test:e2e:ci": "playwright test --grep-invert @layout",
     "test:e2e:install": "playwright install chromium",
     "check": "npm run lint && npm run typecheck && npm run db:up && npm test",
-    "gate": "npm run check && npm run stack:up && npm run test:e2e",
-    "gate:ci": "npm run check && npm run stack:up && npm run test:e2e:ci"
+    "gate": "npm run check && npm run test:e2e",
+    "gate:ci": "npm run check && npm run test:e2e:ci"
   },
   "dependencies": {
     "better-auth": "1.7.12",

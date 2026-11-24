@@ -1,20 +1,16 @@
-import { spawnSync } from 'node:child_process';
-
 import { expect, test } from '@playwright/test';
 
 import { DEMO_COUNTS } from '../fixtures/demo';
+import { verb } from '../support/e2e-stack';
 
-// The image's verb dispatcher, through `docker compose run` (not `sh`, which is
-// not reliably on the Windows host). `--no-deps` because the stack is already
-// up. Serial: the import runs twice and the second must see the first.
+// The image's verb dispatcher, `./docker-entrypoint.sh <verb>`, run inside the e2e `app` container that is
+// already up (#363: a spec starts no container). The `serial` project runs this spec alone: its import
+// asserts the demo feed totals, so no other spec may leave a feed approved. Serial within the file too: the
+// import runs twice and the second must see the first.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 function composeRun(...args: string[]) {
-  const result = spawnSync('docker', ['compose', 'run', '--rm', '-T', '--no-deps', 'app', ...args], {
-    encoding: 'utf8',
-    timeout: 100_000,
-  });
-  return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  return verb('app', args, { timeout: 100_000 });
 }
 
 test.describe('app image entrypoint', () => {

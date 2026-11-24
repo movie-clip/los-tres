@@ -4,6 +4,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { LOCAL_FLAG_REFUSAL, LOCAL_FLAG_REFUSAL_EXIT } from '../../src/config/local-flag';
+import { execIn, verb } from '../support/e2e-stack';
 import { unusedPort } from '../support/net';
 
 // S12.2 (decision 0017, D-2, D-3), ACs 33 to 36 and 38: the app refuses to start with the local flag on and a
@@ -11,8 +12,9 @@ import { unusedPort } from '../support/net';
 // and shows neither value, and exit code 78. The truth table of the judgement is local-flag.test.ts and the two
 // hooks are start-refusal.test.ts; here the REAL start paths run:
 //
-//   the container `server` verb   `docker compose run ... app server` (the Dockerfile CMD, what a deploy runs)
-//   node server.js                the same image, the entrypoint replaced by `node server.js`
+//   the container `server` verb   `./docker-entrypoint.sh server` (the Dockerfile CMD, what a deploy runs), run
+//                                 by `compose exec` in the e2e `app-no-db` service (#363: no container is started)
+//   node server.js                `node server.js` in the same service, the same image
 //   npm run dev                   `next dev` on the host (a real process, an unused port)
 //   next start                    NOT run here (D-11): it needs a host `next build` (minutes, a second `.next`)
 //                                 and shares NextNodeServer.prepareImpl with server.js, which does run
@@ -20,7 +22,7 @@ import { unusedPort } from '../support/net';
 // "Before it migrates" (AC 33) is proved with an unreachable DATABASE_URL: had migrate run, the exit code
 // and the output would be migrate's (the control case shows exactly that for a loopback origin). A refusal
 // never needs the database. The start of a healthy app with the flag on (loopback) or off (public) is
-// collected-public.spec.ts, one app container for each; a `next dev` or `next start` that is allowed to
+// collected-public.spec.ts, one app service for each; a `next dev` or `next start` that is allowed to
 // start would have to be killed as a tree, so no case here starts one. `next build` never calls
 // register(): this file does not run it (a build takes minutes); the design cites the framework source.
 
@@ -36,13 +38,14 @@ const SITE_URLS: [string, string][] = [
 
 const UNREACHABLE_DATABASE = 'postgres://nadie:nada@127.0.0.1:1/ninguna';
 
-function compose(args: string[], env: Record<string, string>, tail: string[]): { status: number | null; out: string } {
-  const flags = Object.entries(env).flatMap(([name, value]) => ['-e', `${name}=${value}`]);
-  const result = spawnSync('docker', ['compose', 'run', '--rm', '-T', '--no-deps', ...args, ...flags, 'app', ...tail], {
-    encoding: 'utf8',
-    timeout: 150_000,
-  });
-  return { status: result.status, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
+/**
+ * A command in a running service of the e2e stack, with extra container environment: the output and the exit
+ * code. `app-no-db` is the same image with a database nobody listens on and no mount, so the `server` verb
+ * either refuses at its start check (78) or fails at its migrate (1), and never reaches a listening server.
+ */
+function inService(service: 'app' | 'app-no-db', env: Record<string, string>, tail: string[], direct = false): { status: number | null; out: string } {
+  const result = direct ? execIn(service, tail, { env, timeout: 150_000 }) : verb(service, tail, { env, timeout: 150_000 });
+  return { status: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
 /** The lines of the output that say the start was refused: the one fixed line, and nothing like it. */
@@ -61,7 +64,7 @@ function expectOneRefusal(out: string, siteUrl: string): void {
 test.describe('the container server verb (AC 33)', () => {
   for (const [label, siteUrl] of SITE_URLS) {
     test(`with the flag on and ${label}: exit ${LOCAL_FLAG_REFUSAL_EXIT}, the one line, before it migrates`, () => {
-      const result = compose([], { LOCAL_COLLECTED_DATA: 'true', SITE_URL: siteUrl, DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
+      const result = inService('app-no-db', { LOCAL_COLLECTED_DATA: 'true', SITE_URL: siteUrl, DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
 
       expect(result.status, result.out).toBe(LOCAL_FLAG_REFUSAL_EXIT);
       expectOneRefusal(result.out, siteUrl);
@@ -71,13 +74,13 @@ test.describe('the container server verb (AC 33)', () => {
   }
 
   test('the flag in capitals and padded is still on, so it still refuses', () => {
-    const result = compose([], { LOCAL_COLLECTED_DATA: ' TRUE ', SITE_URL: 'https://tienda-publica.example', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
+    const result = inService('app-no-db', { LOCAL_COLLECTED_DATA: ' TRUE ', SITE_URL: 'https://tienda-publica.example', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
     expect(result.status, result.out).toBe(LOCAL_FLAG_REFUSAL_EXIT);
     expect(refusalLines(result.out)).toEqual([LOCAL_FLAG_REFUSAL]);
   });
 
   test('control: the flag on beside a loopback origin passes the check and goes on to migrate (so the refusals above never reached it)', () => {
-    const result = compose([], { LOCAL_COLLECTED_DATA: 'true', SITE_URL: 'http://127.0.0.1:3010', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
+    const result = inService('app-no-db', { LOCAL_COLLECTED_DATA: 'true', SITE_URL: 'http://127.0.0.1:3010', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
 
     expect(result.status, result.out).toBe(1);
     expect(refusalLines(result.out)).toEqual([]);
@@ -86,7 +89,7 @@ test.describe('the container server verb (AC 33)', () => {
 
   for (const flag of ['false', '1', 'yes', 'truee', '']) {
     test(`control: the flag set to ${JSON.stringify(flag)} beside a public https origin does not refuse (AC 36)`, () => {
-      const result = compose([], { LOCAL_COLLECTED_DATA: flag, SITE_URL: 'https://tienda-publica.example', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
+      const result = inService('app-no-db', { LOCAL_COLLECTED_DATA: flag, SITE_URL: 'https://tienda-publica.example', DATABASE_URL: UNREACHABLE_DATABASE }, ['server']);
 
       expect(result.status, result.out).toBe(1);
       expect(refusalLines(result.out)).toEqual([]);
@@ -95,7 +98,7 @@ test.describe('the container server verb (AC 33)', () => {
   }
 
   test('start-check is a pre-step, not a verb: given to the entrypoint it still exits 64', () => {
-    const result = compose([], { LOCAL_COLLECTED_DATA: 'true', SITE_URL: 'https://tienda-publica.example' }, ['start-check']);
+    const result = inService('app-no-db', { LOCAL_COLLECTED_DATA: 'true', SITE_URL: 'https://tienda-publica.example' }, ['start-check']);
     expect(result.status, result.out).toBe(64);
     expect(refusalLines(result.out)).toEqual([]);
   });
@@ -104,7 +107,10 @@ test.describe('the container server verb (AC 33)', () => {
 test.describe('node server.js outside the container verb (AC 35)', () => {
   for (const [label, siteUrl] of SITE_URLS.filter(([, value]) => value.startsWith('https') || value === '')) {
     test(`with the flag on and ${label}: exit ${LOCAL_FLAG_REFUSAL_EXIT} and the one line, from the hook the framework runs`, () => {
-      const result = compose(['--entrypoint', 'node'], { LOCAL_COLLECTED_DATA: 'true', SITE_URL: siteUrl, DATABASE_URL: UNREACHABLE_DATABASE }, ['server.js']);
+      // PORT: the service's own server already listens on 3000, and the framework binds the port before its start
+      // hook runs, so a second `node server.js` on 3000 would fail with EADDRINUSE (exit 1) whatever the hook says.
+      const env = { LOCAL_COLLECTED_DATA: 'true', SITE_URL: siteUrl, DATABASE_URL: UNREACHABLE_DATABASE, PORT: '3999' };
+      const result = inService('app-no-db', env, ['node', 'server.js'], true);
 
       expect(result.status, result.out).toBe(LOCAL_FLAG_REFUSAL_EXIT);
       expectOneRefusal(result.out, siteUrl);
@@ -138,27 +144,27 @@ test.describe('the other verbs do not refuse because of the flag (AC 38)', () =>
   const bad = { LOCAL_COLLECTED_DATA: 'true', SITE_URL: 'https://tienda-publica.example' };
 
   test('migrate with the flag on beside a public origin runs as today', () => {
-    const result = compose([], bad, ['migrate']);
+    const result = inService('app', bad, ['migrate']);
     expect(result.status, result.out).toBe(0);
     expect(result.out).toContain('migrate: up to date');
     expect(refusalLines(result.out)).toEqual([]);
   });
 
   test('seed --if-enabled with the flag on beside a public origin runs as today', () => {
-    const result = compose([], bad, ['seed', '--if-enabled']);
+    const result = inService('app', bad, ['seed', '--if-enabled']);
     expect(result.status, result.out).toBe(0);
     expect(refusalLines(result.out)).toEqual([]);
   });
 
   test('import-feeds with the flag on beside a public origin runs and reaches the importer (an unregistered feed exits 1, never 78)', () => {
-    const result = compose([], bad, ['import-feeds', '--feed', '999999']);
+    const result = inService('app', bad, ['import-feeds', '--feed', '999999']);
     expect(result.status, result.out).toBe(1);
     expect(result.out).toContain('not registered');
     expect(refusalLines(result.out)).toEqual([]);
   });
 
   test('create-admin with the flag on beside a public origin runs as today (no input: exit 2 and its usage line)', () => {
-    const result = compose([], bad, ['create-admin']);
+    const result = inService('app', bad, ['create-admin']);
     expect(result.status, result.out).toBe(2);
     expect(result.out).toContain('usage: create-admin');
     expect(refusalLines(result.out)).toEqual([]);
@@ -167,18 +173,8 @@ test.describe('the other verbs do not refuse because of the flag (AC 38)', () =>
 
 test.describe('the image holds no collected file, and the folder is mounted read-only (ACs 40, 41)', () => {
   test('the built app image has no collected-files folder: nothing of it is baked in', () => {
-    const images = spawnSync('docker', ['compose', 'config', '--images'], { encoding: 'utf8', timeout: 60_000 });
-    const appImage = (images.stdout ?? '')
-      .split(/\s+/)
-      .map((name) => name.trim())
-      .find((name) => name !== '' && !name.startsWith('postgres'));
-    expect(appImage, 'the app image name from compose config').toBeTruthy();
-
-    // Run from the image alone, with no mount: nothing of the folder may be inside it.
-    const probe = spawnSync('docker', ['run', '--rm', '--entrypoint', 'sh', appImage!, '-c', 'test ! -e /app/collected-files && echo absent'], {
-      encoding: 'utf8',
-      timeout: 90_000,
-    });
+    // `app-no-db` runs the same image as `app` with no mount: nothing of the folder may be inside it.
+    const probe = execIn('app-no-db', ['sh', '-c', 'test ! -e /app/collected-files && echo absent'], { timeout: 90_000 });
     expect(probe.stdout.trim(), probe.stderr).toBe('absent');
   });
 
@@ -186,7 +182,7 @@ test.describe('the image holds no collected file, and the folder is mounted read
     // If the mount were writable the probe file is removed again, so the owner's folder is never left changed.
     const script =
       'test -d /app/collected-files || { echo no-folder; exit 1; }; if touch /app/collected-files/.probe-e2e 2>/dev/null; then rm -f /app/collected-files/.probe-e2e; echo writable; else echo read-only; fi';
-    const result = compose(['--entrypoint', 'sh'], {}, ['-c', script]);
+    const result = inService('app', {}, ['sh', '-c', script], true);
 
     expect(result.status, result.out).toBe(0);
     const lines = result.out.split('\n').map((line) => line.trim());

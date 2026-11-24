@@ -1,9 +1,9 @@
-import { spawnSync } from 'node:child_process';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { CAR, SAME_MODEL, UNKNOWN_SLUG, carName, cocheValues, fitCountsLine, queryOf } from '../support/car';
+import { serviceLogs } from '../support/e2e-stack';
 import { renderMessage } from '../support/messages';
 import { expectNoForeignOrigin, expectNoSetCookie, openRawHtml } from '../support/page-checks';
 
@@ -464,14 +464,7 @@ test.describe('search page with a car: indexing, cookies and storage', () => {
 test.describe('search page with a car: the car slug is in no application log', () => {
   test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
-  const logs = (): string => {
-    const result = spawnSync('docker', ['compose', 'logs', 'app', '--no-log-prefix'], {
-      encoding: 'utf8',
-      timeout: 60_000,
-      maxBuffer: 256 * 1024 * 1024,
-    });
-    return `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  };
+  const logs = (): string => serviceLogs('app');
 
   test('browsing every grouped state and a past-the-end page leaves no slug in the output', async ({ page, request }) => {
     expect(logs(), 'docker compose logs answered').toContain('Ready');

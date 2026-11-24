@@ -1,60 +1,20 @@
-import { spawnSync } from 'node:child_process';
-
 import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
+import { signInAsAdmin } from '../support/admin-e2e';
 import { cssColour, snapshotOf, whilePressed } from '../support/page-checks';
 
-// US-2.3 against the Compose stack, read-only (D-9): no spec here changes an
-// approval in the shared development database, because fullyParallel specs and
-// the next run's global setup read it. The writes are proved in
-// tests/integration/admin-sources.test.ts on the test database. What this spec
-// proves in a browser: the page is refused to anonymous visitors, the signed-in
-// page renders its loaded state and the confirm panel, a failed write leaves
-// the page as it was, and no feed URL reaches the HTML.
-//
-// This spec owns its own admin account. admin.spec.ts says no other spec may
-// use its account (creating an admin again ends that admin's sessions), so this
-// one is separate and never signs the first one out.
+// US-2.3 against the e2e stack, read-only (D-9): no test here changes an approval. The writes are proved in
+// tests/integration/admin-sources.test.ts on the test database. What this spec proves in a browser: the page
+// is refused to anonymous visitors, the signed-in page renders its loaded state and the confirm panel, a
+// failed write leaves the page as it was, and no feed URL reaches the HTML. It signs in as the e2e admin the
+// global setup created (#363), so it needs no account of its own.
 test.describe.configure({ mode: 'serial', timeout: 90_000 });
-
-const EMAIL = 'e2e-sources-admin@example.test';
-const PASSWORD = 'e2e-sources-password-1';
-const UNAVAILABLE_HINT =
-  'admin e2e: the stack answered "unavailable". Set AUTH_SECRET (32+ characters) and SITE_URL=http://127.0.0.1:<APP_PORT> in .env, then run: docker compose up -d';
 
 const copy = messages.Admin.Sources;
 const SHOP_NAMES = ['Tienda Demo Uno', 'Tienda Demo Dos'];
 /** A feed id no row has: below the integer ceiling, so the action reaches the database and matches nothing. */
 const MISSING_ID = '2000000000';
-
-function createAdminWithCommand(): void {
-  const result = spawnSync(
-    'docker',
-    ['compose', 'run', '--rm', '-T', '--no-deps', 'app', 'create-admin'],
-    { input: `${EMAIL}\n${PASSWORD}\n`, encoding: 'utf8', timeout: 80_000 },
-  );
-  const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  if (result.status !== 0) {
-    throw new Error(`admin sources e2e: create-admin exited ${result.status ?? 'none'}. Is the stack up with the new image? Run: npm run stack:up\n${out.trim()}`);
-  }
-  expect(out).toMatch(/create-admin: (created|updated, sessions ended)/);
-}
-
-test.beforeAll(() => {
-  createAdminWithCommand();
-});
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto('/admin/acceso');
-  await page.locator('#admin-email').fill(EMAIL);
-  await page.locator('#admin-password').fill(PASSWORD);
-  await page.getByTestId('sign-in-submit').click();
-  await expect(page.getByTestId('admin-identity')).toBeVisible({ timeout: 20_000 }).catch(async (error) => {
-    if (await page.getByText(messages.Admin.SignIn.unavailable).count()) throw new Error(UNAVAILABLE_HINT);
-    throw error;
-  });
-}
 
 /** The shop group (its row and its feeds) whose heading is `name`. */
 function shopGroup(page: Page, name: string): Locator {
@@ -90,7 +50,7 @@ test.describe('anonymous visitors', () => {
 
 test.describe('the signed-in page', () => {
   test('the nav opens it as the current item, with the heading, the summary and both demo shops approved', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     const link = page.getByTestId('admin-nav').getByRole('link', { name: messages.Admin.Nav.feeds });
     await expect(link).toHaveAttribute('href', '/admin/tiendas');
     await link.click();
@@ -114,7 +74,7 @@ test.describe('the signed-in page', () => {
   });
 
   test('the page is noindex and no-store, sets no cookie, and carries no feed URL or secret-looking value', async ({ page, request }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     const response = await page.goto('/admin/tiendas');
     expect(response?.status()).toBe(200);
     expect(response?.headers()['x-robots-tag']).toMatch(/noindex/);
@@ -139,7 +99,7 @@ test.describe('the signed-in page', () => {
   });
 
   test('Desactivar feed opens the confirm panel on Cancelar; Escape closes it and returns focus; nothing was written', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     const posts: Request[] = [];
     page.on('request', (req) => {
@@ -171,7 +131,7 @@ test.describe('the signed-in page', () => {
   });
 
   test('Desactivar tienda opens the shop panel, which says each feed keeps its own state', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     const group = shopGroup(page, SHOP_NAMES[1]);
     const shopRow = group.getByTestId(/^source-shop-/).first();
@@ -185,7 +145,7 @@ test.describe('the signed-in page', () => {
   });
 
   test('a write the server cannot apply shows the error block and leaves the tag as it was (unknown id, nothing written)', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     const feed = shopGroup(page, SHOP_NAMES[0]).getByTestId(/^source-feed-/).first();
     await feed.getByTestId('source-disable').click();
@@ -213,7 +173,7 @@ test.describe('the signed-in page', () => {
     playwright,
     baseURL,
   }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     // Capture the browser's own action request and stop it: it never reaches the server.
     let captured: { headers: Record<string, string>; body: string } | null = null;
@@ -302,7 +262,7 @@ test.describe('admin pressed buttons (S11.7)', () => {
   });
 
   test('signed in, a pressed outlined button reads dark fill and light text, and does not move', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     const light = await cssColour(page, 'var(--color-bg)');
     const dark = await cssColour(page, 'var(--color-link)');
@@ -317,7 +277,7 @@ test.describe('admin pressed buttons (S11.7)', () => {
   });
 
   test('signed in, the confirm button of /admin/tiendas is a filled button that inverts when pressed', async ({ page }) => {
-    await signIn(page);
+    await signInAsAdmin(page);
     await page.goto('/admin/tiendas');
     const light = await cssColour(page, 'var(--color-bg)');
     const feed = shopGroup(page, SHOP_NAMES[0]).getByTestId(/^source-feed-/).first();
