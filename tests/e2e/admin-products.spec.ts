@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_FEED_URLS, DEMO_SHARED, DEMO_SHOP_HOSTS } from '../fixtures/demo';
-import { signInAsAdmin } from '../support/admin-e2e';
+import { adminTest, signInAsAdmin } from '../support/admin-e2e';
 import { E2E_ADMIN, origin, psql, psqlScalar, serviceLogs } from '../support/e2e-stack';
 import { expectNoSetCookie, expectServerRenderedNotFound } from '../support/page-checks';
 
@@ -327,5 +327,65 @@ test.describe('a toggle keeps its accessible name while it is saving', () => {
     expect(productHidden()).toBe(false);
     expect(offerHidden(CHEAPER.shopName)).toBe(false);
     expect(offerHidden(DEARER.shopName)).toBe(false);
+  });
+});
+
+// #339 (0006 rule 12): journey J11, an admin hides and unhides a product and the public page follows. Added beside
+// the tests it replaces. It signs in once per worker (`adminTest`) and reads the public site through the `publicRequest`
+// fixture, which holds no admin session. The file's `beforeAll` and `afterAll` leave the product not hidden even if
+// this test fails half way.
+adminTest.describe('hide and unhide journey (#339)', () => {
+  adminTest('J11: find the product by its EAN, hide it and the public site drops it, unhide it and the site shows it again', async ({
+    page,
+    publicRequest: request,
+  }) => {
+    /** The public answers for the product page, its two offers' /go links and a search for the EAN. */
+    async function publicAnswers(goPaths: string[]) {
+      const product = await request.get(`/producto/${SLUG}`, { maxRedirects: 0 });
+      const go: number[] = [];
+      for (const path of goPaths) go.push((await request.get(path, { maxRedirects: 0 })).status());
+      const search = await request.get(`/buscar?q=${TERM}`);
+      return { status: product.status(), html: await product.text(), go, search: await search.text() };
+    }
+
+    // The baseline: public, with a /go link per offer (the ids are read from the page, they differ between runs).
+    const before = await request.get(`/producto/${SLUG}`);
+    expect(before.status()).toBe(200);
+    const goPaths = [...(await before.text()).matchAll(/href="(\/go\/\d+)"/g)].map((match) => match[1]);
+    expect(goPaths).toHaveLength(DEMO_SHARED.offers.length);
+    const baseline = await publicAnswers(goPaths);
+    expect(baseline.status).toBe(200);
+    expect(baseline.go).toEqual([302, 302]);
+    expect(baseline.search).toContain(TITLE);
+
+    // Find it from the list by its EAN: one row, not hidden, on the site now.
+    await page.goto('/admin/productos');
+    await page.getByRole('textbox', { name: copy.searchLabel, exact: true }).fill(TERM);
+    await page.getByRole('button', { name: copy.searchButton, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`[?&]q=${TERM}(&|$)`));
+    const row = page.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 2, name: TITLE, exact: true }) });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByText(copy.tagNotHidden, { exact: true })).toBeVisible();
+    await row.getByRole('link', { name: TITLE, exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+    // Hide it: the screen says so in words, and the public page, /go and search answer as if it did not exist.
+    await page.getByRole('button', { name: detail.hideProduct, exact: true }).click();
+    await expect(page.getByText(detail.doneProductHidden, { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: detail.unhideProduct, exact: true })).toBeVisible();
+    const hidden = await publicAnswers(goPaths);
+    expect(hidden.status).toBe(404);
+    expectServerRenderedNotFound(hidden.html, siteName);
+    expect(hidden.go).toEqual([404, 404]);
+    expect(hidden.search).not.toContain(TITLE);
+
+    // Unhide it: the site shows it again with both offers, and the screen never says it was published.
+    await page.getByRole('button', { name: detail.unhideProduct, exact: true }).click();
+    await expect(page.getByText(detail.doneProductUnhidden, { exact: true })).toBeVisible();
+    await expect(page.getByText(detail.doneProductUnhidden, { exact: true })).not.toContainText(/aparece|publica|visible en el sitio/i);
+    const shown = await publicAnswers(goPaths);
+    expect(shown.status).toBe(200);
+    expect(shown.go).toEqual([302, 302]);
+    expect(shown.search).toContain(TITLE);
   });
 });

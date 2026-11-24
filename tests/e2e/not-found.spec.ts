@@ -10,6 +10,7 @@ import {
   snapshotOf,
   stripScripts,
 } from '../support/page-checks';
+import { aria, expectSmoke } from '../support/smoke';
 
 // S11.6: the public 404 is a Secondary button inside one chrome, with its own tab
 // title. S11.7: the nested 404 is also a full server-rendered page (src/proxy.ts rewrites a
@@ -231,5 +232,26 @@ test.describe('public 404 (S11.6)', () => {
     await homeLink(page).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('banner')).toHaveCount(1);
+  });
+});
+
+// #339 (0006 rule 11): the smoke test of the 404 page family, added beside the tests it replaces. The one
+// console line it lets through is the browser's own report of the document's 404 status.
+test.describe('404 smoke (#339)', () => {
+  test('S7 smoke: an unknown path answers 404, its main region matches and the console has no other error', async ({
+    page,
+  }) => {
+    await expectSmoke(
+      page,
+      '/no-existe',
+      aria`
+        - heading "${messages.NotFound.heading}" [level=1]
+        - paragraph: ${messages.NotFound.body}
+        - paragraph:
+          - link "${messages.NotFound.backHome}":
+            - /url: /
+      `,
+      { status: 404, ignoreOwnStatusLine: true },
+    );
   });
 });

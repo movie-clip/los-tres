@@ -13,6 +13,7 @@ import {
   modelsOf,
   selectedText,
 } from '../support/car';
+import { aria, expectSmoke } from '../support/smoke';
 
 // US-5.7 ACs 7 to 22 and 38 against the Compose stack: the picker as GET steps on /mi-coche,
 // with JavaScript off (the page is a server page; the form presses are plain GET submits). The
@@ -259,5 +260,29 @@ test.describe('the picker page, a response contract (ACs 6, 22, 55)', () => {
       { maxRedirects: 0 },
     );
     expect(done.headers()['set-cookie']).toBeUndefined();
+  });
+});
+
+// #339 (0006 rule 11): the smoke test of the car picker page family, added beside the tests it replaces.
+// It runs with JavaScript on; the same page without script is journey J5 above.
+test.describe('car picker smoke (#339)', () => {
+  test('S5 smoke: the picker page answers 200, its main region matches and the console is clean', async ({ page }) => {
+    const [first, second] = makesOf();
+    await expectSmoke(
+      page,
+      PICKER,
+      aria`
+        - heading "${messages.CarPicker.title}" [level=1]
+        - paragraph: ${messages.CarPicker.stepCounter.replace('{step}', '1').replace('{total}', '3')}
+        - heading "${messages.CarPicker.makeHeading}" [level=2]
+        - list "${messages.CarPicker.makeHeading}":
+          - listitem:
+            - button "${first.label}"
+          - listitem:
+            - button "${second.label}"
+        - link "${messages.CarPicker.cancel}":
+          - /url: /
+      `,
+    );
   });
 });

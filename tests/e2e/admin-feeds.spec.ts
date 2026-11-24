@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { signInAsAdmin } from '../support/admin-e2e';
+import { adminTest, signInAsAdmin } from '../support/admin-e2e';
 import { psql, psqlScalar } from '../support/e2e-stack';
 import { loadEnv } from '../support/env';
 import { expectNoSetCookie, reflowProblems, stripScripts } from '../support/page-checks';
@@ -656,5 +656,97 @@ test.describe('the choices stay after a refusal (05-ux § 6, check 25)', () => {
     await expect(page.locator('#source-address-error')).toHaveText(errors.urlInvalid);
     await expect(page.locator('#source-shop option:checked')).toHaveText(SHOP.name);
     await expect(page.locator('#source-network option:checked')).toHaveText(NETWORK.name);
+  });
+});
+
+// #339 (0006 rule 12): journey J9, an admin registers a network, a shop and an https feed through the forms and
+// approves them, and nothing of it reaches the public site. Added beside the tests it replaces. It signs in once
+// per worker (`adminTest`), uses rows of its own (a fresh e2e database has none, and `releaseRows()` above matches
+// their slug and host patterns), and ends with the feed and the shop disabled again, so nothing is left approved
+// for the next `import-feeds`.
+adminTest.describe('registering and approving a feed journey (#339)', () => {
+  const JOURNEY = {
+    network: { name: 'Red e2e viaje', slug: 'e2e-red-viaje' },
+    shop: { name: 'Tienda e2e viaje', slug: 'e2e-tienda-viaje' },
+    host: 'e2e-feeds-viaje.example',
+    url: 'https://e2e-feeds-viaje.example/privado/KEY-E2E-VIAJE/viaje-datos.csv?token=TOKEN-E2E-VIAJE',
+  };
+
+  adminTest('J9: network, shop and feed through the forms; both approved and disabled again; the public site unchanged', async ({
+    page,
+    publicRequest: request,
+  }) => {
+    const sitemapBefore = await (await request.get('/sitemap.xml')).text();
+    const productBefore = stripScripts(await (await request.get('/producto/demo-filtro-de-aceite-oc-1234')).text());
+
+    // The network, from the toolbar.
+    await page.goto(SOURCES);
+    await page.getByRole('link', { name: copy.addNetwork, exact: true }).click();
+    await page.getByLabel(form.nameLabel, { exact: true }).fill(JOURNEY.network.name);
+    await page.getByLabel(form.slugLabel, { exact: true }).fill(JOURNEY.network.slug);
+    await page.getByRole('button', { name: form.Network.submitNew, exact: true }).click();
+    await expect(page.getByText(copy.noticeNetworkCreated, { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: JOURNEY.network.name, exact: true })).toBeVisible();
+
+    // The shop: it starts not approved and with no feed.
+    await page.getByRole('link', { name: copy.addShop, exact: true }).click();
+    await page.getByLabel(form.nameLabel, { exact: true }).fill(JOURNEY.shop.name);
+    await page.getByLabel(form.slugLabel, { exact: true }).fill(JOURNEY.shop.slug);
+    await page.getByRole('button', { name: form.Shop.submitNew, exact: true }).click();
+    await expect(page.getByText(copy.noticeShopCreated, { exact: true })).toBeVisible();
+    const shop = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { level: 2, name: JOURNEY.shop.name, exact: true }),
+    });
+    await expect(shop.getByText(copy.shopNotApproved, { exact: true })).toBeVisible();
+    await expect(shop.getByText(copy.shopNoFeeds, { exact: true })).toBeVisible();
+
+    // The feed, from the shop's own link: it starts not approved, and the page shows the host and nothing else of the address.
+    await shop.getByRole('link', { name: copy.addFeedName.replace('{shop}', JOURNEY.shop.name), exact: true }).click();
+    await page.getByLabel(form.Feed.networkLabel, { exact: true }).selectOption({ label: JOURNEY.network.name });
+    await page.getByLabel(form.Feed.urlLabelNew, { exact: true }).fill(JOURNEY.url);
+    await page.getByRole('button', { name: form.Feed.submitNew, exact: true }).click();
+    await expect(page.getByText(copy.noticeFeedCreated, { exact: true })).toBeVisible();
+    const feedHeading = shop.getByRole('heading', { level: 3 });
+    const feedId = /\d+/.exec(await feedHeading.innerText())?.[0] ?? '';
+    expect(feedId).not.toBe('');
+    await expect(shop.getByText(copy.feedNotApproved, { exact: true })).toBeVisible();
+    await expect(shop).toContainText(JOURNEY.host);
+    // A fresh load of the list: what Next sent for the form page is not part of it.
+    await page.goto(SOURCES);
+    const content = await page.content();
+    for (const secret of ['KEY-E2E-VIAJE', 'TOKEN-E2E-VIAJE', '/privado/', 'viaje-datos.csv']) expect(content, secret).not.toContain(secret);
+
+    // Two separate approvals, each one a press that says what it saved.
+    await shop.getByRole('button', { name: copy.shopApproveName.replace('{shop}', JOURNEY.shop.name), exact: true }).click();
+    await expect(shop.getByText(copy.doneShopApproved, { exact: true })).toBeVisible();
+    await shop
+      .getByRole('button', {
+        name: copy.feedApproveName.replace('{id}', feedId).replace('{shop}', JOURNEY.shop.name),
+        exact: true,
+      })
+      .click();
+    await expect(shop.getByText(copy.doneFeedApproved, { exact: true })).toBeVisible();
+    await expect(shop.getByText(copy.feedApproved, { exact: true })).toBeVisible();
+
+    // Approving publishes nothing by itself: no import has run, so the public pages are as they were.
+    const sitemap = await request.get('/sitemap.xml');
+    expectNoSetCookie(sitemap);
+    expect(await sitemap.text()).toBe(sitemapBefore);
+    expect(stripScripts(await (await request.get('/producto/demo-filtro-de-aceite-oc-1234')).text())).toBe(productBefore);
+    expect(await (await request.get(`/buscar?q=${JOURNEY.shop.slug}`)).text()).not.toContain(JOURNEY.shop.name);
+
+    // Disable the feed, then the shop, each behind its confirmation: nothing stays approved.
+    await shop
+      .getByRole('button', {
+        name: copy.feedDisableName.replace('{id}', feedId).replace('{shop}', JOURNEY.shop.name),
+        exact: true,
+      })
+      .click();
+    await shop.getByRole('button', { name: copy.confirmFeedYes, exact: true }).click();
+    await expect(shop.getByText(copy.doneFeedDisabled, { exact: true })).toBeVisible();
+    await shop.getByRole('button', { name: copy.shopDisableName.replace('{shop}', JOURNEY.shop.name), exact: true }).click();
+    await shop.getByRole('button', { name: copy.confirmShopYes, exact: true }).click();
+    await expect(shop.getByText(copy.doneShopDisabled, { exact: true })).toBeVisible();
+    await expect(shop.getByText(copy.shopNotApproved, { exact: true })).toBeVisible();
   });
 });

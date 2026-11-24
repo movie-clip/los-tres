@@ -9,6 +9,7 @@ import {
   expectNoSetCookie,
   openRawHtml,
 } from '../support/page-checks';
+import { aria, expectSmoke } from '../support/smoke';
 
 // S9.3 legal pages, footer and demo notice against the Compose stack.
 // The owner identity is read from the host .env at run time and never written
@@ -249,5 +250,27 @@ test.describe('demo notice (S9.3)', () => {
     await expect(page.getByTestId('header-search-button')).toBeVisible();
     await expect(page.getByTestId('car-select')).toBeVisible();
     expect(await context.cookies()).toEqual([]);
+  });
+});
+
+// #339 (0006 rule 11): the smoke test of the legal page family, added beside the tests it replaces. It reads
+// the funding page: the other two answer 500 while the owner identity is blank, which is the case in CI.
+test.describe('legal pages smoke (#339)', () => {
+  test('S6 smoke: the funding page answers 200, its main region matches and the console is clean', async ({ page }) => {
+    await expectSmoke(
+      page,
+      '/como-nos-financiamos',
+      aria`
+        - heading "${siteTitle(messages.Funding.heading)}" [level=1]
+        - paragraph: ${JSON.stringify(siteTitle(messages.Funding.intro))}
+        - list:
+          - listitem:
+            - strong: /\S+/
+          - listitem:
+            - strong: /\S+/
+          - listitem:
+            - strong: /\S+/
+      `,
+    );
   });
 });

@@ -1,8 +1,8 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test as base, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 
-import { E2E_ADMIN, verb } from './e2e-stack';
+import { E2E_ADMIN, origin, verb } from './e2e-stack';
 
 // Sign-in for the admin e2e specs (#363). The e2e run creates one admin, `E2E_ADMIN`, once, in its global
 // setup, on a database that is fresh for the run; every admin spec signs in as that account with
@@ -45,3 +45,43 @@ export async function signInAs(page: Page, email: string, password: string): Pro
 export async function signInAsAdmin(page: Page): Promise<void> {
   await signInAs(page, E2E_ADMIN.email, E2E_ADMIN.password);
 }
+
+// One sign-in per worker (#339). `adminTest` is `test` with a worker-scoped fixture, `adminSession`, that signs in as
+// `E2E_ADMIN` once in a context of its own and keeps `context.storageState()` in memory only: it is never written to
+// disk, because `test-results/` is uploaded when a run fails on CI (#361) and a session token has no place there. Each
+// test then gets a `page` whose context starts from that state, already signed in. Use it for a test that only needs
+// an admin page open; a test whose subject is the sign-in form itself (admin.spec.ts) calls `signInAsAdmin`, which is
+// unchanged. The session is shared by every test of the worker, so no test using `adminTest` may sign `E2E_ADMIN` out
+// or create that email again: either ends the session for the rest of the worker.
+
+type AdminSession = Awaited<ReturnType<BrowserContext['storageState']>>;
+
+// The fixture callbacks name their second argument `provide`: Playwright calls it `use`, which the React hooks
+// lint rule mistakes for the React hook of that name.
+export const adminTest = base.extend<{ publicRequest: APIRequestContext }, { adminSession: AdminSession }>({
+  adminSession: [
+    async ({ browser }, provide) => {
+      const context = await browser.newContext({ baseURL: origin('app') });
+      try {
+        await signInAsAdmin(await context.newPage());
+        await provide(await context.storageState());
+      } finally {
+        await context.close();
+      }
+    },
+    { scope: 'worker' },
+  ],
+  storageState: async ({ adminSession }, provide) => {
+    await provide(adminSession);
+  },
+  // The public site as an anonymous visitor sees it: the `request` fixture can carry the signed-in state above, so a
+  // test that reads public answers beside an admin page asks for this one, which holds no cookie.
+  publicRequest: async ({ playwright, baseURL }, provide) => {
+    const context = await playwright.request.newContext({ baseURL });
+    try {
+      await provide(context);
+    } finally {
+      await context.dispose();
+    }
+  },
+});

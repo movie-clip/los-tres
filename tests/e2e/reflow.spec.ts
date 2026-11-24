@@ -732,3 +732,36 @@ test.describe('the empty-state secondary button', { tag: '@layout' }, () => {
     });
   }
 });
+
+// #339 (0006 rule 11): the one reflow check per public page family, added beside the geometry describes above
+// (which #339 deletes): at 390 px the page does not scroll sideways. It asserts nothing else about size or
+// position. Each page is opened with the longest car selected, because the header's car row is the widest thing
+// a visitor sees; the picker page draws no car control of its own, so it is opened as it is.
+test.describe('no sideways scroll at 390 px (#339)', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  const withLongestCar = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}coche=${LONGEST_CAR.slug}`;
+
+  const FAMILIES: { name: string; url: string }[] = [
+    { name: 'home', url: withLongestCar('/') },
+    { name: 'category', url: withLongestCar('/categoria/filtros-de-aire') },
+    { name: 'search, a 100-character term', url: withLongestCar(`/buscar?q=${'w'.repeat(100)}`) },
+    { name: 'car picker', url: '/mi-coche' },
+    { name: 'legal', url: withLongestCar('/como-nos-financiamos') },
+    { name: '404', url: withLongestCar('/producto/no-existe') },
+  ];
+
+  for (const { name, url } of FAMILIES) {
+    test(`${name}: the page does not scroll sideways`, async ({ page }) => {
+      await page.goto(url);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+    });
+  }
+
+  test('product, the long-title demo product: the page does not scroll sideways', async ({ page }) => {
+    await page.goto(withLongestCar(await longTitleUrl(page)));
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    expect(await sideways(page)).toBeLessThanOrEqual(0);
+  });
+});
