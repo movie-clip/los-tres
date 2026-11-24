@@ -151,7 +151,7 @@ describe('the gate runs no timing test (rule 5)', () => {
     const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     const reached = scriptsReached(scripts, GATE_ENTRIES);
     // The walk follows the real scripts: the gate's own steps are in it.
-    for (const step of ['lint', 'typecheck', 'db:up', 'stack:up', 'test', 'test:e2e', 'test:e2e:ci']) {
+    for (const step of ['lint', 'typecheck', 'db:up', 'test', 'test:e2e', 'test:e2e:ci']) {
       expect(reached.has(step), step).toBe(true);
     }
     expect(timingRuns(scripts, reached)).toEqual([]);
@@ -270,12 +270,23 @@ describe('npm run check is the first part of the gate (0006 rule 8, issue #338)'
     expect(scripts.test).toBe('vitest run');
   });
 
-  it('is what gate and gate:ci start with, and they keep every step they had, in order', () => {
-    expect(steps(scripts, 'gate')).toEqual([...steps(scripts, 'check'), 'stack:up', 'test:e2e']);
-    expect(steps(scripts, 'gate:ci')).toEqual([...steps(scripts, 'check'), 'stack:up', 'test:e2e:ci']);
+  it('is what gate and gate:ci start with, then the e2e run, which starts and removes its own stack (#363)', () => {
+    expect(steps(scripts, 'gate')).toEqual([...steps(scripts, 'check'), 'test:e2e']);
+    expect(steps(scripts, 'gate:ci')).toEqual([...steps(scripts, 'check'), 'test:e2e:ci']);
     // The comparison holds real steps, or two empty lists would pass.
-    expect(steps(scripts, 'gate').length).toBe(6);
-    expect(steps(scripts, 'gate:ci').length).toBe(6);
+    expect(steps(scripts, 'gate').length).toBe(5);
+    expect(steps(scripts, 'gate:ci').length).toBe(5);
+  });
+
+  it('reaches no development-stack script, and the e2e scripts are Playwright alone', () => {
+    // The e2e step builds, starts and removes the Compose project `los-tres-e2e` itself (global setup and
+    // teardown), so a gate that also ran stack:up would rebuild and start the development app for nothing.
+    const reached = scriptsReached(scripts, ['gate', 'gate:ci']);
+    expect(reached.has('stack:up')).toBe(false);
+    expect(reached.has('stack:down')).toBe(false);
+    // The two e2e entries are what the pin above counts as one step each: Playwright and its own flag.
+    expect(scripts['test:e2e']).toBe('playwright test');
+    expect(scripts['test:e2e:ci']).toBe('playwright test --grep-invert @layout');
   });
 
   it.each(['check', 'gate', 'gate:ci'])('%s joins its steps with && and nothing else, each an npm call', (name) => {
@@ -296,6 +307,28 @@ describe('the check-step helpers are not vacuous', () => {
     expect(() => steps({ ...synthetic, b: 'npm run b' }, 'a')).toThrow(/cycle/);
     expect(() => steps({ ...synthetic, b: 'npm run c' }, 'a')).toThrow(/cycle|no script named c/);
     expect(() => steps({ ...synthetic, a: 'npm run missing' }, 'a')).toThrow(/no script named missing/);
+  });
+
+  it('a gate that drops the e2e step, or still reaches stack:up, differs from what the pins above expect (#363)', () => {
+    const gateOf = (gate: string, extra: Record<string, string> = {}): Record<string, string> => ({
+      check: 'npm run lint && npm test',
+      lint: 'eslint .',
+      test: 'vitest run',
+      'test:e2e': 'playwright test',
+      'stack:up': 'docker compose up -d --build --wait',
+      gate,
+      ...extra,
+    });
+    const expected = ['lint', 'test', 'test:e2e'];
+    expect(steps(gateOf('npm run check && npm run test:e2e'), 'gate')).toEqual(expected);
+    expect(steps(gateOf('npm run check'), 'gate')).not.toEqual(expected);
+    expect(steps(gateOf('npm run test:e2e'), 'gate')).not.toEqual(expected);
+    expect(steps(gateOf('npm run check && npm run stack:up && npm run test:e2e'), 'gate')).not.toEqual(expected);
+    // A reach through a pre hook counts, as scriptsReached follows hooks.
+    expect(scriptsReached(gateOf('npm run check && npm run test:e2e'), ['gate']).has('stack:up')).toBe(false);
+    expect(scriptsReached(gateOf('npm run check && npm run stack:up'), ['gate']).has('stack:up')).toBe(true);
+    expect(scriptsReached(gateOf('npm run check', { 'pretest:e2e': 'npm run stack:up' }), ['gate']).has('stack:up')).toBe(false);
+    expect(scriptsReached(gateOf('npm run check && npm run test:e2e', { 'pretest:e2e': 'npm run stack:up' }), ['gate']).has('stack:up')).toBe(true);
   });
 
   it('nonNpmSegments accepts a chain of npm calls and finds a raw command, a semicolon, an or and a pipe', () => {
@@ -1284,5 +1317,168 @@ describe('a spec that starts or removes a container runs in the containers proje
     expect(containerListProblems(['a', 'b'], ['a', CATALOGUE_FLOW_STEM])).toEqual(['b: expected in CONTAINER_SPECS, starts no container']);
     expect(containerListProblems(['a', 'a'], ['a', CATALOGUE_FLOW_STEM])).toEqual(['a: listed twice']);
     expect(containerListProblems(['a'], ['a'])).toEqual([`${CATALOGUE_FLOW_STEM}: expected in CONTAINER_SPECS, starts no container`]);
+  });
+});
+
+// The e2e run owns its stack (#363, run 2026-11-24-363-e2e-own-stack, 03-design § Scripts and pins, items a to c).
+// `playwright test` builds, starts and removes the Compose project `los-tres-e2e` itself (global setup and teardown);
+// the project identity is written once, by playwright.config.ts, and every docker call a spec or helper makes
+// inherits it, through tests/support/e2e-stack.ts. The config is read as text, as the #361 pin above does.
+// Items d to h (the lifecycle detector, the serial list, the project blocks) arrive with the specs' change.
+
+const GLOBAL_SETUP_LINE = "globalSetup: './tests/e2e/global-setup.ts'";
+const GLOBAL_TEARDOWN_LINE = "globalTeardown: './tests/e2e/global-teardown.ts'";
+const E2E_OVERRIDE_FILE = 'tests/e2e/compose.e2e.yaml';
+const E2E_STACK_FILE = 'tests/support/e2e-stack.ts';
+const PROJECT_NAME_ASSIGNMENT = /process\.env\.COMPOSE_PROJECT_NAME = '([^']*)';/g;
+
+/**
+ * What is wrong with the way the config, `compose.yaml` and the override name the e2e project: the project is
+ * assigned exactly once, as a literal that is a valid name and not the development project's, the file list names
+ * both files, and every image of the override is the tag the app build writes.
+ */
+function projectProblems(config: string, composeYaml: string, override: string): string[] {
+  const problems: string[] = [];
+  const names = [...config.matchAll(PROJECT_NAME_ASSIGNMENT)].map((match) => match[1] ?? '');
+  const anyAssignment = [...config.matchAll(/COMPOSE_PROJECT_NAME\s*=(?!=)/g)];
+  if (names.length !== 1 || anyAssignment.length !== 1) {
+    problems.push(`COMPOSE_PROJECT_NAME is assigned ${anyAssignment.length} times, ${names.length} as a single-quoted literal; expected once`);
+  }
+  const project = names[0] ?? '';
+  const development = /^name: (\S+)$/m.exec(composeYaml)?.[1] ?? '';
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(project)) problems.push(`project name '${project}' is not a valid Compose project name`);
+  if (development === '') problems.push('compose.yaml has no top-level name');
+  if (project === development) problems.push(`project name '${project}' is the development project's`);
+  const fileAssignment = /process\.env\.COMPOSE_FILE = (.*);/.exec(config)?.[1] ?? '';
+  for (const file of ["'compose.yaml'", `'${E2E_OVERRIDE_FILE}'`]) {
+    if (!fileAssignment.includes(file)) problems.push(`COMPOSE_FILE does not name ${file}`);
+  }
+  const images = [...override.matchAll(/^\s+image: (\S+)\s*$/gm)].map((match) => match[1] ?? '');
+  if (images.length === 0) problems.push('the override sets no image');
+  for (const image of images) {
+    if (image !== `${project}-app`) problems.push(`override image '${image}' is not '${project}-app'`);
+  }
+  return problems;
+}
+
+/** A source that assigns `COMPOSE_PROJECT_NAME` or `COMPOSE_FILE`, by `=` or as an object key (`env: { COMPOSE_FILE: ... }`). */
+const COMPOSE_IDENTITY_WRITE = /COMPOSE_(?:PROJECT_NAME|FILE)['"\]]*\s*[:=](?!=)/;
+/** A source that passes the project or the file list on a docker command line instead of inheriting them. */
+const COMPOSE_IDENTITY_FLAG = /['"](?:-p|--project-name|-f|--file)['"]/;
+/** A source that starts a docker process itself. */
+const DOCKER_PROCESS = /\bspawn(?:Sync)?\(\s*['"]docker['"]/;
+
+/** The paths of `files` (path to text) whose text matches `pattern`, sorted. */
+const filesMatching = (files: Record<string, string>, pattern: RegExp): string[] =>
+  Object.entries(files)
+    .filter(([, text]) => pattern.test(text))
+    .map(([file]) => file)
+    .sort();
+
+const e2eAndSupportFiles = (): Record<string, string> =>
+  Object.fromEntries([...tsFilesUnder('tests/e2e'), ...tsFilesUnder('tests/support')].map((file) => [file, read(file)]));
+
+// Files that still start docker themselves, or pass the project flags, until the specs move onto
+// tests/support/e2e-stack.ts (#363, lane T2). T2 empties both lists; the pins below compare in both directions,
+// so a file that has moved but is still listed fails here, and a new file that is not listed fails too.
+const DOCKER_PROCESS_UNTIL_SPECS_MOVE = [
+  'tests/e2e/admin-products.spec.ts',
+  'tests/e2e/admin-sources.spec.ts',
+  'tests/e2e/admin.spec.ts',
+  'tests/e2e/car-cross-cutting.spec.ts',
+  'tests/e2e/car-header-error.spec.ts',
+  'tests/e2e/catalogue-file-flow.spec.ts',
+  'tests/e2e/category-car.spec.ts',
+  'tests/e2e/collected-start.spec.ts',
+  'tests/e2e/entrypoint.spec.ts',
+  'tests/e2e/search-car.spec.ts',
+  'tests/e2e/search-privacy.spec.ts',
+  'tests/support/admin-e2e.ts',
+  'tests/support/isolated-app.ts',
+];
+const IDENTITY_FLAG_UNTIL_SPECS_MOVE = [
+  'tests/e2e/car-header-error.spec.ts',
+  'tests/e2e/search-privacy.spec.ts',
+  'tests/support/isolated-app.ts',
+];
+
+describe('the e2e run owns its stack: one project, set in the config (#363)', () => {
+  const config = read(CONFIG_FILE);
+
+  it('(a) the config names one global setup and one global teardown, and both files exist', () => {
+    expect(config.split(GLOBAL_SETUP_LINE).length - 1).toBe(1);
+    expect(config.split(GLOBAL_TEARDOWN_LINE).length - 1).toBe(1);
+    expect(existsSync(path.resolve(process.cwd(), 'tests/e2e/global-setup.ts'))).toBe(true);
+    expect(existsSync(path.resolve(process.cwd(), 'tests/e2e/global-teardown.ts'))).toBe(true);
+  });
+
+  it('(b) the project is assigned once, is not the development project, and the files and the image follow it', () => {
+    expect(projectProblems(config, read('compose.yaml'), read(E2E_OVERRIDE_FILE))).toEqual([]);
+  });
+
+  it('(c) no spec or helper assigns the project, names the old base URL or passes a project flag; only e2e-stack.ts reads the project and starts docker', () => {
+    const files = e2eAndSupportFiles();
+    // The scan sees the trees, or an empty directory would pass.
+    expect(Object.keys(files).length).toBeGreaterThan(30);
+    expect(files[E2E_STACK_FILE]).toBeDefined();
+
+    expect(filesMatching(files, COMPOSE_IDENTITY_WRITE)).toEqual([]);
+    expect(filesMatching(files, /E2E_BASE_URL/)).toEqual([]);
+    expect(filesMatching(files, COMPOSE_IDENTITY_FLAG)).toEqual(IDENTITY_FLAG_UNTIL_SPECS_MOVE);
+    expect(filesMatching(files, /COMPOSE_PROJECT_NAME/)).toEqual([E2E_STACK_FILE]);
+    expect(filesMatching(files, DOCKER_PROCESS).filter((file) => file !== E2E_STACK_FILE)).toEqual(DOCKER_PROCESS_UNTIL_SPECS_MOVE);
+    expect(filesMatching(files, DOCKER_PROCESS)).toContain(E2E_STACK_FILE);
+  });
+
+  it('the checks above can fail', () => {
+    const composeYaml = 'name: los-tres\n\nservices:\n';
+    const override = 'services:\n  app:\n    image: los-tres-e2e-app\n  app-no-db:\n    image: los-tres-e2e-app\n';
+    const good =
+      "process.env.COMPOSE_PROJECT_NAME = 'los-tres-e2e';\nprocess.env.COMPOSE_FILE = [path.resolve('compose.yaml'), path.resolve('tests/e2e/compose.e2e.yaml')].join(path.delimiter);\n";
+    expect(projectProblems(good, composeYaml, override)).toEqual([]);
+
+    // The project assigned twice, not as a literal, not at all, as the development project, or with a bad name.
+    expect(projectProblems(good + "process.env.COMPOSE_PROJECT_NAME = 'other';\n", composeYaml, override)).toHaveLength(1);
+    expect(projectProblems(good.replace("'los-tres-e2e'", 'name'), composeYaml, override)[0]).toMatch(/expected once/);
+    expect(projectProblems(good.replace(/process\.env\.COMPOSE_PROJECT_NAME = .*\n/, ''), composeYaml, override)[0]).toMatch(/expected once/);
+    expect(projectProblems(good.replace('los-tres-e2e', 'los-tres'), composeYaml, override.replaceAll('los-tres-e2e', 'los-tres'))).toEqual([
+      "project name 'los-tres' is the development project's",
+    ]);
+    expect(projectProblems(good.replace('los-tres-e2e', 'Los Tres'), composeYaml, override.replaceAll('los-tres-e2e', 'Los Tres'))[0]).toMatch(/not a valid/);
+    expect(projectProblems(good, 'services:\n', override)).toEqual(['compose.yaml has no top-level name']);
+    // A file list that drops either file, an image that is not the project's tag, and an override with no image.
+    expect(projectProblems(good.replace("path.resolve('compose.yaml'), ", ''), composeYaml, override)).toEqual(["COMPOSE_FILE does not name 'compose.yaml'"]);
+    expect(projectProblems(good.replace('tests/e2e/compose.e2e.yaml', 'x.yaml'), composeYaml, override)).toEqual([`COMPOSE_FILE does not name '${E2E_OVERRIDE_FILE}'`]);
+    expect(projectProblems(good, composeYaml, override.replace('los-tres-e2e-app', 'los-tres-app'))).toEqual(["override image 'los-tres-app' is not 'los-tres-e2e-app'"]);
+    expect(projectProblems(good, composeYaml, 'services:\n')).toEqual(['the override sets no image']);
+
+    for (const source of [
+      "process.env.COMPOSE_PROJECT_NAME = 'x';",
+      "process.env.COMPOSE_FILE='a';",
+      "spawnSync('docker', args, { env: { COMPOSE_PROJECT_NAME: 'x' } })",
+      "env['COMPOSE_FILE'] = 'a';",
+    ]) {
+      expect(COMPOSE_IDENTITY_WRITE.test(source), source).toBe(true);
+    }
+    for (const source of ["const project = process.env.COMPOSE_PROJECT_NAME?.trim();", "if (process.env.COMPOSE_FILE === undefined) {}"]) {
+      expect(COMPOSE_IDENTITY_WRITE.test(source), source).toBe(false);
+    }
+
+    for (const source of ["['compose', '-p', 'x', 'up']", "['compose', '--project-name', 'x']", "['compose', '-f', 'a.yaml']", '["--file", "a.yaml"]']) {
+      expect(COMPOSE_IDENTITY_FLAG.test(source), source).toBe(true);
+    }
+    for (const source of ["['compose', 'exec', '-T', 'db']", "docker(['rm', '-f-x'])", "const path = '/p/f';"]) {
+      expect(COMPOSE_IDENTITY_FLAG.test(source), source).toBe(false);
+    }
+
+    for (const source of ["spawnSync('docker', args)", 'spawn("docker", args)', "spawnSync(\n    'docker',\n    args,\n  )"]) {
+      expect(DOCKER_PROCESS.test(source), source).toBe(true);
+    }
+    for (const source of ["spawnSync('node', ['docker'])", "const docker = 'docker';", "compose(['exec', '-T', 'db'])"]) {
+      expect(DOCKER_PROCESS.test(source), source).toBe(false);
+    }
+
+    expect(filesMatching({ 'b.ts': 'x y', 'a.ts': 'x', 'c.ts': 'z' }, /x/)).toEqual(['a.ts', 'b.ts']);
+    expect(filesMatching({}, /x/)).toEqual([]);
   });
 });

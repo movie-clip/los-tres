@@ -1,15 +1,44 @@
 import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 import { defineConfig, devices } from '@playwright/test';
 
 // This file must not import from tests/: `next build` in the Docker image type
 // checks it, and .dockerignore leaves tests/ out of the build context. The
-// base URL is computed here and nowhere else: specs use the `baseURL` and
-// `request` fixtures, never their own copy of the rule.
+// e2e stack identity and the base URL are computed here and nowhere else:
+// specs use the `baseURL` and `request` fixtures, never their own copy of the
+// rule, and every `docker compose` call (setup, teardown, helpers, specs)
+// inherits the environment set below (#363, tests/support/e2e-stack.ts).
 if (existsSync('.env')) process.loadEnvFile('.env');
-const baseURL =
-  process.env.E2E_BASE_URL?.trim().replace(/\/$/, '') ||
-  `http://127.0.0.1:${process.env.APP_PORT?.trim() || '3010'}`;
+
+// The e2e run builds, starts and removes a Compose project of its own, `los-tres-e2e`, from compose.yaml
+// plus tests/e2e/compose.e2e.yaml. It never touches the development stack (`los-tres`, `name:` in
+// compose.yaml): the project name is assigned here, after `.env`, whatever the shell holds.
+process.env.COMPOSE_PROJECT_NAME = 'los-tres-e2e';
+process.env.COMPOSE_PATH_SEPARATOR = path.delimiter;
+process.env.COMPOSE_FILE = [path.resolve('compose.yaml'), path.resolve('tests/e2e/compose.e2e.yaml')].join(path.delimiter);
+
+if (process.env.E2E_BASE_URL?.trim()) {
+  throw new Error('e2e config: E2E_BASE_URL is no longer read; the e2e run starts its own stack (#363). Remove it from .env');
+}
+
+// Four consecutive loopback ports: the app, then three variant apps (no database, local flag off, local
+// flag on). Only E2E_APP_PORT is configurable; the other three are always computed from it.
+const e2eAppPort = Number(process.env.E2E_APP_PORT?.trim() || '3020');
+if (!Number.isInteger(e2eAppPort) || e2eAppPort < 1024 || e2eAppPort > 65532) {
+  throw new Error('e2e config: E2E_APP_PORT must be a whole number from 1024 to 65532');
+}
+const e2ePorts = [e2eAppPort, e2eAppPort + 1, e2eAppPort + 2, e2eAppPort + 3];
+const developmentPorts = [Number(process.env.APP_PORT?.trim() || '3010'), Number(process.env.DB_HOST_PORT?.trim() || '5433')];
+const taken = e2ePorts.find((port) => developmentPorts.includes(port));
+if (taken !== undefined) {
+  throw new Error(`e2e config: E2E_APP_PORT=${e2eAppPort} uses port ${taken}, which the development stack uses; set E2E_APP_PORT in .env`);
+}
+process.env.E2E_APP_PORT = String(e2ePorts[0]);
+process.env.E2E_NO_DB_PORT = String(e2ePorts[1]);
+process.env.E2E_FLAG_OFF_PORT = String(e2ePorts[2]);
+process.env.E2E_FLAG_ON_PORT = String(e2ePorts[3]);
+const baseURL = `http://127.0.0.1:${e2ePorts[0]}`;
 
 // Playwright runs the projects another project depends on in full: the CLI
 // --grep-invert (test:e2e:ci) is not applied to them, so `chromium` and `containers`, the
@@ -40,12 +69,14 @@ const CONTAINER_SPECS = [
 ];
 const CONTAINERS = new RegExp(`(^|[\\\\/])(${CONTAINER_SPECS.join('|')})\\.spec\\.ts$`);
 
-// No webServer: the Compose stack is the server under test (npm run stack:up).
+// No webServer: the e2e Compose project is the server under test, started by the global setup.
 export default defineConfig({
   testDir: 'tests/e2e',
-  // A string path, never an import (see the note above). Runs the Compose
-  // import once so the product pages have data; tests never write the dev DB.
+  // String paths, never imports (see the note above). The setup builds and starts the e2e project, imports
+  // the demo feeds and creates the one admin; the teardown removes the project with its volume. Playwright
+  // registers the teardown before it runs the setup, so it also runs when the setup throws and on Ctrl-C.
   globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: true,
   reporter: [['list']],
