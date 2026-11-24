@@ -80,8 +80,10 @@ while they build (0006 rule 8).
 
 First run on a fresh clone: `npm ci`, `npm run env:init`,
 `npm run test:e2e:install`. The gate also needs Docker running and a free host
-port for each published service (app on 3010, db on 5433); if one is taken, set
-`APP_PORT` or `DB_HOST_PORT` in `.env` (and `SITE_URL` to match `APP_PORT`) to change the host port.
+port for the database `npm run check` starts with `db:up` (db on 5433); if it is
+taken, set `DB_HOST_PORT` in `.env` to change it. The gate does not start the
+development app, so it does not need `APP_PORT` (3010) free; `APP_PORT` and
+`SITE_URL` matter for `npm run stack:up` only.
 The e2e run builds its own stack (see the e2e row below) and needs four more
 free loopback ports: `E2E_APP_PORT` and the next three, 3020 to 3023 by default.
 Set `E2E_APP_PORT` in `.env` to move them (a whole number from 1024 to 65532;
