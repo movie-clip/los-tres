@@ -55,16 +55,15 @@ function cliGrepInvert(): RegExp | undefined {
   return value ? new RegExp(value) : undefined;
 }
 
-// The specs that write a database (#363): SQL through `psql`, a verb that writes (`import-feeds`,
-// `create-admin`, `seed`, `migrate`), or an admin form that saves. They run in `serial`, one worker, after
-// every `chromium` spec has finished, so nothing reads the e2e database beside a write. Rule: a spec that
-// writes any database is serial, and leaves the database as it found it in what the other specs read (no
-// approved feed or shop it created, no hidden demo item, no changed demo mapping). tests/unit/gate-determinism.test.ts
+// The specs that write the main e2e database (#363, #339): SQL through `psql`, a verb that writes
+// (`import-feeds`, `create-admin`, `seed`, `migrate`) in the `app` service, or an admin form that saves.
+// They run in `serial`, one worker, after every `chromium` spec has finished, so nothing reads the main
+// e2e database beside a write. Rule: a spec that writes the main e2e database is serial, and leaves the
+// database as it found it in what the other specs read (no approved feed or shop it created, no hidden
+// demo item, no changed demo mapping). A spec that only runs verbs in `app-no-db`, or writes only the
+// database of a variant app (`app-flag-off`, `app-flag-on`), is not serial. tests/unit/gate-determinism.test.ts
 // keeps this list and the specs in step.
-const SERIAL_SPECS = [
-  'admin', 'admin-categories', 'admin-feeds', 'admin-products', 'catalogue-file-flow',
-  'collected-admin', 'collected-public', 'collected-start', 'entrypoint',
-];
+const SERIAL_SPECS = ['admin', 'admin-categories', 'admin-feeds', 'admin-products', 'catalogue-file-flow'];
 const SERIAL = new RegExp(`(^|[\\\\/])(${SERIAL_SPECS.join('|')})\\.spec\\.ts$`);
 
 // No webServer: the e2e Compose project is the server under test, started by the global setup.
@@ -82,11 +81,11 @@ export default defineConfig({
   // the CI workflows upload that folder when the gate fails. A passing test keeps nothing. Retries
   // stay at their default of 0 (0006 rule 6).
   use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
-  // Two projects, one after the other (#363). `chromium` holds every spec that only reads, in parallel.
-  // `serial` holds the specs that write a database, on a single worker, after `chromium`: an approved feed or
-  // a hidden demo product would otherwise be counted by a spec that reads the database in parallel, and
-  // `entrypoint.spec.ts` asserts the demo feed totals. No spec starts or stops a container (the stack is up
-  // before the first test), so nothing changes a network interface under a page load.
+  // Two projects, one after the other (#363). `chromium` holds every spec that does not write the main e2e
+  // database, in parallel. `serial` holds the specs that write it, on a single worker, after `chromium`: an
+  // approved feed or a hidden demo product would otherwise be counted by a spec that reads the database in
+  // parallel. No spec starts or stops a container (the stack is up before the first test), so nothing
+  // changes a network interface under a page load.
   projects: [
     {
       name: 'chromium',

@@ -1181,8 +1181,12 @@ describe('the ref, input, permission and strategy checks are not vacuous', () =>
 const CONFIG_FILE = 'playwright.config.ts';
 const SERIAL_DEFINITION =
   "const SERIAL = new RegExp(`(^|[\\\\\\\\/])(${SERIAL_SPECS.join('|')})\\\\.spec\\\\.ts$`);";
-/** A spec that writes a database: SQL through `psql`, a verb inside the app, or the create-admin command. */
-const DATABASE_WRITER = /\b(?:psql|verb|createAdminWithCommand)\(/;
+/**
+ * A spec that writes the main e2e database (#339): a bare `psql(` call (not the `.psql(` method of a variant app,
+ * which writes that variant's own database), the create-admin command, or a `verb(` whose first argument is not the
+ * literal `'app-no-db'`, `'app-flag-off'` or `'app-flag-on'` (a verb in the main `app` service reaches its database).
+ */
+const DATABASE_WRITER = /(?<![.\w])psql\(|\bcreateAdminWithCommand\(|\bverb\((?!\s*'(?:app-no-db|app-flag-off|app-flag-on)')/;
 
 /** The stems in the `SERIAL_SPECS` array literal of the config text, or null when the literal is missing or holds anything but single-quoted stems. */
 function serialSpecsOf(config: string): string[] | null {
@@ -1339,7 +1343,7 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
   it('(e) SERIAL_SPECS is a literal list of existing specs, with no duplicate, and holds every spec that writes a database', () => {
     const listed = serialSpecsOf(read(CONFIG_FILE));
     expect(listed, 'the literal is missing or not made of plain stems').not.toBeNull();
-    expect((listed ?? []).length).toBeGreaterThan(5);
+    expect((listed ?? []).length).toBeGreaterThanOrEqual(5);
     const specs = e2eSpecs();
     // The scan sees the specs, or an empty directory would pass.
     expect(Object.keys(specs).length).toBeGreaterThan(20);
@@ -1460,10 +1464,19 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
     expect(serialSpecsOf("const SERIAL_SPECS = ['a', ...MORE];")).toBeNull();
     expect(serialSpecsOf("const SERIAL_SPECS = ['a', /* b */ 'c'];")).toBeNull();
     expect(serialSpecsOf("const SERIAL_SPECS = ['A'];")).toBeNull();
-    for (const source of ['psql("select 1")', 'app.psql(`x`)', "verb('app', ['seed'])", 'createAdminWithCommand(a, b, c);']) {
+    for (const source of ['psql("select 1")', "verb('app', ['seed'])", 'verb(service, [])', 'createAdminWithCommand(a, b, c);']) {
       expect(DATABASE_WRITER.test(source), source).toBe(true);
     }
-    for (const source of ["psqlScalar('select 1')", "execIn('db', ['sh'])", 'const verbose = 1;', 'serviceLogs(`app`)']) {
+    for (const source of [
+      "psqlScalar('select 1')",
+      "execIn('db', ['sh'])",
+      'const verbose = 1;',
+      'serviceLogs(`app`)',
+      'app.psql(`x`)',
+      "verb('app-no-db', ['bogus'])",
+      "verb( 'app-flag-off', [])",
+      "verb('app-flag-on', [])",
+    ]) {
       expect(DATABASE_WRITER.test(source), source).toBe(false);
     }
     const specs = { 'tests/e2e/a.spec.ts': 'psql("x")', 'tests/e2e/b.spec.ts': "verb('app', [])", 'tests/e2e/c.spec.ts': 'const x = 1;' };
