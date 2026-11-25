@@ -50,6 +50,22 @@ describe('route classification (C-5, TD-6)', () => {
     expect(lookalike).toEqual([]);
   });
 
+  // M4 (#339): the vehicle list is code in the app (decision 0016) and reaches the browser inside
+  // the picker props; no public route serves it, so a visitor cannot list it by URL.
+  it('has no public route that serves a vehicle list', () => {
+    const publicRoutes = routes.filter((file) => classifyRoute(file) === 'public');
+    expect(publicRoutes.length).toBeGreaterThan(0);
+    const listing = publicRoutes.filter((file) => /vehiculo|vehicle/i.test(file));
+    expect(listing).toEqual([]);
+  });
+
+  it('would see a vehicle list route placed under (public)', () => {
+    const looksLikeList = (file: string) => /vehiculo|vehicle/i.test(file);
+    expect(looksLikeList('(public)/api/vehiculos/route.ts')).toBe(true);
+    expect(looksLikeList('(public)/api/vehicles/route.ts')).toBe(true);
+    expect(looksLikeList('(public)/api/health/route.ts')).toBe(false);
+  });
+
   it('detects a route placed outside the two directories', () => {
     expect(classifyRoute('page.tsx')).toBe('unclassified');
     expect(classifyRoute('api/leak/route.ts')).toBe('unclassified');

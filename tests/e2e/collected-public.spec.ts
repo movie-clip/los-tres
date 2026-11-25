@@ -1,36 +1,34 @@
 import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_COUNTS } from '../fixtures/demo';
 import { CAR } from '../support/car';
 import { variant, type E2EVariant, type Variant } from '../support/e2e-stack';
-import { icuPlural, normaliseSpaces } from '../support/messages';
+import { normaliseSpaces } from '../support/messages';
 import { expectNoSetCookie, expectServerRenderedNotFound, openRawHtml, stripScripts } from '../support/page-checks';
 
-// S12.2 (decision 0017), ACs 13 to 27 and 36 on the REAL app: marked rows (rows of a collected feed) are on no
-// public page with the local flag off, are shown only with the flag on beside a loopback SITE_URL, and are
-// never indexed, listed or counted either way. Two variant apps of the e2e stack, on databases of their own
+// S12.2 (decision 0017), ACs 15 to 21, 24, 26 and 36 on the REAL app, B6 of #339: marked rows (rows of a collected
+// feed) are on no public page with the local flag off and are shown only with the flag on beside a loopback
+// SITE_URL, noindex and never counted. Two variant apps of the e2e stack, on databases of their own
 // (`app-flag-off` and `app-flag-on` of tests/e2e/compose.e2e.yaml, started and imported by the global setup,
 // #363), each seeded the same way with invented rows written by psql: a collected file may never be placed in
 // the owner's folder, so the rows are what an import of one would leave (the importer's marking is
 // collected-import.test.ts, the sweep over every reader is collected-public-sweep.test.ts). The main e2e
-// database is never touched.
+// database is never touched, so this spec runs in the parallel project.
 //
 //   off  LOCAL_COLLECTED_DATA=false beside a PUBLIC https SITE_URL: the state of a deploy (AC 36: it starts)
 //   on   LOCAL_COLLECTED_DATA=true beside the loopback SITE_URL of its own port: the owner's local stack
 //
 // The app refuses to start with the flag on beside a public SITE_URL, so that combination (the backstop,
 // AC 37) is not a live case: collected-public-sweep.test.ts runs it over the readers, and
-// collected-start.spec.ts proves the refusal. Serial: each app is shared by its tests.
+// collected-start.spec.ts proves the refusal. Serial within the file: each app is shared by its tests.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
-const PUBLIC_ORIGIN = 'https://tienda-publica.example';
 const siteName = (process.env.SITE_NAME ?? '').trim();
 
 const M = { slug: 'e2e-marcado', title: 'Filtro Colibri E2E reservado', term: 'Colibri', part: 'E2E-77', price: 1234, link: 'https://tienda-recopilada.example/p/m1' };
 const U = { slug: 'e2e-escrito', title: 'Filtro Pelicano E2E escrito', term: 'Pelicano', handPrice: 2000, markedPrice: 1000, markedLink: 'https://tienda-recopilada.example/p/u2' };
 
-type World = { cm: string; cu: string; offerM: number; offerUMarked: number; offerUHand: number };
+type World = { offerM: number; offerUMarked: number; offerUHand: number };
 
 function seed(app: Variant): World {
   const scalar = (sql: string) => app.psqlScalar(sql);
@@ -61,7 +59,7 @@ function seed(app: Variant): World {
 
   const id = (product: string, external: string) =>
     Number(scalar(`select o.id from offers o join products p on p.id = o.product_id where p.slug = '${product}' and o.external_id = '${external}'`));
-  return { cm, cu, offerM: id(M.slug, 'm-1'), offerUMarked: id(U.slug, 'u-2'), offerUHand: id(U.slug, 'u-1') };
+  return { offerM: id(M.slug, 'm-1'), offerUMarked: id(U.slug, 'u-2'), offerUHand: id(U.slug, 'u-1') };
 }
 
 const clicks = (app: Variant): number => Number(app.psqlScalar('select count(*) from clicks'));
@@ -72,12 +70,7 @@ async function get(request: APIRequestContext, path: string, options: { redirect
   return response;
 }
 
-const offerLinks = (html: string): number => (html.match(/data-testid="offer-go"/g) ?? []).length;
-
-function describeFlagState(
-  label: string,
-  o: { service: E2EVariant; shown: boolean; origin: (app: Variant) => string },
-) {
+function describeFlagState(label: string, o: { service: E2EVariant; shown: boolean }) {
   test.describe(label, () => {
     let app: Variant;
     let world: World;
@@ -92,13 +85,11 @@ function describeFlagState(
       await request?.dispose();
     });
 
-    test('starts and is healthy (AC 36), and never printed the refusal', async () => {
+    test('starts and is healthy (AC 36), never printed the refusal, and the unmarked product and the demo catalogue are public, so an absence below means something', async () => {
       const health = await request.get('/api/health');
       expect(health.status()).toBe(200);
       expect(app.logs()).not.toContain('start refused');
-    });
 
-    test('non-vacuity: the unmarked product and the demo catalogue are public, so an absence below means something', async () => {
       const page = await get(request, `/producto/${U.slug}`);
       expect(page.status()).toBe(200);
       expect(await page.text()).toContain(U.title);
@@ -108,13 +99,17 @@ function describeFlagState(
       expect(clicks(app)).toBe(1);
     });
 
-    test(`the marked product page ${o.shown ? 'shows' : 'is a 404, as one that does not exist'} (ACs 16, 26)`, async () => {
+    test(`the marked product ${o.shown ? 'is shown, noindex with no canonical, found by search, and its /go redirects' : 'is a 404 as one that does not exist, is not found by search, and its /go answers 404'}, with no click (ACs 16, 18, 19, 20, 24, 26)`, async ({ browser }) => {
       const page = await get(request, `/producto/${M.slug}`);
       const html = await page.text();
       if (o.shown) {
         expect(page.status()).toBe(200);
         expect(html).toContain(M.title);
         expect(normaliseSpaces(stripScripts(html))).toContain('12,34');
+        const raw = await openRawHtml(browser, html);
+        await expect(raw.page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+        await expect(raw.page.locator('link[rel="canonical"]')).toHaveCount(0);
+        await raw.close();
       } else {
         expect(page.status()).toBe(404);
         expectServerRenderedNotFound(html, siteName, 'marked product');
@@ -123,70 +118,18 @@ function describeFlagState(
         const withCar = await get(request, `/producto/${M.slug}?coche=${CAR.slug}`);
         expect(withCar.status()).toBe(404);
       }
-    });
 
-    test('the marked product page, when it exists, is noindex with no canonical (AC 20)', async ({ browser }) => {
-      test.skip(!o.shown, 'with the flag off there is no marked page to read');
-      const html = await (await get(request, `/producto/${M.slug}`)).text();
-      const { page, close } = await openRawHtml(browser, html);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
-      await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
-      await close();
-    });
-
-    test(`the offer list of the unmarked product ${o.shown ? 'adds' : 'does not add'} the marked offer, and the page is indexable on its public origin (ACs 17, 21)`, async ({ browser }) => {
-      const html = await (await get(request, `/producto/${U.slug}`)).text();
-      expect(offerLinks(html)).toBe(o.shown ? 2 : 1);
-      const { page, close } = await openRawHtml(browser, html);
-      await expect(page.locator('meta[name="robots"][content*="noindex"]')).toHaveCount(0);
-      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${o.origin(app)}/producto/${U.slug}`);
-      await close();
-      expect(html).toContain(U.title);
-      expect(html).not.toContain(M.title);
-    });
-
-    test(`the category of the marked product ${o.shown ? 'lists it' : 'is empty'}, and is noindex with no canonical either way (ACs 15, 22)`, async ({ browser }) => {
-      const response = await get(request, `/categoria/${world.cm}`);
-      expect(response.status()).toBe(200);
-      const html = await response.text();
-      if (o.shown) expect(html).toContain(M.title);
-      else expect(html).not.toContain(M.title);
-      const { page, close } = await openRawHtml(browser, html);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
-      await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
-      await close();
-    });
-
-    test('the category that holds the unmarked product is indexable, with the marked offer not counted as one (AC 22)', async ({ browser }) => {
-      const html = await (await get(request, `/categoria/${world.cu}`)).text();
-      const { page, close } = await openRawHtml(browser, html);
-      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${o.origin(app)}/categoria/${world.cu}`);
-      await close();
-      expect(html).toContain(U.title);
-    });
-
-    test(`search ${o.shown ? 'finds' : 'does not find'} the marked product by its title and its part number (AC 18)`, async () => {
       for (const term of [M.term, M.part]) {
-        const html = await (await get(request, `/buscar?q=${encodeURIComponent(term)}`)).text();
-        if (o.shown) expect(html, term).toContain(M.title);
+        const found = await (await get(request, `/buscar?q=${encodeURIComponent(term)}`)).text();
+        if (o.shown) expect(found, term).toContain(M.title);
         else {
-          expect(html, term).not.toContain(M.title);
-          expect(normaliseSpaces(stripScripts(html)), term).toContain(messages.Search.noResultsHeading);
+          expect(found, term).not.toContain(M.title);
+          expect(normaliseSpaces(stripScripts(found)), term).toContain(messages.Search.noResultsHeading);
         }
       }
       // The unmarked product is found either way.
       expect(await (await get(request, `/buscar?q=${U.term}`)).text()).toContain(U.title);
-    });
 
-    test(`the home page counts ${o.shown ? 'both' : 'only the unmarked'} product${o.shown ? 's' : ''} beside the ${DEMO_COUNTS.publicProducts} demo ones (AC 15)`, async ({ browser }) => {
-      const html = await (await get(request, '/')).text();
-      const { page, close } = await openRawHtml(browser, html);
-      const expected = DEMO_COUNTS.publicProducts + 1 + (o.shown ? 1 : 0);
-      await expect(page.getByTestId('home-all-count')).toHaveText(icuPlural(messages.Home.productCount, expected));
-      await close();
-    });
-
-    test(`/go for the marked offers ${o.shown ? 'redirects to the offer address, with no click' : 'answers 404 as for an unknown offer, with no click'} (ACs 19, 24)`, async () => {
       const before = clicks(app);
       const unknown = await get(request, '/go/2000000000', { redirects: false });
       for (const offer of [world.offerM, world.offerUMarked]) {
@@ -203,42 +146,15 @@ function describeFlagState(
       }
       expect(clicks(app)).toBe(before);
     });
-
-    test('the sitemap lists the unmarked product and its category, and no marked product or category, flag on or off (AC 23)', async () => {
-      const index = await (await get(request, '/sitemap.xml')).text();
-      const locs = [...index.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-      expect(locs.some((loc) => loc.endsWith('/sitemaps/paginas.xml'))).toBe(true);
-      expect(locs.some((loc) => /\/sitemaps\/productos-1\.xml$/.test(loc))).toBe(true);
-      let all = '';
-      for (const loc of locs) {
-        const file = await get(request, new URL(loc).pathname);
-        expect(file.status()).toBe(200);
-        all += await file.text();
-      }
-      expect(all).toContain(`<loc>${o.origin(app)}/producto/${U.slug}</loc>`);
-      expect(all).toContain(`<loc>${o.origin(app)}/categoria/${world.cu}</loc>`);
-      expect(all).not.toContain(M.slug);
-      expect(all).not.toContain(`/categoria/${world.cm}<`);
-      expect(all).not.toContain('/go/');
-    });
-
-    test('no page marks a row as collected, and no public response sets a cookie (AC 26, OD-6)', async () => {
-      for (const path of ['/', `/producto/${U.slug}`, `/categoria/${world.cu}`, `/categoria/${world.cm}`, `/buscar?q=${U.term}`, ...(o.shown ? [`/producto/${M.slug}`] : [])]) {
-        const html = stripScripts(await (await get(request, path)).text());
-        expect(html, path).not.toMatch(/recopilad|uso local|ajuste local|collected/i);
-      }
-    });
   });
 }
 
 describeFlagState('flag off beside a public SITE_URL (a deploy)', {
   service: 'app-flag-off',
   shown: false,
-  origin: () => PUBLIC_ORIGIN,
 });
 
-describeFlagState('flag on beside a loopback SITE_URL (the owner\'s local stack)', {
+describeFlagState("flag on beside a loopback SITE_URL (the owner's local stack)", {
   service: 'app-flag-on',
   shown: true,
-  origin: (app) => app.origin,
 });

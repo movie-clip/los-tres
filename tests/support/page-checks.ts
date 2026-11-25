@@ -1,4 +1,4 @@
-import { expect, type APIResponse, type Browser, type Locator, type Page } from '@playwright/test';
+import { expect, type APIResponse, type Browser, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 
@@ -20,49 +20,6 @@ export async function openRawHtml(
 /** A public response never sets a cookie. */
 export function expectNoSetCookie(response: APIResponse): void {
   expect(response.headers()['set-cookie']).toBeUndefined();
-}
-
-/**
- * Every script `src` and every link `href` on the page is a same-origin path.
- * `allowHrefs` names the exceptions by exact string (the legal pages allow only
- * the contact `mailto:` and the AEPD site); a near miss such as another host or
- * a different path on the same host still fails.
- */
-export async function expectLocalScriptsAndLinks(
-  page: Page,
-  options: { allowHrefs?: string[] } = {},
-): Promise<void> {
-  const allowed = new Set(options.allowHrefs ?? []);
-  const scriptSources = await page
-    .locator('script[src]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('src') ?? ''));
-  for (const src of scriptSources) {
-    expect(src.startsWith('/') && !src.startsWith('//')).toBe(true);
-  }
-  const hrefs = await page
-    .locator('a[href]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href') ?? ''));
-  for (const href of hrefs) {
-    expect(allowed.has(href) || (href.startsWith('/') && !href.startsWith('//'))).toBe(true);
-  }
-}
-
-/** The footer every page carries (S9.3): three plain links, no heading, no paragraph. */
-export async function expectLegalFooter(page: Page): Promise<void> {
-  const footer = page.getByRole('contentinfo');
-  await expect(footer).toHaveCount(1);
-  const links = footer.locator('a');
-  expect(await links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))).toEqual([
-    '/aviso-legal',
-    '/privacidad',
-    '/como-nos-financiamos',
-  ]);
-  expect((await links.allTextContents()).map((label) => label.trim())).toEqual([
-    messages.Footer.legalNotice,
-    messages.Footer.privacy,
-    messages.Footer.funding,
-  ]);
-  await expect(footer.locator('p, h1, h2, h3, h4, h5, h6')).toHaveCount(0);
 }
 
 /** No request left the app origin (data: and blob: do not count). */
@@ -105,93 +62,4 @@ export function expectServerRenderedNotFound(html: string, siteName: string, lab
     `<title>${messages.NotFound.metaTitle.replace('{siteName}', siteName)}</title>`,
   );
   expect(body, say('robots')).toMatch(/<meta\b[^>]*name="robots"[^>]*content="[^"]*noindex/);
-}
-
-/** Resolves any CSS colour (a `var(--token)` too) to the `rgb(...)` string a computed style reports. */
-export async function cssColour(page: Page, value: string): Promise<string> {
-  return page.evaluate((input) => {
-    const probe = document.createElement('span');
-    probe.style.color = input;
-    document.body.appendChild(probe);
-    const resolved = getComputedStyle(probe).color;
-    probe.remove();
-    return resolved;
-  }, value);
-}
-
-/** The computed style a pressed-state check reads, plus the box (a press must not move it). */
-export type StyleSnapshot = {
-  background: string;
-  border: string;
-  colour: string;
-  decoration: string;
-  thickness: string;
-  radius: string;
-  width: number;
-  height: number;
-};
-
-export const snapshotOf = (locator: Locator): Promise<StyleSnapshot> =>
-  locator.evaluate((node) => {
-    const style = getComputedStyle(node);
-    const box = node.getBoundingClientRect();
-    return {
-      background: style.backgroundColor,
-      border: style.borderTopColor,
-      colour: style.color,
-      decoration: style.textDecorationLine,
-      thickness: style.textDecorationThickness,
-      radius: style.borderTopLeftRadius,
-      width: Math.round(box.width * 100) / 100,
-      height: Math.round(box.height * 100) / 100,
-    };
-  });
-
-/**
- * Holds the primary button down on `target` (never released on it, so nothing is clicked or
- * toggled), runs `read`, then lets go away from the target. Chromium applies `:active` for as
- * long as the button is down.
- */
-export async function whilePressed<T>(page: Page, target: Locator, read: () => Promise<T>): Promise<T> {
-  await target.scrollIntoViewIfNeeded();
-  const box = (await target.boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  try {
-    return await read();
-  } finally {
-    await page.mouse.move(0, 0);
-    await page.mouse.up();
-  }
-}
-
-/**
- * Sideways scroll and cut-off text on the page as it is now, for a reflow pass at a given viewport.
- * Returns readable problems, empty when the page fits: the document is not wider than the window,
- * no element in `body` leaves the window, and no element that clips its overflow holds more than it
- * shows. A visually hidden 1px label is left out, as is a native select, which may clip with an ellipsis and an input scrolls its own value, so both are
- * left out.
- */
-export async function reflowProblems(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const problems: string[] = [];
-    const root = document.documentElement;
-    const width = root.clientWidth;
-    if (root.scrollWidth > width) problems.push(`the page scrolls sideways by ${root.scrollWidth - width}px`);
-    for (const node of document.body.querySelectorAll<HTMLElement>('*')) {
-      if (['SELECT', 'OPTION', 'INPUT', 'SCRIPT', 'STYLE', 'NOSCRIPT'].includes(node.tagName)) continue;
-      const box = node.getBoundingClientRect();
-      // A visually hidden label is a 1px box that clips its text on purpose.
-      if (box.width <= 1 || box.height <= 1) continue;
-      const name = `${node.tagName.toLowerCase()}${node.dataset.testid ? `[${node.dataset.testid}]` : ''}`;
-      if (box.right > width + 1 || box.left < -1) {
-        problems.push(`${name} leaves the window: ${Math.round(box.left)} to ${Math.round(box.right)} of ${width}`);
-      }
-      const clips = getComputedStyle(node).overflowX !== 'visible';
-      if (clips && node.scrollWidth > node.clientWidth + 1) {
-        problems.push(`${name} cuts its content: ${node.scrollWidth}px in ${node.clientWidth}px`);
-      }
-    }
-    return problems.slice(0, 12);
-  });
 }

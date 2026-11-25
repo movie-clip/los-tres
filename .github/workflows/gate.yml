@@ -1,7 +1,5 @@
-# Runs `npm run gate:ci` (lint, typecheck, unit + integration, Compose stack, e2e)
-# on every pull request. gate:ci is `gate` minus the e2e specs tagged @layout:
-# those geometry specs run only in the local `npm run gate`, because they are
-# written against Windows system-ui font metrics and fail on ubuntu-latest.
+# Runs `npm run gate` (lint, typecheck, unit + integration, Compose stack, e2e)
+# on every pull request: the same command and the same browser tests as the local gate.
 # Make the `gate` check required on `main` (branch ruleset) so a failing gate blocks the merge.
 #
 # The .env is generated fresh by `npm run env:init` on the runner: random
@@ -42,7 +40,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Gate
-        run: npm run gate:ci
+        run: npm run gate
 
       - name: Compose logs on failure
         if: failure()

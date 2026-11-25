@@ -107,4 +107,13 @@ describe('home links as plain anchors (S5.7, AC 43, 46)', () => {
       expect(source, file).not.toMatch(/from ['"]next\/link['"]/);
     }
   });
+
+  // M2 (#339): next/link prefetches its target on view, hover and focus, so a /go link drawn with it
+  // would load the redirect before any click. OfferList draws the /go links as plain anchors.
+  it('OfferList imports no next/link, so no /go link can be prefetched', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync('src/components/OfferList.tsx', 'utf8');
+    expect(source).not.toMatch(/from ['"]next\/link['"]/);
+    expect(source).not.toMatch(/require\(['"]next\/link['"]\)/);
+  });
 });

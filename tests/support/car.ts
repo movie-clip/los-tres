@@ -2,7 +2,6 @@ import { expect, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { VEHICLE_CATALOGUE, type VehicleEntry } from '../../src/db/vehicle-catalogue';
-import { loadEnv } from './env';
 import { icuPlural } from './messages';
 
 // Shared scaffolding for the S5.7 car-selection e2e (car-*.spec.ts). Vehicles come from the
@@ -29,8 +28,6 @@ const bySlug = (slug: string): VehicleEntry => {
 
 /** Seat León III 1.6 TDI: the first vehicle of the list. */
 export const CAR = VEHICLE_CATALOGUE[0];
-/** Another engine of the same model generation as CAR. */
-export const SAME_MODEL = bySlug('seat-leon-iii-2012-2020-1-4-tsi-125cv');
 /** A car of another make. */
 export const OTHER_MAKE = bySlug('volkswagen-golf-vii-2012-2020-1-6-tdi-110cv');
 /** Slug-shaped, but no vehicle (and, like a retired one, not an active one). */
@@ -127,52 +124,3 @@ export function storageOf(page: Page): Promise<Record<string, string>> {
     return out;
   });
 }
-
-/** Seeds localStorage before any page script runs, on every document this page loads. */
-export async function seedStorage(page: Page, value: string): Promise<void> {
-  await page.addInitScript(
-    ([key, stored]) => {
-      // Seed once per tab: a later document (after Quitar, say) must see what the code left.
-      if (window.sessionStorage.getItem('seeded') === null) {
-        window.sessionStorage.setItem('seeded', '1');
-        window.localStorage.setItem(key, stored);
-      }
-    },
-    [CAR_STORAGE_KEY, value],
-  );
-}
-
-/**
- * Whether the four required owner values are filled in the host .env. When they are not,
- * /aviso-legal and /privacidad answer 500 (the public error page, header included), so a check
- * that needs the legal page body itself runs only when this is true (see legal.spec.ts).
- */
-export function ownerIdentityConfigured(): boolean {
-  loadEnv();
-  return ['OWNER_NAME', 'OWNER_NIF', 'OWNER_ADDRESS', 'CONTACT_EMAIL'].every(
-    (name) => (process.env[name] ?? '').trim() !== '',
-  );
-}
-
-/**
- * The server HTML with the car control's own links neutralised. Their `volver` carries the page's
- * path and query (the picker returns there, AC 20), so a "this text never appears in the markup"
- * check on a page opened with a term must look past them; car-header.spec.ts pins that the term
- * appears nowhere else.
- */
-export function withoutCarLinks(html: string): string {
-  return html.replace(/<a\b[^>]*data-testid="car-(?:select|change|remove)"[^>]*>/g, '<a>');
-}
-
-/** Public pages that carry the header, with a path that opens them. */
-export const CONTROL_PAGES: [string, string][] = [
-  ['home', '/'],
-  ['category', '/categoria/mantenimiento-del-coche'],
-  ['empty category', '/categoria/filtros-de-combustible'],
-  ['search results', '/buscar?q=filtro'],
-  ['search page', '/buscar'],
-  ['aviso legal', '/aviso-legal'],
-  ['privacidad', '/privacidad'],
-  ['como nos financiamos', '/como-nos-financiamos'],
-  ['not found', '/esta-pagina-no-existe'],
-];
