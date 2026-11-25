@@ -1,10 +1,18 @@
-# Runs `npm run gate` (lint, typecheck, unit + integration, Compose stack, e2e)
-# on every pull request: the same command and the same browser tests as the local gate.
-# Make the `gate` check required on `main` (branch ruleset) so a failing gate blocks the merge.
+# Runs the steps of `npm run gate` on every pull request, split over three
+# parallel jobs: `static` (lint, typecheck, unit tests), `integration` (the
+# database, integration tests) and `e2e` (the Playwright browser, cached on the
+# version locked in package-lock.json, then the e2e run, which starts and
+# removes its own Compose stack). The same steps and the same browser tests as
+# the local gate.
 #
-# The .env is generated fresh by `npm run env:init` on the runner: random
-# secrets, SEED_DEMO_DATA=true, blank owner identity (the legal-page specs
-# then expect 500). No repository secret is used or needed.
+# The fourth job, `gate`, is the aggregator: it needs the three, always runs,
+# and fails unless all three succeeded (a failed, cancelled or skipped job fails
+# it). Make the `gate` check required on `main` (branch ruleset) so a failing
+# gate blocks the merge; do not make the three working jobs required.
+#
+# Each working job generates its .env fresh with `npm run env:init` on its
+# runner: random secrets, SEED_DEMO_DATA=true, blank owner identity (the
+# legal-page specs then expect 500). No repository secret is used or needed.
 name: gate
 
 on:
@@ -18,10 +26,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
-    name: gate
+  static:
+    name: static
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -36,25 +44,113 @@ jobs:
       - name: Create .env
         run: npm run env:init
 
-      - name: Install Playwright chromium
-        run: npx playwright install --with-deps chromium
+      - name: Lint
+        run: npm run lint
 
-      - name: Gate
-        run: npm run gate
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Start the database
+        run: npm run db:up
+
+      - name: Integration tests
+        run: npm run test:integration
 
       - name: Compose logs on failure
         if: failure()
-        run: docker compose logs --no-color --tail=300
+        run: docker compose logs --no-color --tail=300 db
+
+      - name: Stop the database
+        if: always()
+        run: docker compose down --volumes
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Read the locked Playwright version
+        id: playwright
+        run: |
+          version="$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")"
+          if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=gate::no locked @playwright/test version in package-lock.json."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: npm run test:e2e
 
       - name: Upload Playwright output on failure
         if: failure()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: playwright-test-results-${{ matrix.attempt }}-${{ github.run_attempt }}
+          name: playwright-test-results-${{ matrix.attempt || 'gate' }}-${{ github.run_attempt }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Stop the stack
-        if: always()
-        run: docker compose down --volumes
+  gate:
+    name: gate
+    needs: [static, integration, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Static, integration and e2e all succeeded
+        env:
+          STATIC: ${{ needs.static.result }}
+          INTEGRATION: ${{ needs.integration.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          echo "static=$STATIC integration=$INTEGRATION e2e=$E2E"
+          for result in "$STATIC" "$INTEGRATION" "$E2E"; do
+            if [ "$result" != success ]; then
+              echo "::error title=gate::static=$STATIC integration=$INTEGRATION e2e=$E2E; all three must be success."
+              exit 1
+            fi
+          done

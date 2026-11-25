@@ -2,10 +2,11 @@
 # 02-design § CI repetition, owner ruling D-4). Never make any job of this
 # workflow a required check: the required check is `gate`, from gate.yml.
 #
-# It runs `runs` independent copies of the CI gate in parallel, each on its own
-# runner, so a change to how tests execute can be shown green by repetition,
-# and one report-only timing job that runs `npm run test:timing` twice (alone,
-# then beside three busy loops) and puts both timing tables in its summary.
+# It runs `runs` independent copies of the CI gate in parallel, each copy as
+# three jobs on their own runners, so a change to how tests execute can be
+# shown green by repetition, and one report-only timing job that runs
+# `npm run test:timing` twice (alone, then beside three busy loops) and puts
+# both timing tables in its summary.
 #
 # Inputs:
 #   runs  how many copies, 1 to 10 (default 5).
@@ -15,9 +16,13 @@
 # Both are read in `plan` through env and validated there; no other step reads
 # an input. A bad value fails `plan`, and nothing else starts.
 #
-# Copies: the steps of the `copy` job are gate.yml's `gate` job steps, with one
-# difference only, the checkout `ref`. A drift pin in
-# tests/unit/gate-determinism.test.ts compares them. No copy is named `gate`.
+# Copies: three copy jobs, one per working job of gate.yml: `copy-static`,
+# `copy-integration` and `copy-e2e`, named `repeat <n> static|integration|e2e`.
+# The steps, runner and timeout of each are those of gate.yml's `static`,
+# `integration` and `e2e` job, with one difference only, the checkout `ref`.
+# Copy n is green when its three jobs are green; there is no aggregator here
+# (runs=10 starts 30 copy jobs). A drift pin in
+# tests/unit/gate-determinism.test.ts compares each pair. No copy is named `gate`.
 #
 # Timing: a slow timing cannot fail this workflow. The timing commands keep
 # their exit code and write it to the summary instead of failing the step, so
@@ -84,11 +89,11 @@ jobs:
           echo "attempts=$(seq 1 "$RUNS" | jq -cs .)" >> "$GITHUB_OUTPUT"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
-  copy:
-    name: repeat ${{ matrix.attempt }}
+  copy-static:
+    name: repeat ${{ matrix.attempt }} static
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -109,28 +114,109 @@ jobs:
       - name: Create .env
         run: npm run env:init
 
-      - name: Install Playwright chromium
-        run: npx playwright install --with-deps chromium
+      - name: Lint
+        run: npm run lint
 
-      - name: Gate
-        run: npm run gate
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+  copy-integration:
+    name: repeat ${{ matrix.attempt }} integration
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Start the database
+        run: npm run db:up
+
+      - name: Integration tests
+        run: npm run test:integration
 
       - name: Compose logs on failure
         if: failure()
-        run: docker compose logs --no-color --tail=300
+        run: docker compose logs --no-color --tail=300 db
+
+      - name: Stop the database
+        if: always()
+        run: docker compose down --volumes
+
+  copy-e2e:
+    name: repeat ${{ matrix.attempt }} e2e
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env
+        run: npm run env:init
+
+      - name: Read the locked Playwright version
+        id: playwright
+        run: |
+          version="$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")"
+          if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=gate::no locked @playwright/test version in package-lock.json."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: npm run test:e2e
 
       - name: Upload Playwright output on failure
         if: failure()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: playwright-test-results-${{ matrix.attempt }}-${{ github.run_attempt }}
+          name: playwright-test-results-${{ matrix.attempt || 'gate' }}-${{ github.run_attempt }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Stop the stack
-        if: always()
-        run: docker compose down --volumes
 
   timing:
     name: timing
