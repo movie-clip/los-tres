@@ -315,6 +315,7 @@
       "fileLabel": "Archivo:",
       "fileUnavailable": "no disponible",
       "feedMetaOffers": "{offers, plural, one {{offersText} oferta} other {{offersText} ofertas}}",
+      "offersOnSite": "{countText} en el sitio ahora",
       "feedNotePaused": "En pausa: la tienda no está aprobada, así que sus ofertas no se muestran.",
       "feedApprove": "Aprobar feed",
       "feedApproving": "Aprobando…",
