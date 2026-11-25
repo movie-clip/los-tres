@@ -126,7 +126,7 @@ describe('creating a collected feed (AC 1)', () => {
     ]);
     const [shop] = await listSourcesForAdmin();
     expect(shop.feeds).toEqual([
-      { id, approved: false, demo: false, source: 'collected_file', networkId: null, networkName: null, offerCount: 0, host: null, fileName: 'precios.csv' },
+      { id, approved: false, demo: false, source: 'collected_file', networkId: null, networkName: null, offerCount: 0, onSiteOfferCount: 0, host: null, fileName: 'precios.csv' },
     ]);
     expect(await getFeedForEdit(id)).toEqual({
       source: 'collected_file',

@@ -263,7 +263,7 @@ describe('feeds: create (AC 14, 15, 5, 4)', () => {
     ]);
     const [shop] = await listSourcesForAdmin();
     expect(shop.feeds).toEqual([
-      { id, approved: false, demo: false, source: 'affiliate_network', networkId, networkName: 'Red Uno', offerCount: 0, host: 'feeds.example', fileName: null },
+      { id, approved: false, demo: false, source: 'affiliate_network', networkId, networkName: 'Red Uno', offerCount: 0, onSiteOfferCount: 0, host: 'feeds.example', fileName: null },
     ]);
     expect(shop.demo).toBe(false);
   });
@@ -711,7 +711,7 @@ describe('feeds: create a catalogue file (S3.7, AC 1 to 4, 7, 9, 13)', () => {
     ]);
     const [shop] = await listSourcesForAdmin();
     expect(shop.feeds).toEqual([
-      { id, approved: false, demo: false, source: 'catalogue_file', networkId: null, networkName: null, offerCount: 0, host: null, fileName: 'mi-catalogo.csv' },
+      { id, approved: false, demo: false, source: 'catalogue_file', networkId: null, networkName: null, offerCount: 0, onSiteOfferCount: 0, host: null, fileName: 'mi-catalogo.csv' },
     ]);
     expect(await getFeedForEdit(id)).toEqual({
       source: 'catalogue_file',
