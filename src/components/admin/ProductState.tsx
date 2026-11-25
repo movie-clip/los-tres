@@ -14,7 +14,11 @@ export type ProductStateProps = {
   publicLabel: string;
   publicYes: string;
   publicNo: string;
-  /** `product-row`, `product` or `offer`: the test ids are `<prefix>-tag` and `<prefix>-public`. */
+  /** "Motivo:" with its colon, already translated. */
+  reasonLabel: string;
+  /** Why the site does not show it now, as finished text; null when it is on the site, and then no line is drawn. */
+  reason: string | null;
+  /** `product-row`, `product` or `offer`: the test ids are `<prefix>-tag`, `<prefix>-public` and `<prefix>-reason`. */
   testIdPrefix: string;
 };
 
@@ -22,7 +26,8 @@ export type ProductStateProps = {
  * The two facts of a product or an offer on one line: the hidden flag as a tag
  * and, apart from it in a different form, whether the site shows it now. The
  * words carry the meaning, fill and outline only back them up; the two never
- * share a label.
+ * share a label. When the site does not show it, the reason follows on a line
+ * of its own, as plain text in the page (US-2.5).
  */
 export function ProductState({
   hidden,
@@ -32,6 +37,8 @@ export function ProductState({
   publicLabel,
   publicYes,
   publicNo,
+  reasonLabel,
+  reason,
   testIdPrefix,
 }: ProductStateProps) {
   return (
@@ -43,6 +50,11 @@ export function ProductState({
         testId={`${testIdPrefix}-tag`}
       />
       <ValueLine label={publicLabel} value={publicNow ? publicYes : publicNo} testId={`${testIdPrefix}-public`} />
+      {reason !== null ? (
+        <div className={styles.reason}>
+          <ValueLine label={reasonLabel} value={reason} testId={`${testIdPrefix}-reason`} />
+        </div>
+      ) : null}
     </div>
   );
 }

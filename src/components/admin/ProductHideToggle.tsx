@@ -3,8 +3,10 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 
 import type { HideActionState } from '@/app/admin/(shell)/productos/actions';
+import type { NotPublicReason } from '@/server/admin/products';
 
 import { ErrorBlock } from './ErrorBlock';
+import { hideReadKey, shownHideFacts } from './hide-toggle-state';
 import { PendingButton } from './PendingButton';
 import { ProductState } from './ProductState';
 import styles from './ProductHideToggle.module.css';
@@ -16,6 +18,10 @@ export type ProductHideLabels = {
   publicLabel: string;
   publicYes: string;
   publicNo: string;
+  /** "Motivo:" with its colon. */
+  reasonLabel: string;
+  /** The finished text of every not-public code, so an answer with a new reason needs no message lookup. */
+  reasons: Record<NotPublicReason, string>;
   hide: string;
   /** An accessible name that begins with `hide` and adds what it acts on; null for the product's own button. */
   hideName: string | null;
@@ -32,9 +38,10 @@ export type ProductHideLabels = {
 export type ProductHideToggleProps = {
   kind: 'product' | 'offer';
   id: number;
-  /** The stored flag and the public-now fact, as last rendered by the server. */
+  /** The stored flag, the public-now fact and the not-public code, as last rendered by the server. */
   hidden: boolean;
   publicNow: boolean;
+  reason: NotPublicReason | null;
   labels: ProductHideLabels;
   /** The server action for this kind, passed down by the page. */
   action: (previous: HideActionState, form: FormData) => Promise<HideActionState>;
@@ -59,7 +66,16 @@ function isNextRedirect(error: unknown): boolean {
  * after that (an offer press can change the product's "en el sitio ahora").
  * Nothing asks for confirmation (D-9).
  */
-export function ProductHideToggle({ kind, id, hidden, publicNow, labels, action, children }: ProductHideToggleProps) {
+export function ProductHideToggle({
+  kind,
+  id,
+  hidden,
+  publicNow,
+  reason,
+  labels,
+  action,
+  children,
+}: ProductHideToggleProps) {
   // A transport failure (a 500, a dropped connection) rejects the action's promise, which would
   // reach the error boundary and replace the page. It becomes a failed result for this row instead.
   // Next's own redirect (a session that has ended) is rethrown so it still navigates to sign-in.
@@ -75,13 +91,14 @@ export function ProductHideToggle({ kind, id, hidden, publicNow, labels, action,
   const [state, formAction, pending] = useActionState(guardedAction, IDLE);
 
   // The answer holds only while the page's read is the one it arrived with: a refreshed read
-  // (the page is revalidated after a press) is newer than the answer and takes over.
-  const readKey = `${hidden}|${publicNow}`;
+  // (the page is revalidated after a press) is newer than the answer and takes over, also when
+  // only its reason changed.
+  const read = { hidden, publicNow, reason };
+  const readKey = hideReadKey(read);
   const [arrived, setArrived] = useState({ state, readKey });
   if (arrived.state !== state) setArrived({ state, readKey });
-  const stored = state.status === 'done' && state.kind === kind && state.id === id && arrived.readKey === readKey ? state : null;
-  const shownHidden = stored ? stored.hidden : hidden;
-  const shownPublicNow = stored ? stored.publicNow : publicNow;
+  const shown = shownHideFacts(state, kind, id, read, arrived.readKey);
+  const shownHidden = shown.hidden;
 
   // Focus stays on the row's button after any result: its label has changed, the button has not.
   const formRef = useRef<HTMLFormElement>(null);
@@ -97,10 +114,12 @@ export function ProductHideToggle({ kind, id, hidden, publicNow, labels, action,
           hidden={shownHidden}
           tagHidden={labels.tagHidden}
           tagNotHidden={labels.tagNotHidden}
-          publicNow={shownPublicNow}
+          publicNow={shown.publicNow}
           publicLabel={labels.publicLabel}
           publicYes={labels.publicYes}
           publicNo={labels.publicNo}
+          reasonLabel={labels.reasonLabel}
+          reason={shown.reason === null ? null : labels.reasons[shown.reason]}
           testIdPrefix={kind}
         />
       </div>

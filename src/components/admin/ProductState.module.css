@@ -6,3 +6,9 @@
   gap: var(--space-1);
   min-width: 0;
 }
+
+/* The reason takes a line of its own under the two facts, full width, and wraps. */
+.reason {
+  flex-basis: 100%;
+  min-width: 0;
+}
