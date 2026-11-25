@@ -288,10 +288,8 @@ deploy it must be the public https origin**, or all of them point at
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
 | e2e | `npm run test:e2e` (`playwright test`; its global setup builds and starts its own Compose project, `los-tres-e2e`, and its teardown removes it; see below) | Docker running, `.env` with `SEED_DEMO_DATA=true`, four free loopback ports from `E2E_APP_PORT` (3020), Playwright browser; the development stack is not needed |
-| e2e (CI) | `npm run test:e2e:ci` (`playwright test --grep-invert @layout`: `test:e2e` without the specs tagged `@layout`) | as `test:e2e` |
 | check | `npm run check` (`lint`, `typecheck`, `db:up`, `test`: all of Vitest; no image build, no Playwright; budget 90 s, 0006 rule 13) | Docker running, `.env` |
-| **gate** | `npm run gate` (`npm run check && npm run test:e2e`) | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
-| gate (CI) | `npm run gate:ci` (`gate` with `test:e2e:ci` as its last step; what CI runs) | as `gate` |
+| **gate** | `npm run gate` (`npm run check && npm run test:e2e`; what CI runs too) | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
 
 `npm run gate` is `npm run check` (`lint`, `typecheck`, `db:up`, `test`), then
 `test:e2e`. It has no `stack:up` step: it neither starts, rebuilds nor leaves up
@@ -312,9 +310,12 @@ threw and Ctrl-C, so the run leaves nothing behind. After a run that was killed
 first; by hand: `docker compose -p los-tres-e2e down --volumes --remove-orphans`.
 No spec starts or stops a container between the first and the last browser test:
 verbs and probes run by `docker compose exec` in the running stack, through
-`tests/support/e2e-stack.ts`. Playwright has two projects, `chromium` (the specs
-that only read, in parallel) and then `serial` (the specs that write a database,
-one worker; `SERIAL_SPECS` in `playwright.config.ts`). `typecheck` in the
+`tests/support/e2e-stack.ts`. Playwright has two projects, `chromium` (every
+spec that does not write the main e2e database, in parallel) and then `serial`
+(the specs that write it, one worker; `SERIAL_SPECS` in `playwright.config.ts`
+lists five: `admin`, `admin-categories`, `admin-feeds`, `admin-products` and
+`catalogue-file-flow`). A spec that only runs verbs in the no-database app or
+writes only the database of a flag variant app is `chromium`. `typecheck` in the
 gate covers both `tsconfig.json` and `tsconfig.cli.json`. Its two cost tests
 (`category-fit-cost`, `sitemap-performance`) assert a query-count ceiling
 instead of a time, and their timings run on demand with `npm run test:timing`,
@@ -333,8 +334,7 @@ not read for it. A value that is not a positive whole number fails the run.
 
 Budgets on the dev machine (0006 rules 13 to 15): `check` 90 s, integration
 60 s, e2e 90 s, full gate 4 min; the integration review reports the measured
-times and the tests added and removed per level. The e2e and full-gate budgets
-are provisional until #363.
+times and the tests added and removed per level.
 
 **Time in tests (0006, § Amendment 2026-11-23).** The unit, integration and
 support test files do not use `Date.now()`, `performance.now()`,
@@ -345,13 +345,11 @@ time functions and sleeps are not flagged and fall to the integration review
 (0006 names them). Real timings are `npm run test:timing`, never a gate step.
 The e2e tests are outside that rule.
 
-**CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate:ci` on every
+**CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate` on every
 pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
-(random secrets, `SEED_DEMO_DATA=true`, blank owner identity). `gate:ci` is
-`gate` except that its e2e step skips the tests tagged `@layout`: pixel
-geometry written against Windows system-ui font metrics, which fails on the
-Linux runner. The local `npm run gate` stays the gate and runs everything,
-`@layout` included; a story is still not done until it exits 0. When a gate run
+(random secrets, `SEED_DEMO_DATA=true`, blank owner identity). CI and the local
+gate run the same command and the same browser tests: no test is tagged and no
+project filters by grep. A story is still not done until it exits 0. When a gate run
 fails, `gate.yml` uploads `test-results/` (the trace and screenshot of each
 failing test, which `playwright.config.ts` keeps on failure only, and
 `e2e-stack.log`, the e2e stack's logs) as a workflow
@@ -375,7 +373,7 @@ runs, in parallel on separate runners:
 
 - **`runs` copies**, named `repeat <n>`, each the steps of the `gate` job of
   `gate.yml` (checkout, Node, `npm ci`, `env:init`, Playwright chromium,
-  `npm run gate:ci`, Compose logs on failure, Playwright output upload on
+  `npm run gate`, Compose logs on failure, Playwright output upload on
   failure, Compose down), with the same 45
   minute timeout. One red copy does not stop the others. A pin in
   `tests/unit/gate-determinism.test.ts` fails when a copy and the `gate` job

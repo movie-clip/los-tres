@@ -164,11 +164,12 @@ rules continue the numbering of the amendment above.
    all of Vitest (`npm test`, both projects, every file): no image build, no
    Playwright, no changed-files subset. Build lanes verify with it while they
    build. The full `npm run gate` runs at the integration review, before every
-   pull request and in CI, and decides "done". `gate` and `gate:ci` start with
+   pull request and in CI, and decides "done". `gate` starts with
    `npm run check`, so the shared steps have one definition. The scripts read:
-   `"check": "npm run lint && npm run typecheck && npm run db:up && npm test"`,
-   `"gate": "npm run check && npm run test:e2e"` and
-   `"gate:ci": "npm run check && npm run test:e2e:ci"`. There is no
+   `"check": "npm run lint && npm run typecheck && npm run db:up && npm test"`
+   and `"gate": "npm run check && npm run test:e2e"`. CI runs `npm run gate`,
+   the same command as the local gate (#339 removed `gate:ci` and
+   `test:e2e:ci`). There is no
    `stack:up` step (#363): the e2e run's global setup builds the app image and
    starts its own Compose project, and its global teardown removes it.
 9. **The test level.** A behaviour is tested at the lowest level that can
@@ -210,8 +211,8 @@ rules continue the numbering of the amendment above.
     at unit level. Outside this rule, for a later owner call: screenshot
     comparison, until the design settles, and an automated accessibility scan
     (axe), because it is a new dependency. Existing specs are brought under the
-    rule by issue #339. Until then no new `@layout` test is written, and the
-    existing tag and `test:e2e:ci` stay.
+    rule by issue #339: the `@layout` tag, `test:e2e:ci` and `gate:ci` are gone,
+    and CI runs the same `npm run gate` as the local gate.
 12. **The journeys.** The e2e journeys are the list below, 12 entries; a new
     journey is added by a story that names it. This list corrects the key flows
     the Decision first named: it keeps the first, corrects the second and
@@ -244,15 +245,15 @@ Each entry names the spec that holds it today.
 
 | # | Journey | Today in |
 |---|---|---|
-| J1 | search, product page, offers sorted by price, `/go/<offer>` logs the click and redirects | `search.spec.ts`, `product.spec.ts`, `go.spec.ts` |
-| J2 | home, category, product through the category tree | `home.spec.ts`, `category.spec.ts`, `product.spec.ts` |
+| J1 | search, product page, offers sorted by price, `/go/<offer>` logs the click and redirects | `search.spec.ts` (demo offers are never counted, so the counted click is in J12 and in an integration test) |
+| J2 | home, category, product through the category tree | `home.spec.ts` |
 | J3 | header search from a public page to `/buscar` | `header-search.spec.ts` |
-| J4 | car selection in the dialog, by mouse and keyboard, then a listing for that car | `car-dialog.spec.ts`, `category-car.spec.ts` |
+| J4 | car selection in the dialog, by mouse and keyboard, then a listing for that car | `car-dialog.spec.ts` |
 | J5 | car selection with JavaScript off through `/mi-coche` and back | `car-picker-nojs.spec.ts` |
 | J6 | the stored car restored on a later visit, and removed | `car-storage.spec.ts` |
-| J7 | with a car: listing to product with its fit banner, `coche` kept on links and through the click-out | `car-links.spec.ts`, `product-fit.spec.ts`, `car-cross-cutting.spec.ts` |
+| J7 | with a car: listing to product with its fit banner, `coche` kept on links and through the click-out | `car-links.spec.ts` |
 | J8 | admin sign-in, a refused sign-in, sign-out (also a guardrail e2e) | `admin.spec.ts` |
-| J9 | an admin registers a shop and a feed through the forms and approves them | `admin-feeds.spec.ts`, `admin-sources.spec.ts`, `collected-admin.spec.ts` |
+| J9 | an admin registers a shop and a feed through the forms and approves them | `admin-feeds.spec.ts` |
 | J10 | an admin maps a feed category | `admin-categories.spec.ts` |
 | J11 | an admin hides and unhides a product, and the public page follows | `admin-products.spec.ts` |
 | J12 | catalogue file: file placed, feed registered, two approvals, `import-feeds`, mapping, public product, removal | `catalogue-file-flow.spec.ts` |
@@ -280,8 +281,8 @@ no longer starts, refreshes or leaves up the development app.
 
 | Rule | Checked by |
 |---|---|
-| 8 (the steps) | `tests/unit/gate-determinism.test.ts`, pinned: `check` expands to `lint`, `typecheck`, `db:up`, `test` in order; nothing reached from it, hooks included, is `stack:up`, an e2e run, `build`, `dev` or text with `playwright` or `--build`; `scripts.test` is `vitest run`; `gate` and `gate:ci` expand to the steps of `check` plus `test:e2e` (`test:e2e:ci`), 5 steps each; each of the three is bare npm calls joined by `&&`; neither gate script reaches `stack:up` or `stack:down`, and `test:e2e` and `test:e2e:ci` are `playwright test` and `playwright test --grep-invert @layout` and nothing more. The walk of rule 5 now also starts from `check`, so no timing run is reachable from it. A change to the gate's step list updates those literals on purpose. |
-| 7, 8 (the e2e stack, #363) | `tests/unit/gate-determinism.test.ts`, pinned, describe "the e2e run owns its stack: one project, set in the config (#363)", items (a) to (g): `playwright.config.ts` has one `globalSetup` and one `globalTeardown`, both files existing, and assigns `COMPOSE_PROJECT_NAME` once (a name other than the `name:` of `compose.yaml`, equal to the `image:` prefix of `tests/e2e/compose.e2e.yaml`) and `COMPOSE_FILE` naming `compose.yaml` and the override; no file in `tests/e2e` or `tests/support` assigns those variables, names `E2E_BASE_URL` or passes `-p`, `--project-name`, `-f` or `--file`, and only `tests/support/e2e-stack.ts` reads the project name or spawns `docker`; the files holding a lifecycle command (`run`, `rm`, `create`, `start`, `stop`, `kill`, `restart`, `up`, `down`, `build`, `pause`, `unpause`, or `--network`) are exactly `global-setup.ts` and `global-teardown.ts`, so no spec starts or stops a container; `SERIAL_SPECS` is a literal list of existing spec stems, with every spec that calls `psql`, `verb` or `createAdminWithCommand` in it; the projects are exactly `chromium` (`testIgnore: SERIAL`, no `dependencies`, no `workers`) and `serial` (`testMatch: SERIAL`, `dependencies: ['chromium']`, `workers: 1`); `tests/support/isolated-app.ts` does not exist and `createAdminWithCommand(` is called once in the specs, in `admin.spec.ts`. Review, not pinned: that a lifecycle command built from a variable or joined string, or a `compose exec` that changes a container's state, is not seen (the `docker events` check of the integration review covers it). |
+| 8 (the steps) | `tests/unit/gate-determinism.test.ts`, pinned: `check` expands to `lint`, `typecheck`, `db:up`, `test` in order; nothing reached from it, hooks included, is `stack:up`, an e2e run, `build`, `dev` or text with `playwright` or `--build`; `scripts.test` is `vitest run`; `gate` expands to the steps of `check` plus `test:e2e`, 5 steps; `check` and `gate` are each bare npm calls joined by `&&`; `gate` does not reach `stack:up` or `stack:down`, and `test:e2e` is `playwright test` and nothing more. A second describe, "CI and the local gate run the same browser tests (#339)", fails on a `grep` or `grepInvert` setting in `playwright.config.ts`, on `@layout` in a spec, on a `gate:ci` or `test:e2e:ci` script, and on either name in a non-comment line of a workflow. The walk of rule 5 now also starts from `check`, so no timing run is reachable from it. A change to the gate's step list updates those literals on purpose. |
+| 7, 8 (the e2e stack, #363) | `tests/unit/gate-determinism.test.ts`, pinned, describe "the e2e run owns its stack: one project, set in the config (#363)", items (a) to (g): `playwright.config.ts` has one `globalSetup` and one `globalTeardown`, both files existing, and assigns `COMPOSE_PROJECT_NAME` once (a name other than the `name:` of `compose.yaml`, equal to the `image:` prefix of `tests/e2e/compose.e2e.yaml`) and `COMPOSE_FILE` naming `compose.yaml` and the override; no file in `tests/e2e` or `tests/support` assigns those variables, names `E2E_BASE_URL` or passes `-p`, `--project-name`, `-f` or `--file`, and only `tests/support/e2e-stack.ts` reads the project name or spawns `docker`; the files holding a lifecycle command (`run`, `rm`, `create`, `start`, `stop`, `kill`, `restart`, `up`, `down`, `build`, `pause`, `unpause`, or `--network`) are exactly `global-setup.ts` and `global-teardown.ts`, so no spec starts or stops a container; `SERIAL_SPECS` is a literal list of existing spec stems, with every spec that writes the main e2e database in it (a bare `psql(` call, `createAdminWithCommand(`, or `verb(` whose first argument is not the literal `'app-no-db'`, `'app-flag-off'` or `'app-flag-on'`), at least five stems; the projects are exactly `chromium` (`testIgnore: SERIAL`, no `dependencies`, no `workers`) and `serial` (`testMatch: SERIAL`, `dependencies: ['chromium']`, `workers: 1`); `tests/support/isolated-app.ts` does not exist and `createAdminWithCommand(` is called once in the specs, in `admin.spec.ts`. Review, not pinned: that a lifecycle command built from a variable or joined string, or a `compose exec` that changes a container's state, is not seen (the `docker events` check of the integration review covers it). |
 | 8 (lanes verify with it) | The work orders and the integration review. Nothing machine-checks which command a lane ran. |
 | 9, 10, 11, 12 | The integration review only. Nothing machine-checks the level of a test, its locators or the journey list. |
 | 13, 14, 15 | The integration review only. Nothing machine-checks a time or a count; the numbers are measured by the commands rule 13 names. |
