@@ -171,6 +171,7 @@ describe('a signed-in call from the site origin hides and unhides, and revalidat
       id: product.id,
       hidden: true,
       publicNow: false,
+      reason: 'product_hidden',
     });
     expect(await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'unhide' }))).toEqual({
       status: 'done',
@@ -178,6 +179,7 @@ describe('a signed-in call from the site origin hides and unhides, and revalidat
       id: product.id,
       hidden: false,
       publicNow: true,
+      reason: null,
     });
     expect(revalidatePath).toHaveBeenCalledTimes(2);
     expect(vi.mocked(revalidatePath).mock.calls).toEqual([
@@ -197,6 +199,7 @@ describe('a signed-in call from the site origin hides and unhides, and revalidat
       id: near,
       hidden: true,
       publicNow: false,
+      reason: 'offer_hidden',
     });
     expect(await setOfferHiddenAction(IDLE, hideForm({ id: far, target: 'hide' }))).toMatchObject({
       status: 'done',
@@ -210,6 +213,7 @@ describe('a signed-in call from the site origin hides and unhides, and revalidat
       id: near,
       hidden: false,
       publicNow: true,
+      reason: null,
     });
     expect(vi.mocked(revalidatePath).mock.calls.every((call) => call[0] === '/admin/productos' && call[1] === 'layout')).toBe(true);
   });
