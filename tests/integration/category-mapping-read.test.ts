@@ -3,9 +3,18 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { closeDb, getDb } from '@/db/client';
 import { clicks, feeds, networks, products } from '@/db/schema';
 import { listCategoryMappingsForAdmin, markOutsideScope, assignCategory } from '@/server/admin/category-mappings';
+import { listSourcesForAdmin } from '@/server/admin/sources';
 import { importFeeds } from '@/server/importer';
 
-import { insertCategoryMapping, insertFeed, insertFixtureFeed, insertOffer, insertProduct, insertShop } from '../support/catalogue';
+import {
+  insertCategoryMapping,
+  insertFeed,
+  insertFixtureFeed,
+  insertOffer,
+  insertProduct,
+  insertShop,
+  setOfferRemoved,
+} from '../support/catalogue';
 import {
   aFeed,
   allRecords,
@@ -315,5 +324,71 @@ describe('opening the screen writes nothing and changes no public answer (AC 50)
     // The /go call in the view logs a click of its own; compare the rest of the dump.
     const after = await dump();
     expect({ ...after, clicks: undefined }).toEqual({ ...before, clicks: undefined });
+  });
+});
+
+// S2.6 (T-2.6.3b), AC 23 and D-5: `hasOffers` is "the feed has at least one offer row, whatever its state", the
+// meaning it had before the /admin/tiendas first count stopped counting removed offers. It is not the first count.
+describe('hasOffers keeps its meaning whatever the state of the offers (S2.6, AC 23)', () => {
+  type Offer = Partial<Parameters<typeof insertOffer>[0]>;
+  const STATES: [string, Offer][] = [
+    ['removed by an import', { isRemoved: true }],
+    ['hidden', { isHidden: true }],
+    ['in review', { inReview: true }],
+    ['removed, hidden and in review', { isRemoved: true, isHidden: true, inReview: true }],
+  ];
+
+  it.each(STATES)('a feed whose only offer is %s, with no category, reads "has offers" and one empty cell', async (_label, state) => {
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id);
+    const product = await insertProduct({ categoryId: null });
+    await insertOffer({ productId: product.id, feedId, feedCategory: null, ...state });
+
+    expect(await feedOf(feedId)).toMatchObject({ hasOffers: true, emptyCellProducts: 1, rows: [] });
+  });
+
+  it.each(STATES)('a feed whose only offer is %s, with a category, reads "has offers" and lists the category', async (_label, state) => {
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id);
+    const product = await insertProduct({ categoryId: null });
+    await insertOffer({ productId: product.id, feedId, feedCategory: 'Cat', ...state });
+
+    const feed = await feedOf(feedId);
+
+    expect(feed.hasOffers).toBe(true);
+    expect(summary(feed.rows)).toEqual([['Cat', 1, 'not_reviewed']]);
+  });
+
+  it('a feed whose offers were all removed is "has offers" here while the /admin/tiendas first count says 0', async () => {
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id);
+    for (const slug of ['quitada-uno', 'quitada-dos']) {
+      const product = await insertProduct({ slug, categoryId: null });
+      const offerId = await insertOffer({ productId: product.id, feedId, feedCategory: null });
+      await setOfferRemoved(offerId, true);
+    }
+
+    const tiendas = (await listSourcesForAdmin()).flatMap((row) => row.feeds).find((feed) => feed.id === feedId);
+    expect(tiendas).toMatchObject({ offerCount: 0, onSiteOfferCount: 0 });
+    expect(await feedOf(feedId)).toMatchObject({ hasOffers: true, emptyCellProducts: 2 });
+  });
+
+  it('a feed with no offer row at all still reads "never imported", next to one whose offers are all removed', async () => {
+    const empty = await aFeed();
+    const removed = await aFeed();
+    const product = await insertProduct({ categoryId: null });
+    await setOfferRemoved(await insertOffer({ productId: product.id, feedId: removed.feedId, feedCategory: null }), true);
+
+    expect((await feedOf(empty.feedId)).hasOffers).toBe(false);
+    expect((await feedOf(removed.feedId)).hasOffers).toBe(true);
+  });
+
+  it('a feed with offers of another feed beside it is not told "has offers" by them', async () => {
+    const empty = await aFeed();
+    const other = await aFeed();
+    await productIn(other.feedId, 'Otra');
+
+    expect((await feedOf(empty.feedId)).hasOffers).toBe(false);
+    expect((await feedOf(other.feedId)).hasOffers).toBe(true);
   });
 });

@@ -3,15 +3,17 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 
 import { closeDb, getDb } from '@/db/client';
 import { feeds, networks, shops } from '@/db/schema';
+import { readProductForAdmin } from '@/server/admin/products';
 import { setFeedApproval } from '@/server/admin/sources';
 import { seedDemoData } from '@/server/seed';
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_COUNTS } from '../fixtures/demo';
 import { SITE_ORIGIN, createAdmin, signInForCookie } from '../support/admin';
-import { insertShop } from '../support/catalogue';
+import { insertFeed, insertOffer, insertProduct, insertShop } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 import { startAdminRequest } from '../support/next-request';
+import { sourceRowOf } from '../support/source-rows';
 
 // A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
 // default of 5 s is not.
@@ -358,5 +360,148 @@ describe('the shops table is untouched by a page render', () => {
       shops: await getDb().select().from(shops).orderBy(shops.id),
       feeds: await getDb().select().from(feeds).orderBy(feeds.id),
     }).toEqual(before);
+  });
+});
+
+// US-2.6 (T-2.6.3b), ACs 1, 3, 20 to 22: the real page over the real reader, the lines and the paused notes. The
+// exact lines for 0, 1, many and 1.000 or more are tests/unit/sources-page-counts.test.ts (the reader replaced);
+// here the numbers come from stored rows, and each note is compared with the S2.5 reason of the offer it speaks of.
+
+describe('a real read draws both counts on the shop line and the feed line (AC 1, 3)', () => {
+  it('a feed with a hidden offer reads three offers and two on the site, and its shop the same', async () => {
+    const shop = await insertShop({ name: 'Tienda con oferta oculta' });
+    const feedId = await insertFeed(shop.id);
+    for (const [slug, hidden] of [['linea-uno', false], ['linea-dos', false], ['linea-tres', true]] as const) {
+      const product = await insertProduct({ slug });
+      await insertOffer({ productId: product.id, feedId, isHidden: hidden });
+    }
+
+    const page = await sourcesPage();
+
+    expect(sourceRowOf(page, 'feed', feedId).meta).toMatch(/ · 3 ofertas · 2 en el sitio ahora$/);
+    expect(sourceRowOf(page, 'shop', shop.id).meta).toBe('1 feed · 3 ofertas · 2 en el sitio ahora');
+  });
+
+  it('a shop with no feed and a feed with no offer read 0 and 0 in words', async () => {
+    const bare = await insertShop({ name: 'Tienda sin feeds' });
+    const withFeed = await insertShop({ name: 'Tienda con feed vacío' });
+    const feedId = await insertFeed(withFeed.id);
+
+    const page = await sourcesPage();
+
+    expect(sourceRowOf(page, 'shop', bare.id).meta).toBe('Sin feeds · 0 ofertas · 0 en el sitio ahora');
+    expect(sourceRowOf(page, 'feed', feedId).meta).toMatch(/ · 0 ofertas · 0 en el sitio ahora$/);
+  });
+});
+
+describe('the paused notes agree with the shared rule and with the second count (S2.6, ACs 20 to 22)', () => {
+  // The offer reason a note speaks of (S2.5): the two notes about the shop name its approval, the one about the feeds
+  // names the feeds' approval.
+  const REASON_OF_NOTE: Record<string, string> = {
+    [copy.shopNotePaused]: 'offer_shop_not_approved',
+    [copy.feedNotePaused]: 'offer_shop_not_approved',
+    [copy.shopNoteNoApprovedFeed]: 'offer_feed_not_approved',
+  };
+
+  async function offerOf(feedId: number, slug: string) {
+    const product = await insertProduct({ slug });
+    const offerId = await insertOffer({ productId: product.id, feedId });
+    return { productId: product.id, offerId };
+  }
+
+  async function reasonOf(productId: number, offerId: number): Promise<string | null> {
+    const detail = await readProductForAdmin(productId);
+    return detail?.offers.find((offer) => offer.id === offerId)?.reason ?? null;
+  }
+
+  it.each([
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ])('shop approved %s, feed approved %s: each note as before, agreeing with the offer reason and the second count', async (shopApproved, feedApproved) => {
+    const shop = await insertShop({ isApproved: shopApproved });
+    const feedId = await insertFeed(shop.id, { isApproved: feedApproved });
+    const { productId, offerId } = await offerOf(feedId, `nota-${Number(shopApproved)}-${Number(feedApproved)}`);
+
+    const page = await sourcesPage();
+    const shopRow = sourceRowOf(page, 'shop', shop.id);
+    const feedRow = sourceRowOf(page, 'feed', feedId);
+
+    // AC 20: the conditions of the notes, as the story states them.
+    expect(feedRow.note).toBe(feedApproved && !shopApproved ? copy.feedNotePaused : null);
+    expect(shopRow.note).toBe(
+      !shopApproved
+        ? feedApproved
+          ? copy.shopNotePaused
+          : null
+        : !feedApproved
+          ? copy.shopNoteNoApprovedFeed
+          : null,
+    );
+
+    // AC 21: wherever a note says why, the offer reads that reason on /admin/productos/[id].
+    const reason = await reasonOf(productId, offerId);
+    for (const note of [shopRow.note, feedRow.note]) {
+      if (note !== null) expect(reason, note).toBe(REASON_OF_NOTE[note]);
+    }
+
+    // AC 22: a row whose note says its offers are not shown reads 0 on the site; the first count is untouched.
+    const live = shopApproved && feedApproved;
+    expect(reason === null).toBe(live);
+    for (const row of [shopRow, feedRow]) {
+      expect(row.meta).toMatch(live ? / · 1 ofertas? · 1 en el sitio ahora$/ : / · 1 ofertas? · 0 en el sitio ahora$/);
+      if (row.note !== null) expect(row.meta).toMatch(/ · 0 en el sitio ahora$/);
+    }
+  });
+
+  it('a shop not approved with one approved feed and one not: the shop note and the approved feed note only, 0 on every line', async () => {
+    const shop = await insertShop({ isApproved: false });
+    const approved = await insertFeed(shop.id, { isApproved: true });
+    const unapproved = await insertFeed(shop.id, { isApproved: false });
+    const first = await offerOf(approved, 'nota-dos-feeds-a');
+    const second = await offerOf(unapproved, 'nota-dos-feeds-b');
+
+    const page = await sourcesPage();
+
+    expect(sourceRowOf(page, 'shop', shop.id).note).toBe(copy.shopNotePaused);
+    expect(sourceRowOf(page, 'feed', approved).note).toBe(copy.feedNotePaused);
+    expect(sourceRowOf(page, 'feed', unapproved).note).toBeNull();
+    expect(await reasonOf(first.productId, first.offerId)).toBe('offer_shop_not_approved');
+    expect(await reasonOf(second.productId, second.offerId)).toBe('offer_shop_not_approved');
+    for (const row of [sourceRowOf(page, 'shop', shop.id), sourceRowOf(page, 'feed', approved), sourceRowOf(page, 'feed', unapproved)]) {
+      expect(row.meta).toMatch(/ en el sitio ahora$/);
+      expect(row.meta).toMatch(/ · 0 en el sitio ahora$/);
+    }
+  });
+
+  it('an approved shop whose feeds are all not approved says so, and its offers read the feed reason', async () => {
+    const shop = await insertShop();
+    const one = await insertFeed(shop.id, { isApproved: false });
+    const two = await insertFeed(shop.id, { isApproved: false });
+    const first = await offerOf(one, 'nota-sin-feed-a');
+    const second = await offerOf(two, 'nota-sin-feed-b');
+
+    const page = await sourcesPage();
+
+    expect(sourceRowOf(page, 'shop', shop.id).note).toBe(copy.shopNoteNoApprovedFeed);
+    expect(sourceRowOf(page, 'feed', one).note).toBeNull();
+    expect(sourceRowOf(page, 'feed', two).note).toBeNull();
+    expect(await reasonOf(first.productId, first.offerId)).toBe('offer_feed_not_approved');
+    expect(await reasonOf(second.productId, second.offerId)).toBe('offer_feed_not_approved');
+    expect(sourceRowOf(page, 'shop', shop.id).meta).toMatch(/ · 2 ofertas · 0 en el sitio ahora$/);
+  });
+
+  it('a shop with no feed has no note, and an approved one with an approved feed has none either', async () => {
+    const bare = await insertShop();
+    const shop = await insertShop();
+    const feedId = await insertFeed(shop.id);
+    await offerOf(feedId, 'nota-ninguna');
+
+    const page = await sourcesPage();
+
+    expect(sourceRowOf(page, 'shop', bare.id).note).toBeNull();
+    expect(sourceRowOf(page, 'shop', shop.id).note).toBeNull();
+    expect(sourceRowOf(page, 'feed', feedId).note).toBeNull();
   });
 });

@@ -8,7 +8,9 @@ import {
   OFFER_NOT_PUBLIC_REASONS,
   PRODUCT_CAUSES,
   PRODUCT_NOT_PUBLIC_REASONS,
+  currentOfferWhere,
   offerNotPublicReasonSql,
+  offerOnSiteWhere,
   offerRules,
   productNotPublicReasonSql,
   productRules,
@@ -176,5 +178,72 @@ describe('the reason builders are literal, ordered and follow one reading of the
       ),
     );
     expect(built.sql).toBe("(case when a then 'first' when b then 'second' when not coalesce((c), false) then 'unknown' else null end)");
+  });
+});
+
+// US-2.6 (T-2.6.3b), D-T3 and ACs 13, 14, 17, 18, 27: the two conditions the /admin/tiendas counts are read with.
+// `currentOfferWhere` is the removed rule of the offer table and nothing more, so a count and the public rule cannot
+// disagree on removal and sources.ts needs no flag word. `offerOnSiteWhere` is the two public builders together, the
+// flag read on every call. The database answers (counts equal what the public pages list) are in
+// tests/integration/admin-sources-counts.test.ts; here the text of the conditions, no database.
+describe('the count conditions of /admin/tiendas (S2.6)', () => {
+  const removedRule = (shown: boolean) => {
+    const rule = offerRules(shown).find((candidate) => candidate.cause === 'removed');
+    if (!rule) throw new Error('the offer table has no removed rule');
+    return rule.holds;
+  };
+
+  it.each(MODES)('the removed rule of the offer table renders as currentOfferWhere, mode %s', (mode) => {
+    stubLocalFlag(mode);
+    expect(render(removedRule(shownIn(mode)))).toEqual(render(currentOfferWhere()));
+  });
+
+  it('currentOfferWhere names the removed flag and no approval, hide, review or collected condition, in every mode', () => {
+    const texts = new Set<string>();
+    for (const mode of MODES) {
+      stubLocalFlag(mode);
+      const built = render(currentOfferWhere());
+      texts.add(JSON.stringify(built));
+      expect(built.sql).toContain('is_removed');
+      expect(built.sql).not.toMatch(/is_approved|is_hidden|in_review|is_collected|source_type|category_id|exists/);
+      expect(built.params).toEqual([false]);
+    }
+    // The flag is never read: one rendering for every mode.
+    expect(texts.size).toBe(1);
+  });
+
+  it.each(MODES)('offerOnSiteWhere holds the offer scope and the product scope, each whole, mode %s', (mode) => {
+    stubLocalFlag(mode);
+    // Placeholders are numbered by position, so the text is compared with the numbers taken out.
+    const shape = (text: string) => text.replace(/\$\d+/g, '?');
+    const offer = render(visibleOfferWhere());
+    const product = render(visibleProductWhere());
+    const onSite = render(offerOnSiteWhere());
+    expect(shape(onSite.sql)).toContain(shape(offer.sql));
+    expect(shape(onSite.sql)).toContain(shape(product.sql));
+    expect(onSite.params).toHaveLength(offer.params.length + product.params.length);
+    for (const param of [...offer.params, ...product.params]) expect(onSite.params).toContain(param);
+    // More than the removed rule alone: a count of "on the site" is not a count of "not removed".
+    expect(onSite.sql.length).toBeGreaterThan(render(currentOfferWhere()).sql.length);
+  });
+
+  it('offerOnSiteWhere reads the local flag on every call, never once at load', () => {
+    stubLocalFlag('off');
+    const hidden = render(offerOnSiteWhere());
+    stubLocalFlag('on');
+    const shown = render(offerOnSiteWhere());
+    stubLocalFlag('on-https');
+    const backstop = render(offerOnSiteWhere());
+    expect(shown).not.toEqual(hidden);
+    expect(backstop).toEqual(hidden);
+    stubLocalFlag('off');
+    expect(render(offerOnSiteWhere())).toEqual(hidden);
+  });
+
+  it('is neither public builder alone: dropping either one changes the text (non-vacuity)', () => {
+    stubLocalFlag('off');
+    const onSite = render(offerOnSiteWhere());
+    expect(onSite.sql).not.toEqual(render(visibleOfferWhere()).sql);
+    expect(onSite.sql).not.toEqual(render(visibleProductWhere()).sql);
   });
 });
