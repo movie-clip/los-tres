@@ -7,7 +7,9 @@ import { listProductsForAdmin, readProductForAdmin } from '@/server/admin/produc
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import {
   NOT_PUBLIC_REASONS,
+  offerNotPublicReasonSql,
   offerRules,
+  productNotPublicReasonSql,
   productRules,
   reasonCaseSql,
   visibleOfferWhere,
@@ -23,6 +25,33 @@ import { BACKSTOP_MODES, stubLocalFlag, type LocalFlagMode } from '../support/lo
 // A hang guard set at over ten times the slowest test of this file (0006, rule 4); the Vitest
 // default of 5 s is not.
 vi.setConfig({ testTimeout: 30_000 });
+
+// The one seam the shipped reason builders offer for the guard (AC 8): each reads the local flag once for its rule
+// tables and once more through each public builder it asks, so a queue of readings makes the public side disagree with
+// the tables for one build and nothing else. With the queue empty (every other test of this file) the real reading
+// answers, so the environment stubs of `stubLocalFlag` keep working. The queue is armed and emptied inside
+// `withFlagReadings`, around a synchronous build, so no other reader can take a value from it.
+const flag = vi.hoisted(() => ({ readings: [] as boolean[] }));
+vi.mock('@/config/local-flag', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/config/local-flag')>();
+  return {
+    ...actual,
+    collectedRowsShown: (env?: Parameters<typeof actual.collectedRowsShown>[0]) => {
+      const next = flag.readings.shift();
+      return next === undefined ? actual.collectedRowsShown(env) : next;
+    },
+  };
+});
+
+/** Builds with the next flag readings fixed, in the order the builder reads them; the queue is empty again after. */
+function withFlagReadings<T>(readings: boolean[], build: () => T): T {
+  flag.readings = [...readings];
+  try {
+    return build();
+  } finally {
+    flag.readings = [];
+  }
+}
 
 // US-2.5 (T-2.5.3b), ACs 5, 7, 8, 10 to 27: the reason an admin row reads No, against the test database, through
 // the two real admin reads (the list and the product with its offers). Every row is compared with the public
@@ -334,6 +363,91 @@ describe('a row that reads No for a cause no rule names reads unknown, never a b
     expect(await productReason(world['p-hidden'].id, and(visibleProductWhere(), sql`false`) as SQL)).toBe('hidden');
     expect(await offerReason(world['o-shop_not_approved'].offerIds[0], visibleOfferWhere())).toBe('shop_not_approved');
     expect(await productReason(world['p-no_category'].id, visibleProductWhere())).toBe('no_category');
+  });
+});
+
+// The same guard through the builders as they ship (CR-1): `offerNotPublicReasonSql` and `productNotPublicReasonSql`
+// read the flag for their tables and again for the public builders their fallback tests. A reading that differs
+// between the two makes a row the public builders call not public while no table rule names a cause, which is a
+// condition added outside the tables as far as the CASE can tell. The tests above pin `reasonCaseSql`; these pin
+// that the builders hand it the public builders.
+describe('the shipped reason builders read unknown, never a blank, when the public side disagrees with the tables (AC 8, D-14)', () => {
+  const db = () => getDb();
+
+  async function offerReasonOf(offerId: number, readings: boolean[]): Promise<string | null> {
+    const reason = withFlagReadings(readings, () => offerNotPublicReasonSql());
+    const [row] = await db()
+      .select({ reason: sql<string | null>`${reason}` })
+      .from(offers)
+      .innerJoin(feeds, eq(offers.feedId, feeds.id))
+      .innerJoin(shops, eq(feeds.shopId, shops.id))
+      .innerJoin(products, eq(offers.productId, products.id))
+      .where(eq(offers.id, offerId));
+    return row.reason;
+  }
+
+  async function productReasonOf(productId: number, readings: boolean[]): Promise<string | null> {
+    const reason = withFlagReadings(readings, () => productNotPublicReasonSql());
+    const [row] = await db()
+      .select({ reason: sql<string | null>`${reason}` })
+      .from(products)
+      .where(eq(products.id, productId));
+    return row.reason;
+  }
+
+  // The offer builder reads the flag three times (its tables, the public offer scope, the public product scope),
+  // the product builder twice (its tables, the public product scope): `true` shows collected rows, `false` hides them.
+  const SHOWN = true;
+  const HIDDEN = false;
+
+  it('an offer of a collected feed reads unknown when only the public offer scope hides it, and when no table does', async () => {
+    const id = world['o-collected'].offerIds[0];
+    // Controls on the same row: every reading agreeing gives no reason (shown) and the named cause (hidden).
+    expect(await offerReasonOf(id, [SHOWN, SHOWN, SHOWN])).toBeNull();
+    expect(await offerReasonOf(id, [HIDDEN, HIDDEN, HIDDEN])).toBe('offer_collected');
+    expect(await offerReasonOf(id, [SHOWN, HIDDEN, SHOWN])).toBe('unknown');
+  });
+
+  it('an offer of a collected product reads unknown when only the public product scope hides it', async () => {
+    const id = world['p-collected'].offerIds[0];
+    expect(await offerReasonOf(id, [SHOWN, SHOWN, SHOWN])).toBeNull();
+    expect(await offerReasonOf(id, [HIDDEN, HIDDEN, HIDDEN])).toBe('product_collected');
+    expect(await offerReasonOf(id, [SHOWN, SHOWN, HIDDEN])).toBe('unknown');
+    // The public offer scope alone does not hide this offer (its feed is ordinary), so the halves are independent.
+    expect(await offerReasonOf(id, [SHOWN, HIDDEN, SHOWN])).toBeNull();
+  });
+
+  it('a product reads unknown when only its public scope hides it, whether the collected rule is its own or its offer\'s', async () => {
+    for (const [slug, named] of [
+      ['p-collected', 'product_collected'],
+      ['o-collected', 'offers_collected'],
+    ] as const) {
+      const id = world[slug].id;
+      expect(await productReasonOf(id, [SHOWN, SHOWN]), `${slug} shown`).toBeNull();
+      expect(await productReasonOf(id, [HIDDEN, HIDDEN]), `${slug} hidden`).toBe(named);
+      expect(await productReasonOf(id, [SHOWN, HIDDEN]), `${slug} disagreeing`).toBe('unknown');
+    }
+  });
+
+  it('keeps a named cause named, and a public row public, while the public side disagrees', async () => {
+    // The hidden offer is named by its table whatever the collected reading says.
+    expect(await offerReasonOf(world['o-hidden'].offerIds[0], [SHOWN, HIDDEN, HIDDEN])).toBe('offer_hidden');
+    expect(await productReasonOf(world['p-hidden'].id, [SHOWN, HIDDEN])).toBe('product_hidden');
+    // An ordinary public row has no collected row anywhere to disagree about: no reason on any reading.
+    for (const readings of [[SHOWN, HIDDEN, HIDDEN], [HIDDEN, SHOWN, SHOWN]]) {
+      expect(await offerReasonOf(world['p-public'].offerIds[0], readings)).toBeNull();
+    }
+    for (const readings of [[SHOWN, HIDDEN], [HIDDEN, SHOWN]]) {
+      expect(await productReasonOf(world['p-public'].id, readings)).toBeNull();
+    }
+  });
+
+  it('reads the real flag again once the readings are used up (the seam leaves nothing behind)', async () => {
+    stubLocalFlag('off');
+    expect(await offerReasonOf(world['o-collected'].offerIds[0], [])).toBe('offer_collected');
+    stubLocalFlag('on');
+    expect(await offerReasonOf(world['o-collected'].offerIds[0], [])).toBeNull();
+    expect(flag.readings).toEqual([]);
   });
 });
 
