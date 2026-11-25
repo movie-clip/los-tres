@@ -214,7 +214,9 @@ export function offerNotPublicReasonSql(): SQL<OfferNotPublicReason | null> {
       rule.cause === 'has_visible_offer' ? [] : [{ failing: fails(rule), code: codeLiteral(productCode(rule.cause)) }],
     ),
   ];
-  const isPublic = sql`(${allHold(offerTable)}) and (${allHold(productTable)})`;
+  // The fallback tests the public builders, not the tables: a condition added to
+  // either builder outside its table still reads `unknown`, never blank (D-14).
+  const isPublic = sql`(${visibleOfferWhere()}) and (${visibleProductWhere()})`;
   return reasonCaseSql(branches, isPublic) as SQL<OfferNotPublicReason | null>;
 }
 
@@ -243,7 +245,8 @@ export function productNotPublicReasonSql(): SQL<ProductNotPublicReason | null> 
     failing: fails(rule),
     code: rule.cause === 'has_visible_offer' ? firstOfferCause : codeLiteral(productCode(rule.cause)),
   }));
-  return reasonCaseSql(branches, allHold(productTable)) as SQL<ProductNotPublicReason | null>;
+  // As above: the fallback tests the public builder (D-14).
+  return reasonCaseSql(branches, visibleProductWhere()) as SQL<ProductNotPublicReason | null>;
 }
 
 /** Maps a driver value to the closed set (or to `allowed`): a member, null, or `unknown` for anything else. */
