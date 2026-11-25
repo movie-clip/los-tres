@@ -1,6 +1,6 @@
 # S2.6 The /admin/tiendas offer count says what it counts
 
-Status: **draft, 2026-11-25, for the owner's approval.** Nothing below is ruled yet. OD-1 to OD-6 block ticketing; OD-7 blocks the build go only. The ACs are written on the recommended answers and each OD names the ACs that move if the owner rules otherwise. Board status follows the human's own move.
+Status: **approved 2026-11-25 by the owner, shipped in PR #379** (run `2026-11-25-373-tiendas-offer-count`). The owner ruled OD-1 (two numbers), OD-2 (as recommended) and OD-4 (keep the two notes, add the test) in session, approved the story, and allowed the seven exact-shape assertions of OD-7; OD-3, OD-5 and OD-6 stood as drafted. The ACs below are written on those answers. Board status follows the human's own move.
 Epic: E2 (#10) · Iteration: not read · Priority: P1 (set by the owner) · Size: S proposed by the owner; this draft is the upper end of S (backend S, frontend S, test M), see § Notes for the human for what to cut
 Issue: #373 · Tickets: T-2.6.1 to T-2.6.3 (described below; the orchestrator files the issues)
 Depends on: S2.5 (#344, shipped in #372: the visibility module's rule tables and the "on the site now" meaning of an offer row), S3.3 (#28, offer removal, decision 0018; shipped), S12.2 (#306, collected rows and the local flag; shipped) and S2.4 (hide; shipped). No open dependency.
