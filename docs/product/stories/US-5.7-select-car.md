@@ -1,10 +1,10 @@
 # S5.7 The visitor picks their car once, the site remembers it on this device, and they can change or remove it
 
-Status: approved 2026-10-30 (the human, D-9) and built on branch `269-select-car`; the review gate passed with all 61 ACs satisfied (`agentic/runs/2026-10-30-s5-7-select-car/23-review.md`). Rulings since approval that changed what the text below says: D-21 (the storage key is `mi-coche`, not `lostres.coche`; AC 31), D-17 (no options route, the options are embedded server-side), D-18 (404 and error pages read the car like any page), D-22 (the no-car control sits in header row 1, not a second row) and D-23 (the no-script car links carry `volver` with the `/buscar` query). The privacy page is unchanged (D-1; changed later in S5.8, D-18, D-22, D-23). Board status follows the human's own move
+Status: approved 2026-10-30 (the human, D-9) and built on branch `269-select-car`; the review gate passed with all 61 ACs satisfied (run `2026-10-30-s5-7-select-car`, review report 23). Rulings since approval that changed what the text below says: D-21 (the storage key is `mi-coche`, not `lostres.coche`; AC 31), D-17 (no options route, the options are embedded server-side), D-18 (404 and error pages read the car like any page), D-22 (the no-car control sits in header row 1, not a second row) and D-23 (the no-script car links carry `volver` with the `/buscar` query). The privacy page is unchanged (D-1; changed later in S5.8, D-18, D-22, D-23). Board status follows the human's own move
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: L
 Issue: #269 · Tickets: #270-#273 (T5.7.1-T5.7.4) and one new ticket (T5.7.5, issue to be created; ruling D-2)
 Depends on: S5.5 (#261), merged: the vehicle list and `findActiveVehicle`. S5.6 (#265), merged, gives the demo feeds their fitment, but this story reads no fitment. S5.8 (#274) and S5.9 (#278) depend on this story.
-Source: `docs/product/vehicle-fitment.md` rules 4 to 7 and 9; decision 0016; `docs/product/stories/US-5.5-vehicle-fitment-model.md` (§ Scope > Out hands S5.7 its slice); issue #269 acceptance outline; the delivery brief and the human's rulings D-1 to D-7 of 2026-10-30 (`agentic/runs/2026-10-30-s5-7-select-car/decisions.md`); guardrail 5.
+Source: `docs/product/vehicle-fitment.md` rules 4 to 7 and 9; decision 0016; `docs/product/stories/US-5.5-vehicle-fitment-model.md` (§ Scope > Out hands S5.7 its slice); issue #269 acceptance outline; the delivery brief and the human's rulings D-1 to D-7 of 2026-10-30 (run `2026-10-30-s5-7-select-car`); guardrail 5.
 
 ## Open decisions
 

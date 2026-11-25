@@ -4,7 +4,7 @@ Status: approved (owner, 2026-10-29; board status Ready follows the human's own 
 Epic: E5 Browse and search (#13) · Priority: P0 · Size: L · Iteration 2
 Issue: #37 · Tickets: #125-#128 and #282 (T5.4.1-T5.4.5)
 Depends on: none (S11.4, the card grid, is closed in #245)
-Source: delivery brief `agentic/runs/2026-10-28-s5-4-search/02-product.md` and rulings D-1 to D-5 and D-A1 to D-A5 in the same run's `decisions.md`; recon `01-recon.md`; `docs/product/mvp.md` § Search and browsing; CLAUDE.md § Search engines (S6.2); issue #37 and the open item of #255.
+Source: delivery brief of run `2026-10-28-s5-4-search` and its rulings D-1 to D-5 and D-A1 to D-A5; that run's recon (the claims they support are stated in this file); `docs/product/mvp.md` § Search and browsing; CLAUDE.md § Search engines (S6.2); issue #37 and the open item of #255.
 
 ## Open decisions
 
