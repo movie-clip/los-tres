@@ -57,7 +57,7 @@ function tsFilesUnder(dir: string): string[] {
 // The scripts the gate and the fast check run directly, and the lifecycle scripts `npm ci` runs on the
 // way in. A script reached from any of them, by a call or by an npm pre or post hook,
 // runs inside the gate.
-const GATE_SCRIPTS = ['test', 'test:unit', 'test:integration', 'check', 'gate', 'gate:ci'];
+const GATE_SCRIPTS = ['test', 'test:unit', 'test:integration', 'check', 'gate'];
 const GATE_ENTRIES = [...GATE_SCRIPTS, 'preinstall', 'install', 'postinstall', 'prepare'];
 const TIMING_TEXT = /test:timing|vitest\.timing|tests\/timing|\.timing\.test/;
 
@@ -151,7 +151,7 @@ describe('the gate runs no timing test (rule 5)', () => {
     const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     const reached = scriptsReached(scripts, GATE_ENTRIES);
     // The walk follows the real scripts: the gate's own steps are in it.
-    for (const step of ['lint', 'typecheck', 'db:up', 'test', 'test:e2e', 'test:e2e:ci']) {
+    for (const step of ['lint', 'typecheck', 'db:up', 'test', 'test:e2e']) {
       expect(reached.has(step), step).toBe(true);
     }
     expect(timingRuns(scripts, reached)).toEqual([]);
@@ -256,7 +256,7 @@ describe('npm run check is the first part of the gate (0006 rule 8, issue #338)'
 
   it('reaches no image build, no e2e run, no server and no Playwright, even through a hook', () => {
     const reached = scriptsReached(scripts, ['check']);
-    for (const name of ['stack:up', 'test:e2e', 'test:e2e:ci', 'test:e2e:install', 'build', 'dev']) {
+    for (const name of ['stack:up', 'test:e2e', 'test:e2e:install', 'build', 'dev']) {
       expect(reached.has(name), name).toBe(false);
     }
     for (const name of reached) {
@@ -270,26 +270,23 @@ describe('npm run check is the first part of the gate (0006 rule 8, issue #338)'
     expect(scripts.test).toBe('vitest run');
   });
 
-  it('is what gate and gate:ci start with, then the e2e run, which starts and removes its own stack (#363)', () => {
+  it('is what gate starts with, then the e2e run, which starts and removes its own stack (#363)', () => {
     expect(steps(scripts, 'gate')).toEqual([...steps(scripts, 'check'), 'test:e2e']);
-    expect(steps(scripts, 'gate:ci')).toEqual([...steps(scripts, 'check'), 'test:e2e:ci']);
     // The comparison holds real steps, or two empty lists would pass.
     expect(steps(scripts, 'gate').length).toBe(5);
-    expect(steps(scripts, 'gate:ci').length).toBe(5);
   });
 
-  it('reaches no development-stack script, and the e2e scripts are Playwright alone', () => {
+  it('reaches no development-stack script, and the e2e script is Playwright alone', () => {
     // The e2e step builds, starts and removes the Compose project `los-tres-e2e` itself (global setup and
     // teardown), so a gate that also ran stack:up would rebuild and start the development app for nothing.
-    const reached = scriptsReached(scripts, ['gate', 'gate:ci']);
+    const reached = scriptsReached(scripts, ['gate']);
     expect(reached.has('stack:up')).toBe(false);
     expect(reached.has('stack:down')).toBe(false);
-    // The two e2e entries are what the pin above counts as one step each: Playwright and its own flag.
+    // The e2e entry is what the pin above counts as one step: Playwright and nothing else.
     expect(scripts['test:e2e']).toBe('playwright test');
-    expect(scripts['test:e2e:ci']).toBe('playwright test --grep-invert @layout');
   });
 
-  it.each(['check', 'gate', 'gate:ci'])('%s joins its steps with && and nothing else, each an npm call', (name) => {
+  it.each(['check', 'gate'])('%s joins its steps with && and nothing else, each an npm call', (name) => {
     expect(scripts[name], name).toBeDefined();
     expect(nonNpmSegments(scripts[name])).toEqual([]);
   });
@@ -711,7 +708,8 @@ describe('the copy job runs what the gate job runs', () => {
     expect(removed).toBe(1);
     // The comparison holds the steps the gate is made of, or an empty pair would pass.
     expect(expected.length).toBeGreaterThan(5);
-    expect(expected.flat().join('\n')).toContain('npm run gate:ci');
+    // The gate job runs the gate itself: the whole line, so `npm run gate:<anything>` fails it.
+    expect(expected.flat().map((line) => line.trim())).toContain('run: npm run gate');
   });
 
   it('its runner, timeout and every other job setting equal the gate job, apart from name, needs and strategy', () => {
@@ -960,7 +958,7 @@ describe('the workflow checks are not vacuous', () => {
     '      - uses: actions/checkout@v4',
     '',
     '      - name: Gate',
-    '        run: npm run gate:ci',
+    '        run: npm run gate',
   ];
   const copyJob = (...steps: string[]): string[] => [
     'jobs:',
@@ -976,7 +974,7 @@ describe('the workflow checks are not vacuous', () => {
   const refWith = ['        with:', '          ref: ${{ needs.plan.outputs.ref }}'];
   const gate = (): Job => jobNamed(gateJob.join('\n'), 'gate');
   const copyStepsOf = (...lines: string[]) => withoutCopyRef(stepsOf(jobNamed(copyJob(...lines).join('\n'), 'copy')));
-  const gateStep = ['      - name: Gate', '        run: npm run gate:ci'];
+  const gateStep = ['      - name: Gate', '        run: npm run gate'];
 
   it('reads jobs, check names, settings and steps through comments, blank lines and CRLF', () => {
     const text = ['# a comment', ...gateJob, '      # another', ''].join('\r\n');
@@ -994,7 +992,7 @@ describe('the workflow checks are not vacuous', () => {
     const same = copyStepsOf(...checkout, ...refWith, '', ...gateStep);
     expect(same.removed).toBe(1);
     expect(same.steps).toEqual(stepsOf(gate()));
-    const changed = copyStepsOf(...checkout, ...refWith, '      - name: Gate', '        run: npm run gate');
+    const changed = copyStepsOf(...checkout, ...refWith, '      - name: Gate', '        run: npm run check');
     expect(changed.steps).not.toEqual(stepsOf(gate()));
     const extra = copyStepsOf(...checkout, ...refWith, ...gateStep, '      - run: echo done');
     expect(extra.steps).not.toEqual(stepsOf(gate()));
@@ -1050,7 +1048,7 @@ describe('the workflow checks are not vacuous', () => {
       expect(swallowingLines([line]), line).toEqual([line.trim()]);
     }
     for (const line of [
-      'run: npm run gate:ci',
+      'run: npm run gate',
       'group: gate-repeat-${{ inputs.pr || github.ref }}',
       'if: always()',
       'if: failure()',
@@ -1071,7 +1069,7 @@ describe('the workflow checks are not vacuous', () => {
     ]) {
       expect(TIMING_TEXT.test(line), line).toBe(true);
     }
-    expect(TIMING_TEXT.test('run: npm run gate:ci')).toBe(false);
+    expect(TIMING_TEXT.test('run: npm run gate')).toBe(false);
   });
 });
 
@@ -1356,14 +1354,12 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
 
     const chromium = projectBlock(config, 'chromium') ?? '';
     expect(chromium).toMatch(/testIgnore: SERIAL\b/);
-    expect(chromium).toMatch(/grepInvert: cliGrepInvert\(\)/);
     expect(chromium).not.toMatch(/\bdependencies\b|\bworkers\b/);
 
     const serial = projectBlock(config, 'serial') ?? '';
     expect(serial).toMatch(/testMatch: SERIAL\b/);
     expect(serial).toMatch(/dependencies: \['chromium'\]/);
     expect(serial).toMatch(/\bworkers: 1\b/);
-    expect(serial).toMatch(/grepInvert: cliGrepInvert\(\)/);
 
     // No global worker count: the one `workers` above is the only one.
     expect([...config.matchAll(/\bworkers\s*:/g)]).toHaveLength(1);
@@ -1496,5 +1492,103 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
     expect(projectBlock(sample, 'two')).not.toContain("'one'");
     expect(projectBlock(sample, 'three')).toBeNull();
     expect(projectBlock("{ use: { a: 1 }, name: 'x' }", 'x')).toBeNull();
+  });
+});
+
+// CI and the local gate run the same browser tests (#339). The `@layout` tag, `test:e2e:ci`, `gate:ci` and the
+// config's `cliGrepInvert()` existed so CI could skip the geometry specs written against Windows font metrics;
+// those specs are gone (0006 rule 11), and both workflows run `npm run gate`. This pin fails when any piece of
+// a CI-only subset comes back. The workflow step itself is pinned above (the gate job's step is `npm run gate`,
+// the copy job's steps equal the gate job's).
+
+/** The lines of a source that are not blank and not whole-line `//` or `#` comments. */
+const codeOnly = (text: string): string =>
+  text
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== '' && !/^\s*(?:\/\/|#)/.test(line))
+    .join('\n');
+
+/** A filter on which tests a run keeps: Playwright's `grep`, `grepInvert` or the CLI forms, and the old helper. */
+const TEST_FILTER = /\bgrep\w*\b|--grep|\bcliGrepInvert\b|(?:^|\s)-gv\b/i;
+/** What a CI-only subset of the gate is spelled with. */
+const CI_SUBSET = /gate:ci|test:e2e:ci|@layout|--grep/;
+
+/** What breaks the claim that CI and the local gate run the same browser tests, one line each. */
+function sameBrowserTestsProblems(input: {
+  config: string;
+  specs: Record<string, string>;
+  scripts: Record<string, string>;
+  workflows: Record<string, string>;
+}): string[] {
+  const problems: string[] = [];
+  if (TEST_FILTER.test(codeOnly(input.config))) problems.push(`${CONFIG_FILE}: filters tests with grep or grepInvert`);
+  for (const [file, text] of Object.entries(input.specs)) {
+    if (text.includes('@layout')) problems.push(`${file}: names @layout`);
+  }
+  for (const [name, text] of Object.entries(input.scripts)) {
+    if (name === 'gate:ci' || name === 'test:e2e:ci') problems.push(`package.json: has the script ${name}`);
+    else if (CI_SUBSET.test(text)) problems.push(`package.json: script ${name} runs a subset of the tests`);
+  }
+  for (const [file, text] of Object.entries(input.workflows)) {
+    if (CI_SUBSET.test(codeOnly(text))) problems.push(`${file}: names a CI-only subset of the gate`);
+  }
+  return problems;
+}
+
+describe('CI and the local gate run the same browser tests (#339)', () => {
+  const workflows = (): Record<string, string> => Object.fromEntries(workflowFiles().map((file) => [file, workflowText(file)]));
+
+  it('no project filters tests, no spec names @layout, and package.json and the workflows have no CI-only subset', () => {
+    const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
+    const specs = e2eSpecs();
+    const flows = workflows();
+    // The scan sees what it scans, or an empty tree would pass.
+    expect(Object.keys(specs).length).toBeGreaterThan(20);
+    expect(Object.keys(scripts)).toEqual(expect.arrayContaining(['gate', 'test:e2e']));
+    expect(Object.keys(flows)).toEqual(expect.arrayContaining([GATE_FILE, REPEAT_FILE]));
+    expect(projectNames(read(CONFIG_FILE))).toEqual(['chromium', 'serial']);
+
+    expect(sameBrowserTestsProblems({ config: read(CONFIG_FILE), specs, scripts, workflows: flows })).toEqual([]);
+  });
+
+  it('the check can fail: each piece of the old CI subset is named', () => {
+    const config = "export default defineConfig({ projects: [{ name: 'chromium' }, { name: 'serial' }] });";
+    const specs = { 'tests/e2e/a.spec.ts': "test.describe('x', () => {});" };
+    const scripts = { gate: 'npm run check && npm run test:e2e', 'test:e2e': 'playwright test' };
+    const gateYml = '      - name: Gate\n        run: npm run gate\n';
+    const good = { config, specs, scripts, workflows: { 'gate.yml': gateYml } };
+    expect(sameBrowserTestsProblems(good)).toEqual([]);
+
+    // A grep filter on a project, at the top, the old helper; the same words in a comment are allowed.
+    const withSerial = (extra: string): string => config.replace("{ name: 'serial' }", `{ name: 'serial', ${extra} }`);
+    expect(sameBrowserTestsProblems({ ...good, config: withSerial('grepInvert: /@x/') })).toEqual([`${CONFIG_FILE}: filters tests with grep or grepInvert`]);
+    expect(sameBrowserTestsProblems({ ...good, config: withSerial('grepInvert: cliGrepInvert()') })).toHaveLength(1);
+    expect(sameBrowserTestsProblems({ ...good, config: config.replace('projects', 'grep: /a/, projects') })).toHaveLength(1);
+    expect(sameBrowserTestsProblems({ ...good, config: `${config}\nconst x = cliGrepInvert();` })).toHaveLength(1);
+    expect(sameBrowserTestsProblems({ ...good, config: `// no grepInvert here\n${config}` })).toEqual([]);
+
+    // The tag in a spec.
+    expect(
+      sameBrowserTestsProblems({ ...good, specs: { 'tests/e2e/a.spec.ts': "test.describe('x', { tag: '@layout' }, () => {});" } }),
+    ).toEqual(['tests/e2e/a.spec.ts: names @layout']);
+
+    // The two scripts, and a script that filters by hand.
+    expect(sameBrowserTestsProblems({ ...good, scripts: { ...scripts, 'gate:ci': 'npm run check && npm run test:e2e:ci' } })).toEqual([
+      'package.json: has the script gate:ci',
+    ]);
+    expect(sameBrowserTestsProblems({ ...good, scripts: { ...scripts, 'test:e2e:ci': 'playwright test' } })).toEqual([
+      'package.json: has the script test:e2e:ci',
+    ]);
+    expect(sameBrowserTestsProblems({ ...good, scripts: { ...scripts, 'test:e2e': 'playwright test --grep-invert @layout' } })).toEqual([
+      'package.json: script test:e2e runs a subset of the tests',
+    ]);
+
+    // A workflow that runs the old command, in a step or in a `run: |` block; the same words in a comment are allowed.
+    const named = ['gate.yml: names a CI-only subset of the gate'];
+    expect(sameBrowserTestsProblems({ ...good, workflows: { 'gate.yml': gateYml.replace('npm run gate', 'npm run gate:ci') } })).toEqual(named);
+    expect(
+      sameBrowserTestsProblems({ ...good, workflows: { 'gate.yml': '      - run: |\n          npx playwright test --grep-invert @layout\n' } }),
+    ).toEqual(named);
+    expect(sameBrowserTestsProblems({ ...good, workflows: { 'gate.yml': `# gate:ci is gone\n${gateYml}` } })).toEqual([]);
   });
 });

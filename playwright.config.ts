@@ -40,21 +40,6 @@ process.env.E2E_FLAG_OFF_PORT = String(e2ePorts[2]);
 process.env.E2E_FLAG_ON_PORT = String(e2ePorts[3]);
 const baseURL = `http://127.0.0.1:${e2ePorts[0]}`;
 
-// Playwright runs the projects another project depends on in full: the CLI --grep-invert (test:e2e:ci)
-// is not applied to them, so `chromium`, the dependency of `serial`, would run every @layout test. The
-// same pattern is passed to it here, read from the command line.
-function cliGrepInvert(): RegExp | undefined {
-  const args = process.argv;
-  const i = args.findIndex((a) => a === '--grep-invert' || a === '-gv');
-  const eq = args.find((a) => a.startsWith('--grep-invert='));
-  const value = eq
-    ? eq.slice('--grep-invert='.length)
-    : i >= 0
-      ? args[i + 1]
-      : undefined;
-  return value ? new RegExp(value) : undefined;
-}
-
 // The specs that write the main e2e database (#363, #339): SQL through `psql`, a verb that writes
 // (`import-feeds`, `create-admin`, `seed`, `migrate`) in the `app` service, or an admin form that saves.
 // They run in `serial`, one worker, after every `chromium` spec has finished, so nothing reads the main
@@ -90,7 +75,6 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore: SERIAL,
-      grepInvert: cliGrepInvert(),
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -98,7 +82,6 @@ export default defineConfig({
       testMatch: SERIAL,
       dependencies: ['chromium'],
       workers: 1,
-      grepInvert: cliGrepInvert(),
       use: { ...devices['Desktop Chrome'] },
     },
   ],
