@@ -225,9 +225,9 @@ rules continue the numbering of the amendment above.
     (it builds and removes its own stack, so it needs nothing left up by the
     gate; the image build is cached by then).
     Nothing else heavy runs during a measurement, and the report records the CPU
-    count and `INTEGRATION_WORKERS`. The e2e and full-gate budgets are
-    provisional until issue #363 lands: they are reported, and rule 14 applies
-    to them from that merge, when both are measured again.
+    count and `INTEGRATION_WORKERS`. All four budgets apply (rule 14): the
+    e2e and full-gate budgets were provisional until issue #363 merged, and
+    all four were met when measured after #339 and #340.
 14. **Budgets are checked.** The integration review reports the measured
     `check`, integration, e2e and full-gate times next to the budgets. A story
     that takes a step over its budget trims in the same pull request or stops
@@ -253,7 +253,7 @@ Each entry names the spec that holds it today.
 | J6 | the stored car restored on a later visit, and removed | `car-storage.spec.ts` |
 | J7 | with a car: listing to product with its fit banner, `coche` kept on links and through the click-out | `car-links.spec.ts` |
 | J8 | admin sign-in, a refused sign-in, sign-out (also a guardrail e2e) | `admin.spec.ts` |
-| J9 | an admin registers a shop and a feed through the forms and approves them | `admin-feeds.spec.ts` |
+| J9 | an admin registers a network, a shop and a feed through the forms and approves them | `admin-feeds.spec.ts` |
 | J10 | an admin maps a feed category | `admin-categories.spec.ts` |
 | J11 | an admin hides and unhides a product, and the public page follows | `admin-products.spec.ts` |
 | J12 | catalogue file: file placed, feed registered, two approvals, `import-feeds`, mapping, public product, removal | `catalogue-file-flow.spec.ts` |

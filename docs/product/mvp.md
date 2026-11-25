@@ -203,7 +203,10 @@ and the backup passphrase are kept in a password manager plus an offline copy
     at once;
   - hides any product or offer, and unhides it, at `/admin/productos` (S2.4);
   - reads, on each product and offer row there that is not on the site, the one
-    reason it is not (S2.5).
+    reason it is not (S2.5);
+  - reads, on each feed and each shop at `/admin/tiendas`, how many offers it
+    has now (not removed by an import) and how many of them are on the site now
+    (S2.6).
 
   Imports run from the `import-feeds` command; an import button with reports
   in the admin area is deferred.

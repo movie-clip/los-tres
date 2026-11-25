@@ -4,12 +4,13 @@ import { asc, eq, isNotNull, sql } from 'drizzle-orm';
 
 // Relative on purpose: files in src/server import each other relatively.
 import { getDb, type Executor } from '../../db/client';
-import { feeds, networks, offers, shops } from '../../db/schema';
+import { feeds, networks, offers, products, shops } from '../../db/schema';
 import {
   checkCatalogueFileName,
   displayableFileName,
   type CatalogueFileNameError,
 } from '../catalogue-file-name';
+import { currentOfferWhere, offerOnSiteWhere } from '../visibility';
 import { feedHost } from './feed-host';
 import {
   FEED_URL_MAX,
@@ -59,8 +60,19 @@ export type AdminFeed = {
   networkId: number | null;
   /** `networks.name`; null when the feed has no network (a shop upload, a catalogue or collected file). */
   networkName: string | null;
-  /** All stored offers of this feed, hidden and in-review included. */
+  /**
+   * The offers this feed has now: every stored offer row except those the last
+   * import removed (decision 0018). Hidden, in-review and collected offers are
+   * counted, and shop and feed approval are not read (S2.6 D-2). Not "any offer
+   * row": /admin/categorias reads its own (category-mappings.ts, D-5).
+   */
   offerCount: number;
+  /**
+   * Of `offerCount`, the offers on the site now: those the public product page
+   * lists (`offerOnSiteWhere`, S2.5 meaning), with the local flag read as the
+   * public rule reads it. Never above `offerCount`.
+   */
+  onSiteOfferCount: number;
   /** The host of the stored address, or null when it cannot be read as one (a demo feed, a file name); always null for a catalogue or collected file, which is never read as an address. */
   host: string | null;
   /** A catalogue or collected file only: the stored file name when it is one by the rule, else null; null for every other source. */
@@ -74,8 +86,10 @@ export type AdminShop = {
   approved: boolean;
   /** Derived (D-8): at least one feed and every feed a demo feed. */
   demo: boolean;
-  /** The sum of its feeds' offer counts. */
+  /** The sum of its feeds' `offerCount`; 0 with no feeds. */
   offerCount: number;
+  /** The sum of its feeds' `onSiteOfferCount`; 0 with no feeds. */
+  onSiteOfferCount: number;
   /** By id ascending. */
   feeds: AdminFeed[];
 };
@@ -160,11 +174,16 @@ export async function listSourcesForAdmin(): Promise<AdminShop[]> {
       networkId: feeds.networkId,
       networkName: networks.name,
       stored: feeds.url,
-      offerCount: sql<number>`count(${offers.id})::int`,
+      // Both conditions come from the visibility scope, read on every call
+      // (the local flag included); this file names no removed flag (S2.6).
+      offerCount: sql<number>`(count(${offers.id}) filter (where ${currentOfferWhere()}))::int`,
+      onSiteOfferCount: sql<number>`(count(${offers.id}) filter (where ${offerOnSiteWhere()}))::int`,
     })
     .from(feeds)
     .leftJoin(networks, eq(feeds.networkId, networks.id))
+    .innerJoin(shops, eq(feeds.shopId, shops.id))
     .leftJoin(offers, eq(offers.feedId, feeds.id))
+    .leftJoin(products, eq(offers.productId, products.id))
     .groupBy(feeds.id, networks.name)
     .orderBy(asc(feeds.id));
 
@@ -180,6 +199,7 @@ export async function listSourcesForAdmin(): Promise<AdminShop[]> {
       networkId: row.networkId,
       networkName: row.networkName,
       offerCount: Number(row.offerCount),
+      onSiteOfferCount: Number(row.onSiteOfferCount),
       host: isFile ? null : feedHost(row.stored),
       fileName: isFile ? displayableFileName(row.stored) : null,
     };
@@ -197,6 +217,7 @@ export async function listSourcesForAdmin(): Promise<AdminShop[]> {
       approved: shop.approved,
       demo: shopFeeds.length > 0 && shopFeeds.every((feed) => feed.demo),
       offerCount: shopFeeds.reduce((sum, feed) => sum + feed.offerCount, 0),
+      onSiteOfferCount: shopFeeds.reduce((sum, feed) => sum + feed.onSiteOfferCount, 0),
       feeds: shopFeeds,
     };
   });

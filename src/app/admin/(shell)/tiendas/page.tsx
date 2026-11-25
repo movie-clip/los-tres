@@ -68,6 +68,8 @@ function feedView(feed: AdminFeed, shop: AdminShop, t: Translate): FeedRowView {
             ? t('feedMetaNetwork', { network: feed.networkName })
             : null,
     t('feedMetaOffers', { offers: feed.offerCount, offersText }),
+    // The offers on the site now (S2.6); written as a number, 0 included.
+    t('offersOnSite', { countText: countFormat.format(feed.onSiteOfferCount) }),
   ].filter((part): part is string => part !== null);
   const values = { id: feed.id, shop: shop.name };
   // The file name or a fixed phrase for either file kind; the host or a fixed phrase otherwise. The stored
@@ -128,11 +130,11 @@ function shopView(shop: AdminShop, t: Translate): ShopGroupView {
   return {
     id: shop.id,
     title: shop.name,
-    meta: t('shopMeta', {
+    meta: `${t('shopMeta', {
       feeds: shop.feeds.length,
       offers: shop.offerCount,
       offersText: countFormat.format(shop.offerCount),
-    }),
+    })} · ${t('offersOnSite', { countText: countFormat.format(shop.onSiteOfferCount) })}`,
     note,
     approved: shop.approved,
     noFeeds: t('shopNoFeeds'),

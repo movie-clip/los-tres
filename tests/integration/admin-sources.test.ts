@@ -260,12 +260,13 @@ describe('listSourcesForAdmin', () => {
         approved: false,
         demo: false,
         offerCount: 3,
+        onSiteOfferCount: 0,
         feeds: [
-          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: 'feeds.example', fileName: null },
-          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkId: network.id, networkName: 'Red Prueba', offerCount: 3, host: 'api.example', fileName: null },
+          { id: uploadFeed, approved: false, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, onSiteOfferCount: 0, host: 'feeds.example', fileName: null },
+          { id: affiliate.id, approved: true, demo: true, source: 'affiliate_network', networkId: network.id, networkName: 'Red Prueba', offerCount: 3, onSiteOfferCount: 0, host: 'api.example', fileName: null },
         ],
       },
-      { id: empty.id, name: 'Beta', slug: empty.slug, approved: true, demo: false, offerCount: 0, feeds: [] },
+      { id: empty.id, name: 'Beta', slug: empty.slug, approved: true, demo: false, offerCount: 0, onSiteOfferCount: 0, feeds: [] },
       {
         id: zeta.id,
         name: 'Zeta',
@@ -273,12 +274,14 @@ describe('listSourcesForAdmin', () => {
         approved: true,
         demo: false,
         offerCount: 0,
-        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, host: null, fileName: null }],
+        onSiteOfferCount: 0,
+        feeds: [{ id: zetaFeed, approved: true, demo: false, source: 'shop_upload', networkId: null, networkName: null, offerCount: 0, onSiteOfferCount: 0, host: null, fileName: null }],
       },
     ]);
     for (const shop of result) {
-      expect(Object.keys(shop).sort()).toEqual(['approved', 'demo', 'feeds', 'id', 'name', 'offerCount', 'slug']);
+      expect(Object.keys(shop).sort()).toEqual(['approved', 'demo', 'feeds', 'id', 'name', 'offerCount', 'onSiteOfferCount', 'slug']);
       expect(typeof shop.offerCount).toBe('number');
+      expect(typeof shop.onSiteOfferCount).toBe('number');
       for (const feed of shop.feeds) {
         expect(Object.keys(feed).sort()).toEqual([
           'approved',
@@ -289,9 +292,11 @@ describe('listSourcesForAdmin', () => {
           'networkId',
           'networkName',
           'offerCount',
+          'onSiteOfferCount',
           'source',
         ]);
         expect(typeof feed.offerCount).toBe('number');
+        expect(typeof feed.onSiteOfferCount).toBe('number');
       }
     }
     const text = JSON.stringify(result);

@@ -150,6 +150,7 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | admin submitting | `page.route` delays the POST to `/admin/acceso*` |
 | admin 404 | `/admin/no-existe` (signed in: the admin 404; anonymous: redirect to sign-in) |
 | admin shops and feeds page | sign in as the e2e admin, open `/admin/tiendas` at 1280 wide only; re-approve every demo shop and feed you disable, or the e2e import finds no approved feed |
+| admin shops and feeds, offer counts (US-2.6) | after `import-feeds`, demo shops 1 to 4 read 22/22, 35/32, 28/28, 39/38 (offers and on the site now); hiding Feed 1's offer on `/admin/productos/1` takes Demo Uno from 38 to 37 |
 | admin shops and feeds, paused feed and shop note | press "Desactivar tienda" on a demo shop and confirm; its approved feed reads "Aprobado, en pausa" |
 | admin shops and feeds, confirm open | press any "Desactivar …" button |
 | admin shops and feeds, pending | `page.route` delays the action POST by 1.5 s, then press |

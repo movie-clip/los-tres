@@ -74,4 +74,8 @@ Status: accepted, 2026-11-22. Builds on 0013 (a failed import rolls back).
   reason. Showing why is tracked in issue #344, not part of this decision.
   Reconciled: S2.5 (#344) delivers the reason; a removed offer now says its
   feed no longer had it in the last import.
+- 2026-11-25, S2.6 (#373): the "offers" count of a feed or shop on
+  `/admin/tiendas` leaves out removed offers (it read every row before); it is
+  computed through `currentOfferWhere()` in the visibility module, so the
+  importer stays the flag's only writer and no admin file names it.
 - Changing the numbers or the override is an owner decision, not a code edit.
