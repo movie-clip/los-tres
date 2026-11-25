@@ -120,7 +120,7 @@ function offerRuleTable(collected: SQL | undefined): Rule<OfferCause>[] {
     { cause: 'shop_not_approved', holds: eq(shops.isApproved, true) },
     { cause: 'feed_not_approved', holds: eq(feeds.isApproved, true) },
     { cause: 'collected', holds: collected },
-    { cause: 'removed', holds: eq(offers.isRemoved, false) },
+    { cause: 'removed', holds: currentOfferWhere() },
     { cause: 'hidden', holds: eq(offers.isHidden, false) },
     { cause: 'in_review', holds: eq(offers.inReview, false) },
   ]);
@@ -184,6 +184,25 @@ export function visibleProductWhere(): SQL {
   return allHold(productRuleTable(collected, collected === undefined));
 }
 
+/**
+ * Condition over `offers`: the last import of its feed still had the offer
+ * (not removed, S3.3, decision 0018). Not a visibility test: approval, hide,
+ * review and the collected mark are not read. The offer table's `removed` rule
+ * is this condition, so a count and the public rule cannot disagree on removal.
+ */
+export function currentOfferWhere(): SQL {
+  return eq(offers.isRemoved, false);
+}
+
+/**
+ * Condition over `offers` ⋈ `feeds` ⋈ `shops` ⋈ `products`: the public product
+ * page lists the offer now (the S2.5 "on the site now" meaning). The AND of the
+ * two public builders, flag read on every call, never restated.
+ */
+export function offerOnSiteWhere(): SQL {
+  return sql`(${visibleOfferWhere()}) and (${visibleProductWhere()})`;
+}
+
 /** A code from the closed set as an SQL string literal. Never input: only constants reach it. */
 const codeLiteral = (code: NotPublicReason): SQL => sql.raw(`'${code}'`);
 
@@ -216,7 +235,7 @@ export function offerNotPublicReasonSql(): SQL<OfferNotPublicReason | null> {
   ];
   // The fallback tests the public builders, not the tables: a condition added to
   // either builder outside its table still reads `unknown`, never blank (D-14).
-  const isPublic = sql`(${visibleOfferWhere()}) and (${visibleProductWhere()})`;
+  const isPublic = offerOnSiteWhere();
   return reasonCaseSql(branches, isPublic) as SQL<OfferNotPublicReason | null>;
 }
 

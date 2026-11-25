@@ -51,6 +51,10 @@ export type AdminCategoryFeed = {
   host: string | null;
   /** A catalogue file only: its file name when the stored value is one by the rule, else null. */
   fileName: string | null;
+  /**
+   * At least one offer row of this feed, in any state, removed included (D-5);
+   * read from this file's own offer reads, not from `AdminFeed.offerCount`.
+   */
   hasOffers: boolean;
   /** Distinct products of this feed with an empty category cell. */
   emptyCellProducts: number;
@@ -160,6 +164,13 @@ export async function listCategoryMappingsForAdmin(): Promise<AdminCategoryPage>
   const emptyByFeed = new Map<number, number>();
   for (const group of emptyCells) emptyByFeed.set(group.feedId, Number(group.productCount));
 
+  // `carried` and `emptyCells` together hold every offer row, whatever its state
+  // (S2.6 D-5). Not `rowsByFeed`: it also holds mapping records of feeds with no offer.
+  const feedsWithOffers = new Set<number>([
+    ...carried.map((group) => group.feedId),
+    ...emptyCells.map((group) => group.feedId),
+  ]);
+
   const rowsByFeed = new Map<number, Map<string, AdminCategoryRow>>();
   const rowsOf = (feedId: number): Map<string, AdminCategoryRow> => {
     let rows = rowsByFeed.get(feedId);
@@ -198,7 +209,7 @@ export async function listCategoryMappingsForAdmin(): Promise<AdminCategoryPage>
         networkName: feed.networkName,
         host: feed.host,
         fileName: feed.fileName,
-        hasOffers: feed.offerCount > 0,
+        hasOffers: feedsWithOffers.has(feed.id),
         emptyCellProducts: emptyByFeed.get(feed.id) ?? 0,
         rows: [...(rowsByFeed.get(feed.id)?.values() ?? [])].sort(compareRows),
       });
