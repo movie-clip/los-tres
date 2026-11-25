@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +9,7 @@ import {
 } from '@/app/admin/(shell)/productos/actions';
 import { closeDb, getDb } from '@/db/client';
 import { clicks, feeds, offers, products, shops } from '@/db/schema';
+import { readProductForAdmin } from '@/server/admin/products';
 import { signOutAction } from '@/server/auth/actions';
 
 import { SITE_ORIGIN, consoleMethods, createAdmin, expireSessionRow, forge, signInForCookie } from '../support/admin';
@@ -393,5 +394,76 @@ describe('the states hold no address and the log holds no value (AC 24, 57)', ()
     await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'hide' }));
     await setOfferHiddenAction(IDLE, hideForm({ id: near, target: 'hide' }));
     expect(lines).toEqual([]);
+  });
+});
+
+// US-2.5 (T-2.5.3b), ACs 28 and 29: the answer of a hide or an unhide carries the reason that applies after it, and the
+// read that follows (the page's own re-read) agrees, also for the reasons an offer press changes on its product.
+describe('the answer carries the reason that applies after the change (US-2.5, AC 28, 29)', () => {
+  const stateOf = (kind: 'product' | 'offer', id: number, hidden: boolean, publicNow: boolean, reason: string | null) => ({
+    status: 'done',
+    kind,
+    id,
+    hidden,
+    publicNow,
+    reason,
+  });
+
+  it('an unhide of an item with another cause answers that cause, never none, and publishes nothing by itself', async () => {
+    const { product, near, feedId } = await world();
+    startAdminRequest({ cookie: (await signedIn()).cookie, origin: SITE_ORIGIN });
+    await getDb().update(feeds).set({ isApproved: false }).where(eq(feeds.id, feedId));
+
+    // The offer first: hidden while its feed is not approved, it names the hide only once nothing ranks before it.
+    expect(await setOfferHiddenAction(IDLE, hideForm({ id: near, target: 'hide' }))).toEqual(
+      stateOf('offer', near, true, false, 'offer_feed_not_approved'),
+    );
+    expect(await setOfferHiddenAction(IDLE, hideForm({ id: near, target: 'unhide' }))).toEqual(
+      stateOf('offer', near, false, false, 'offer_feed_not_approved'),
+    );
+    // Then the product: its own hide, then the cause of its offers.
+    expect(await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'hide' }))).toEqual(
+      stateOf('product', product.id, true, false, 'product_hidden'),
+    );
+    expect(await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'unhide' }))).toEqual(
+      stateOf('product', product.id, false, false, 'offers_feed_not_approved'),
+    );
+  });
+
+  it('hiding the last offer on the site changes the product reason on the re-read, and unhiding one gives the product back', async () => {
+    const { product, near, far } = await world();
+    startAdminRequest({ cookie: (await signedIn()).cookie, origin: SITE_ORIGIN });
+
+    expect(await setOfferHiddenAction(IDLE, hideForm({ id: near, target: 'hide' }))).toMatchObject({ reason: 'offer_hidden', publicNow: false });
+    // Another offer is still on the site, so the product reads Yes with no reason, and the hidden offer names itself.
+    const first = await readProductForAdmin(product.id);
+    expect(first).toMatchObject({ publicNow: true, reason: null });
+    expect(first?.offers.map((offer) => [offer.id, offer.reason])).toEqual(
+      expect.arrayContaining([[near, 'offer_hidden'], [far, null]]),
+    );
+
+    expect(await setOfferHiddenAction(IDLE, hideForm({ id: far, target: 'hide' }))).toMatchObject({ reason: 'offer_hidden' });
+    const second = await readProductForAdmin(product.id);
+    expect(second).toMatchObject({ publicNow: false, reason: 'offers_hidden' });
+    expect(second?.offers.map((offer) => offer.reason)).toEqual(['offer_hidden', 'offer_hidden']);
+
+    expect(await setOfferHiddenAction(IDLE, hideForm({ id: near, target: 'unhide' }))).toMatchObject({ reason: null, publicNow: true });
+    expect(await readProductForAdmin(product.id)).toMatchObject({ publicNow: true, reason: null });
+  });
+
+  it('hiding a product gives its fine offers the product reason on the re-read, and unhiding it takes the reason away', async () => {
+    const { product, near, far } = await world();
+    startAdminRequest({ cookie: (await signedIn()).cookie, origin: SITE_ORIGIN });
+
+    expect(await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'hide' }))).toMatchObject({ reason: 'product_hidden' });
+    const hidden = await readProductForAdmin(product.id);
+    expect(hidden).toMatchObject({ hidden: true, publicNow: false, reason: 'product_hidden' });
+    for (const offer of hidden?.offers ?? []) expect(offer).toMatchObject({ hidden: false, publicNow: false, reason: 'product_hidden' });
+    expect(hidden?.offers.map((offer) => offer.id).sort()).toEqual([near, far].sort());
+
+    expect(await setProductHiddenAction(IDLE, hideForm({ id: product.id, target: 'unhide' }))).toMatchObject({ reason: null, publicNow: true });
+    const back = await readProductForAdmin(product.id);
+    expect(back).toMatchObject({ publicNow: true, reason: null });
+    for (const offer of back?.offers ?? []) expect(offer).toMatchObject({ publicNow: true, reason: null });
   });
 });

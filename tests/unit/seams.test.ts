@@ -1367,3 +1367,46 @@ describe('seams (guardrails 1 and 2, S12.2 local flag and the one marked-row rul
     expect(codeOf('src/server/catalogue/demo.ts')).not.toMatch(shownCall);
   });
 });
+
+// US-2.5 (T-2.5.3b), ACs 9 and 5: the not-public reason is computed in the visibility scope and only selected
+// by the admin files. No seam rule above is edited; these rules are additive.
+describe('seams (guardrail 1, US-2.5 the not-public reason)', () => {
+  const ADMIN_DIRS = ['src/server/admin/', 'src/app/admin/', 'src/components/admin/'];
+  const inAdmin = (file: string) => ADMIN_DIRS.some((dir) => file.startsWith(dir));
+  /** A SQL CASE, however it is spaced or cased; a TypeScript `case 'x':` label never matches. */
+  const sqlCase = /\bcase\s+when\b/i;
+
+  it('finds the admin files it scans, so the rule below is not vacuous', () => {
+    const files = sources().filter(({ file }) => inAdmin(file));
+    expect(files.length).toBeGreaterThan(20);
+    expect(files.map(({ file }) => file)).toEqual(
+      expect.arrayContaining(['src/server/admin/products.ts', 'src/components/admin/ProductState.tsx']),
+    );
+  });
+
+  it('has the admin product read select both reasons from the visibility scope', () => {
+    const code = sources().find(({ file }) => file === 'src/server/admin/products.ts')?.code ?? '';
+    expect(code).toMatch(/\bofferNotPublicReasonSql\(\)/);
+    expect(code).toMatch(/\bproductNotPublicReasonSql\(\)/);
+    // The reason is read, never rebuilt: the public scope calls stay, and nothing builds a reason here.
+    expect(code).toMatch(/\bvisibleProductWhere\(\)/);
+    expect(code).toMatch(/\bvisibleOfferWhere\(\)/);
+  });
+
+  it('keeps every SQL case of a reason out of the admin files, and sees one planted there', () => {
+    const found = sources()
+      .filter(({ file, code }) => inAdmin(file) && sqlCase.test(code))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+
+    const planted = [
+      "sql`case when ${offers.isHidden} then 'offer_hidden' end`",
+      'sql`(CASE\n  WHEN ${products.isHidden} THEN 1 END)`',
+      "sql`select case   when x then 'a' else null end`",
+    ];
+    for (const code of planted) expect(sqlCase.test(code), code).toBe(true);
+    for (const fine of ["switch (kind) { case 'saved': return 1; }", 'const showcase = whenReady();', 'a case of when']) {
+      expect(sqlCase.test(fine), fine).toBe(false);
+    }
+  });
+});
