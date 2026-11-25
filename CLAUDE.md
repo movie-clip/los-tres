@@ -74,7 +74,7 @@ line here is the owner's call: propose it and stop.
 ## Commands
 
 npm and Node 22 (`.nvmrc`). **`npm run gate` is the gate**: the
-integration review runs it, it runs before every pull request and in CI, and a
+integration review runs it, it runs before every pull request, CI runs the same steps in three jobs, and a
 story is not done until it exits 0. Build lanes verify with `npm run check`
 while they build (0006 rule 8).
 
@@ -289,7 +289,7 @@ deploy it must be the public https origin**, or all of them point at
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |
 | e2e | `npm run test:e2e` (`playwright test`; its global setup builds and starts its own Compose project, `los-tres-e2e`, and its teardown removes it; see below) | Docker running, `.env` with `SEED_DEMO_DATA=true`, four free loopback ports from `E2E_APP_PORT` (3020), Playwright browser; the development stack is not needed |
 | check | `npm run check` (`lint`, `typecheck`, `db:up`, `test`: all of Vitest; no image build, no Playwright; budget 90 s, 0006 rule 13) | Docker running, `.env` |
-| **gate** | `npm run gate` (`npm run check && npm run test:e2e`; what CI runs too) | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
+| **gate** | `npm run gate` (`npm run check && npm run test:e2e`; CI runs the same steps in three jobs, see CI below) | Docker running, `.env` with `SEED_DEMO_DATA=true`, Playwright browser |
 
 `npm run gate` is `npm run check` (`lint`, `typecheck`, `db:up`, `test`), then
 `test:e2e`. It has no `stack:up` step: it neither starts, rebuilds nor leaves up
@@ -345,16 +345,27 @@ time functions and sleeps are not flagged and fall to the integration review
 (0006 names them). Real timings are `npm run test:timing`, never a gate step.
 The e2e tests are outside that rule.
 
-**CI (D-5, D-6).** `.github/workflows/gate.yml` runs `npm run gate` on every
-pull request, on `ubuntu-latest`, with a fresh `.env` from `npm run env:init`
-(random secrets, `SEED_DEMO_DATA=true`, blank owner identity). CI and the local
-gate run the same command and the same browser tests: no test is tagged and no
-project filters by grep. A story is still not done until it exits 0. When a gate run
-fails, `gate.yml` uploads `test-results/` (the trace and screenshot of each
+**CI (D-5, D-6).** `.github/workflows/gate.yml` runs on every pull request, on
+`ubuntu-latest`, as three parallel jobs and an aggregator, each working job with
+a fresh `.env` from `npm run env:init` (random secrets, `SEED_DEMO_DATA=true`,
+blank owner identity): `static` (`npm run lint`, `typecheck`, `test:unit`),
+`integration` (`npm run db:up`, `test:integration`) and `e2e` (the Playwright
+browser, then `npm run test:e2e`). CI runs no `npm run gate` or `npm run check`:
+it runs the same steps as the local gate, split across the three jobs, and the
+same browser tests; no test is tagged and no project filters by grep. The fourth
+job, `gate`, is the required check: it needs the other three, always runs, and
+fails unless all three succeeded (a failed, cancelled or skipped job fails it).
+Do not make `static`, `integration` or `e2e` required checks. The `e2e` job
+caches the Playwright browser (`~/.cache/ms-playwright`) on the
+`@playwright/test` version locked in `package-lock.json`, with no `restore-keys`;
+`gate.yml` runs only on pull requests, so the cache is scoped to each pull
+request's own ref: its first run misses and its later pushes hit. A story is
+still not done until the local `npm run gate` exits 0. When the e2e job fails, it
+uploads `test-results/` (the trace and screenshot of each
 failing test, which `playwright.config.ts` keeps on failure only, and
 `e2e-stack.log`, the e2e stack's logs) as a workflow
-artifact for 7 days; `gate-repeat.yml` does the same from an identical step
-(#361). A trace may hold the ephemeral CI admin session and test credentials, in
+artifact for 7 days; the `e2e` copies of `gate-repeat.yml` do the same from an
+identical step (#361). A trace may hold the ephemeral CI admin session and test credentials, in
 a public repository's artifacts (#361).
 
 **Repeat run (`gate-repeat`, 0006 rule 7).** `.github/workflows/gate-repeat.yml`
@@ -371,13 +382,15 @@ A bad value, or a pull request with no merge ref (closed, merged or
 conflicting), fails the first job and nothing else starts. The workflow then
 runs, in parallel on separate runners:
 
-- **`runs` copies**, named `repeat <n>`, each the steps of the `gate` job of
-  `gate.yml` (checkout, Node, `npm ci`, `env:init`, Playwright chromium,
-  `npm run gate`, Compose logs on failure, Playwright output upload on
-  failure, Compose down), with the same 45
-  minute timeout. One red copy does not stop the others. A pin in
-  `tests/unit/gate-determinism.test.ts` fails when a copy and the `gate` job
-  drift apart.
+- **`runs` copies of the gate**, each three jobs, named `repeat <n> static`,
+  `repeat <n> integration` and `repeat <n> e2e` (ids `copy-static`,
+  `copy-integration`, `copy-e2e`). Each runs the steps of the matching job of
+  `gate.yml`, with that job's runner and timeout (15, 15 and 30 minutes); the
+  checkout `ref` is the only difference. Copy n is green when its three jobs are
+  green; there is no aggregator here. `runs=10` starts 30 copy jobs, plus `plan`
+  and `timing`. One red copy does not stop the others. A pin in
+  `tests/unit/gate-determinism.test.ts` fails when a copy job and its `gate.yml`
+  job drift apart.
 - **One `timing` job**, which runs `npm run test:timing` twice, alone
   (`TIMING_LABEL=alone`) and beside three busy loops (`TIMING_LABEL=cpu-load`),
   and prints in its summary the commit, the runner's CPU count and model, for
