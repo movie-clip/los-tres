@@ -131,7 +131,7 @@ describe('the list holds every product in every state, and says which is public 
       expect(rows[slug], slug).toMatchObject({ brand: null, partNumber: null, ean: null });
     }
     expect(Object.keys(rows['p-completo']).sort()).toEqual(
-      ['brand', 'ean', 'hidden', 'id', 'partNumber', 'publicNow', 'slug', 'title'].sort(),
+      ['brand', 'ean', 'hidden', 'id', 'partNumber', 'publicNow', 'reason', 'slug', 'title'].sort(),
     );
   });
 });
@@ -325,8 +325,8 @@ describe('the product read: every offer, in the public order, with its state (AC
     expect(detail).toMatchObject({ id: product.id, slug: 'p-ofertas', title: 'Producto', brand: 'Marca', hidden: false, publicNow: true });
     expect(detail?.offers.map((offer) => offer.id)).toEqual([ids.hidden, ids.cheap, ids.review, ids.unapproved, ids.dear]);
     const byId = Object.fromEntries((detail?.offers ?? []).map((offer) => [offer.id, offer]));
-    expect(byId[ids.cheap]).toEqual({ id: ids.cheap, shopName: 'Barata', feedId: cheap.feedId, priceCents: 1000, hidden: false, publicNow: true });
-    expect(byId[ids.dear]).toEqual({ id: ids.dear, shopName: 'Cara', feedId: dear.feedId, priceCents: 2550, hidden: false, publicNow: true });
+    expect(byId[ids.cheap]).toEqual({ id: ids.cheap, shopName: 'Barata', feedId: cheap.feedId, priceCents: 1000, hidden: false, publicNow: true, reason: null });
+    expect(byId[ids.dear]).toEqual({ id: ids.dear, shopName: 'Cara', feedId: dear.feedId, priceCents: 2550, hidden: false, publicNow: true, reason: null });
     expect(byId[ids.hidden]).toMatchObject({ priceCents: 900, hidden: true, publicNow: false });
     expect(byId[ids.review]).toMatchObject({ hidden: false, publicNow: false });
     expect(byId[ids.unapproved]).toMatchObject({ shopName: 'Sin Aprobar', hidden: false, publicNow: false });

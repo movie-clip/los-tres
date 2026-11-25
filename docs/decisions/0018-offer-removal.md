@@ -72,4 +72,6 @@ Status: accepted, 2026-11-22. Builds on 0013 (a failed import rolls back).
   fitments, and a removed offer does not change it.
 - The admin offer list shows a removed offer as not on the site with no
   reason. Showing why is tracked in issue #344, not part of this decision.
+  Reconciled: S2.5 (#344) delivers the reason; a removed offer now says its
+  feed no longer had it in the last import.
 - Changing the numbers or the override is an owner decision, not a code edit.

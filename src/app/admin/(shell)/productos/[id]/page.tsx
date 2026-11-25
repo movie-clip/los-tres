@@ -9,6 +9,7 @@ import { ProductHideToggle, type ProductHideLabels } from '@/components/admin/Pr
 import { ProductIdentifiers } from '@/components/admin/ProductIdentifiers';
 import { ProductOfferRow } from '@/components/admin/ProductOfferRow';
 import { ProductOffersSection } from '@/components/admin/ProductOffersSection';
+import { reasonLabels } from '@/components/admin/product-reason-labels';
 import { getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
 import { adminProductListHref, parseAdminProductListQuery } from '@/server/admin/product-rules';
@@ -63,6 +64,8 @@ export default async function AdminProductPage({ params, searchParams }: { param
     publicLabel: t('publicNowLabel'),
     publicYes: t('publicNowYes'),
     publicNo: t('publicNowNo'),
+    reasonLabel: t('reasonLabel'),
+    reasons: reasonLabels(t),
     saving: d('saving'),
     errorTitle: d('errorTitle'),
   };
@@ -111,6 +114,7 @@ export default async function AdminProductPage({ params, searchParams }: { param
           id={product.id}
           hidden={product.hidden}
           publicNow={product.publicNow}
+          reason={product.reason}
           labels={productLabels}
           action={setProductHiddenAction}
         >
@@ -136,6 +140,7 @@ export default async function AdminProductPage({ params, searchParams }: { param
               id={offer.id}
               hidden={offer.hidden}
               publicNow={offer.publicNow}
+              reason={offer.reason}
               labels={offerLabels(offer)}
               action={setOfferHiddenAction}
             />

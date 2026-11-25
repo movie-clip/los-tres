@@ -514,3 +514,96 @@ describe('the tab titles and the menu', () => {
     expect(layout).toMatch(/key: 'review', label: nav\('review'\) \}/);
   });
 });
+
+// US-2.5 (T-2.5.3b), ACs 1 to 4 and 6: the reason on the three kinds of row, rendered from the real pages, so the
+// words are in the first response, one line per row, and none on a row that reads Yes. Which code a state gets is
+// proved in admin-not-public-reason.test.ts; here one state per row kind is enough, read through the copy keys.
+describe('the reason on a list row, the product block and an offer row (US-2.5, AC 1 to 4, 6)', () => {
+  /** A value line by test id: its label and its value, as the text the markup carries. */
+  const lineOf = (markup: string, testId: string): { label: string; value: string } | null => {
+    const found = new RegExp(`data-testid="${testId}"><span[^>]*>([^<]*)</span> <span[^>]*>([^<]*)</span>`).exec(markup);
+    return found ? { label: found[1], value: found[2] } : null;
+  };
+  const offerRows = (page: string): string[] => page.split('data-testid="offer-row"').slice(1);
+
+  it('puts one "Motivo:" line on each list row that reads No and none on a row that reads Yes, with no link in it', async () => {
+    const live = await approvedFeed();
+    const shopOff = await insertShop({ isApproved: false });
+    const shopOffFeed = await insertFeed(shopOff.id);
+    const publico = await insertProduct({ slug: 'p-publico', title: 'Producto publico' });
+    const oculto = await insertProduct({ slug: 'p-oculto', title: 'Producto oculto', isHidden: true });
+    const tienda = await insertProduct({ slug: 'p-tienda', title: 'Producto tienda' });
+    await insertProduct({ slug: 'p-vacio', title: 'Producto vacio' });
+    await insertOffer({ productId: publico.id, feedId: live.feedId });
+    await insertOffer({ productId: oculto.id, feedId: live.feedId });
+    await insertOffer({ productId: tienda.id, feedId: shopOffFeed });
+
+    const rows: Record<string, string> = Object.fromEntries(rowsOf(await listPage()).map((row) => [/>(Producto [a-z ]+)<\/a>/.exec(row)?.[1], row]));
+
+    expect(lineOf(rows['Producto publico'], 'product-row-reason')).toBeNull();
+    expect(rows['Producto publico']).not.toContain(copy.reasonLabel);
+    expect(lineOf(rows['Producto oculto'], 'product-row-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonProductHidden });
+    expect(lineOf(rows['Producto tienda'], 'product-row-reason')).toEqual({
+      label: copy.reasonLabel,
+      value: copy.reasonProductOffersShop,
+    });
+    expect(lineOf(rows['Producto vacio'], 'product-row-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonProductNoOffers });
+    for (const row of Object.values(rows)) {
+      expect(row.match(/data-testid="product-row-reason"/g)?.length ?? 0).toBeLessThanOrEqual(1);
+      // The title is still the one link of the row: the reason is words, not a way to another screen.
+      expect(row.match(/<a /g)).toHaveLength(1);
+    }
+    // The tag keeps saying what the admin set, beside the reason.
+    expect(rows['Producto oculto']).toContain(`>${copy.tagHidden}<`);
+    expect(rows['Producto tienda']).toContain(`>${copy.tagNotHidden}<`);
+  });
+
+  it('puts the reason on the product block and on each offer row that reads No, and none on a page that reads Yes', async () => {
+    const live = await approvedFeed('Tienda Buena');
+    const hidden = await insertProduct({ slug: 'p-oculto', title: 'Producto oculto', isHidden: true });
+    const fine = await insertProduct({ slug: 'p-bueno', title: 'Producto bueno' });
+    await insertOffer({ productId: hidden.id, feedId: live.feedId });
+    await insertOffer({ productId: fine.id, feedId: live.feedId });
+
+    const off = await productPage(hidden.id);
+    expect(lineOf(off, 'product-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonProductHidden });
+    const [offerRow] = offerRows(off);
+    // The offer is fine on its own flags, so it reads its product's reason, and its own tag is unchanged.
+    expect(lineOf(offerRow, 'offer-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonProductHidden });
+    expect(offerRow).toContain(`>${copy.tagOfferNotHidden}<`);
+    expect(off).toContain(`>${copy.tagHidden}<`);
+
+    const on = await productPage(fine.id);
+    expect(on).not.toContain('-reason"');
+    expect(on).not.toContain(copy.reasonLabel);
+    expect(on).toMatch(new RegExp(`${copy.publicNowLabel}</span> <span[^>]*>${copy.publicNowYes}</span>`));
+  });
+
+  it('names each offer by its own cause, the product by the first cause of its offers, and the hidden tag stays beside a feed reason', async () => {
+    const unapproved = await insertShop({ name: 'Tienda Sin Feed' });
+    const offFeed = await insertFeed(unapproved.id, { isApproved: false });
+    const good = await approvedFeed('Tienda Buena');
+    const lone = await insertProduct({ slug: 'p-solo-sin-feed', title: 'Solo sin feed' });
+    const mixed = await insertProduct({ slug: 'p-mezcla', title: 'Mezcla' });
+    await insertOffer({ productId: lone.id, feedId: offFeed, priceCents: 1000, isHidden: true });
+    await insertOffer({ productId: mixed.id, feedId: good.feedId, priceCents: 1000 });
+    await insertOffer({ productId: mixed.id, feedId: good.feedId, priceCents: 1500, isHidden: true });
+    await insertOffer({ productId: mixed.id, feedId: offFeed, priceCents: 2000 });
+
+    // No offer of the first product is on the site: its block names the first cause of its offers, and the offer names its own.
+    const alone = await productPage(lone.id);
+    expect(lineOf(alone, 'product-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonProductOffersFeed });
+    const [onlyOffer] = offerRows(alone);
+    expect(lineOf(onlyOffer, 'offer-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonOfferFeed });
+    expect(onlyOffer).toContain(`>${copy.tagOfferHidden}<`);
+
+    // One offer is on the site, so the product reads Yes with no reason, and its two other offers say why they are not.
+    const page = await productPage(mixed.id);
+    expect(lineOf(page, 'product-reason')).toBeNull();
+    const [cheap, hiddenOffer, feedOffer] = offerRows(page);
+    expect(lineOf(cheap, 'offer-reason')).toBeNull();
+    expect(lineOf(hiddenOffer, 'offer-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonOfferHidden });
+    expect(lineOf(feedOffer, 'offer-reason')).toEqual({ label: copy.reasonLabel, value: copy.reasonOfferFeed });
+    expect(page.match(/data-testid="offer-reason"/g)).toHaveLength(2);
+  });
+});

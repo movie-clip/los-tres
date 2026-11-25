@@ -1,7 +1,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { createTranslator } from 'use-intl/core';
 import { describe, expect, it } from 'vitest';
+
+import { REASON_KEY, reasonLabels, type ProductsTranslate } from '@/components/admin/product-reason-labels';
+import { NOT_PUBLIC_REASONS } from '@/server/visibility';
 
 import messages from '../../messages/es-ES.json';
 
@@ -353,5 +357,97 @@ describe('no copy on the product screens promises that unhiding publishes (AC 59
     ]) {
       expect(line).not.toMatch(/[{}]/);
     }
+  });
+});
+
+// US-2.5 (T-2.5.3b), ACs 8, 30 to 33 and 5: the 17 reason lines of Admin.Products. Each code has its own line
+// (one key per code, no key left over), the lines pass the S2.4 pins that scan the whole block (the "promises"
+// describe above reads them because they are keys of Admin.Products), and a line never holds a value, an address
+// or a promise. The wording is the owner's; these tests pin its rules, not its sentences.
+describe('the not-public reason lines of the product screens (US-2.5, AC 30 to 33)', () => {
+  const copy = messages.Admin.Products as Record<string, unknown>;
+  const reasonKeys = Object.keys(copy).filter((key) => /^reason[A-Z]/.test(key) && key !== 'reasonLabel');
+  const lineOf = (code: (typeof NOT_PUBLIC_REASONS)[number]): string => copy[REASON_KEY[code]] as string;
+  const lines = NOT_PUBLIC_REASONS.map((code) => [code, lineOf(code)] as const);
+  const translator = createTranslator({
+    locale: 'es-ES',
+    messages,
+    namespace: 'Admin.Products',
+  } as never) as unknown as ProductsTranslate;
+
+  it('gives every code its own line: one key per code, all different, and no reason key without a code (AC 30)', () => {
+    expect(Object.keys(REASON_KEY).sort()).toEqual([...NOT_PUBLIC_REASONS].sort());
+    const keys = NOT_PUBLIC_REASONS.map((code) => REASON_KEY[code]);
+    expect(new Set(keys).size).toBe(NOT_PUBLIC_REASONS.length);
+    expect([...keys].sort()).toEqual([...reasonKeys].sort());
+    for (const [code, line] of lines) {
+      expect(typeof line, code).toBe('string');
+      expect(line.trim(), code).not.toBe('');
+    }
+    expect(new Set(lines.map(([, line]) => line)).size).toBe(NOT_PUBLIC_REASONS.length);
+    expect(messages.Admin.Products.reasonLabel).toMatch(/:$/);
+  });
+
+  it('builds the finished text of every code through the real translator, as the two pages do (AC 30)', () => {
+    const built = reasonLabels(translator);
+    expect(Object.keys(built).sort()).toEqual([...NOT_PUBLIC_REASONS].sort());
+    for (const [code, line] of lines) expect(built[code], code).toBe(line);
+  });
+
+  it('is scanned by the existing Admin.Products pins: the block holds every reason key (AC 31)', () => {
+    const block = leaves(messages.Admin.Products, 'Products').map(([key]) => key);
+    for (const key of [...reasonKeys, 'reasonLabel']) expect(block, key).toContain(`Products.${key}`);
+    expect(reasonKeys).toHaveLength(NOT_PUBLIC_REASONS.length);
+    for (const [code, line] of lines) {
+      expect(offerPromises(line), code).toEqual([]);
+      expect(line, code).not.toMatch(/\bvisibles?\b|\bp[úu]blic[oa]s?\b/i);
+      expect(line, code).not.toMatch(/\b(mostrar|publicar|aprobar|eliminar|borrar)\b/i);
+    }
+  });
+
+  it('lets the "only on the local site" lines through only because they are conditional (non-vacuity of AC 31)', () => {
+    const conditional = lines.filter(([, line]) => SHOWS_OFFERS.test(line));
+    expect(conditional.map(([code]) => code).sort()).toEqual(['offer_collected', 'offers_collected', 'product_collected']);
+    for (const [code, line] of conditional) {
+      expect(offerPromises(line), code).toEqual([]);
+      expect(offerPromises(line.replace(/\bSolo\b/g, 'Se muestra y')), code).not.toEqual([]);
+    }
+  });
+
+  it('says no step makes the item appear: no future or promise verb on any line (AC 32)', () => {
+    for (const [code, line] of lines) {
+      expect(line, code).not.toMatch(/\b(aparec\w*|publicar\w*|mostrar\w*|ver[aá]n?|quedar\w*|volver\w*|saldr\w*|ser[aá]n? visible\w*)\b/i);
+    }
+  });
+
+  it('holds no placeholder, number, address, file name, table or column: the cause is a name, the text fixed (AC 33)', () => {
+    for (const [code, line] of lines) {
+      expect(line, code).not.toMatch(/[{}]/);
+      expect(line, code).not.toMatch(/\d/);
+      expect(line, code).not.toMatch(/[/\\]/);
+      expect(line, code).not.toMatch(/https?:|www\.|\.(?:csv|xml|gz)\b/i);
+      expect(line, code).not.toMatch(/\b(?:offers|products|feeds|shops)\.\w+|\b\w+_(?:id|at)\b|is_\w+|\bisHidden\b|\binReview\b|\bisRemoved\b/);
+    }
+  });
+
+  it('follows the label "Motivo:": lower case at the start, whole sentences, and says where the cause is changed (AC 8, D-7)', () => {
+    for (const [code, line] of lines) {
+      expect(line[0], code).toBe(line[0].toLowerCase());
+      expect(line, code).toMatch(/[.»]$/);
+    }
+    const nav = messages.Admin.Nav;
+    const detail = messages.Admin.Products.Detail;
+    expect(lineOf('offer_shop_not_approved')).toContain(nav.feeds);
+    expect(lineOf('offer_feed_not_approved')).toContain(nav.feeds);
+    expect(lineOf('offers_shop_not_approved')).toContain(nav.feeds);
+    expect(lineOf('offers_feed_not_approved')).toContain(nav.feeds);
+    expect(lineOf('product_no_category')).toContain(nav.categories);
+    // A hidden item says which of the two existing buttons undoes it.
+    expect(lineOf('offer_hidden')).toContain(detail.unhideOffer);
+    expect(lineOf('offers_hidden')).toContain(detail.unhideOffer);
+    expect(lineOf('product_hidden')).toContain(detail.unhideProduct);
+    // The general line names both places the admin can look, so it never reads as a dead end.
+    expect(lineOf('unknown')).toContain(nav.feeds);
+    expect(lineOf('unknown')).toContain(nav.categories);
   });
 });

@@ -8,7 +8,12 @@ import { redirect } from 'next/navigation';
 
 import { getSiteUrl } from '@/config/auth';
 import { parseHideTarget } from '@/server/admin/product-rules';
-import { setOfferHidden, setProductHidden, type HiddenStored } from '@/server/admin/products';
+import {
+  setOfferHidden,
+  setProductHidden,
+  type HiddenStored,
+  type NotPublicReason,
+} from '@/server/admin/products';
 import { parseId } from '@/server/admin/source-rules';
 import { isAdminRefusal, requireAdminAction } from '@/server/auth/guard';
 import { isSameSiteOrigin } from '@/server/auth/origin';
@@ -29,7 +34,14 @@ type Kind = 'product' | 'offer';
 
 export type HideActionState =
   | { status: 'idle' }
-  | { status: 'done'; kind: Kind; id: number; hidden: boolean; publicNow: boolean }
+  | {
+      status: 'done';
+      kind: Kind;
+      id: number;
+      hidden: boolean;
+      publicNow: boolean;
+      reason: NotPublicReason | null;
+    }
   | { status: 'gone'; kind: Kind; id: number }
   | { status: 'failed'; kind: Kind; id: number | null };
 
@@ -65,7 +77,14 @@ async function apply(kind: Kind, form: FormData): Promise<HideActionState> {
   if (stored === null) return { status: 'gone', kind, id };
 
   revalidatePath('/admin/productos', 'layout');
-  return { status: 'done', kind, id: stored.id, hidden: stored.hidden, publicNow: stored.publicNow };
+  return {
+    status: 'done',
+    kind,
+    id: stored.id,
+    hidden: stored.hidden,
+    publicNow: stored.publicNow,
+    reason: stored.reason,
+  };
 }
 
 export async function setProductHiddenAction(

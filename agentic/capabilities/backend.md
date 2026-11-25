@@ -49,6 +49,8 @@ Identity ids are not reused or rewound: a seed re-run burns identity values on `
 
 Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line string replace on an existing file silently does nothing: use the Edit tool and check `git diff`.
 
+To read the SQL a builder renders, run `NODE_PATH=<repo>/node_modules node --conditions=react-server --import tsx <script>` with `PgDialect.sqlToQuery`; `server-only` needs the condition.
+
 ## Guardrails, in code terms
 
 - **(1) Visibility.** Every public read goes through the one visibility scope,
@@ -67,7 +69,8 @@ Working-copy files are CRLF on Windows (autocrlf), so a scripted multi-line stri
   Drizzle 0.45 `update().set().from(table).where().returning()` works and qualifies RETURNING columns (`setFeedApproval` reads the shop's flag in the same statement).
   The category and product read models inner-join `categories` and return `categorySlug`; the join is not a filter (`isNotNull` stays in `visibility.ts`).
   Sitemap and `indexable` = `indexableProductWhere()` (`demo.ts`; excludes demo and collected alike, flag-independent, S12.2); the literal call must appear in `sitemap.ts`;
-  marked rows are excluded only inside `visibleOfferWhere`/`visibleProductWhere` via `collectedRowsShown()`; `markedFeedSql`/`markedProductSql` are named only in `visibility.ts`, `demo.ts`, `offer-target.ts` and `category-mappings.ts` (seams S-7);
+  marked rows are excluded only inside `visibleOfferWhere`/`visibleProductWhere` via `collectedRowsShown()`; `markedFeedSql`/`markedProductSql` are named only in `visibility.ts`, `demo.ts`, `offer-target.ts` and `category-mappings.ts` (seams S-7); seams C-4 reads the literal text `collectedRowsShown() ? undefined : not(markedFeedSql())` (and the `markedProductSql` twin) inside the bodies of `visibleOfferWhere` and `visibleProductWhere`, so a refactor must keep that expression written in those two bodies;
+  the not-public reason (US-2.5) is computed only in `visibility.ts` from `offerRules`/`productRules`, the same tables the public conditions AND; admin files only select it;
   `products.is_collected` is written only in `createProduct` (`importer/index.ts`), once, from the feed's source kind (seams S-4, S-5); `demo.ts` names `feeds.isDemo` only inside `src/server/catalogue`.
 - **(2) No scraping in this repo.** The importer fetches only the URL of a feed registered in
   the database, and parses it as CSV or XML feed data (a file from the owner's

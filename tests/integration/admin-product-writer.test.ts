@@ -74,11 +74,21 @@ describe('setProductHidden (AC 26, 27, 4)', () => {
   it('hides and unhides a product, returning the stored flag and whether the public page shows it now', async () => {
     const { product } = await world();
 
-    expect(await setProductHidden(product.id, true)).toEqual({ id: product.id, hidden: true, publicNow: false });
+    expect(await setProductHidden(product.id, true)).toEqual({
+      id: product.id,
+      hidden: true,
+      publicNow: false,
+      reason: 'product_hidden',
+    });
     expect(await productRow(product.id)).toMatchObject({ isHidden: true });
     expect(await getPublicProductBySlug('p-uno')).toBeNull();
 
-    expect(await setProductHidden(product.id, false)).toEqual({ id: product.id, hidden: false, publicNow: true });
+    expect(await setProductHidden(product.id, false)).toEqual({
+      id: product.id,
+      hidden: false,
+      publicNow: true,
+      reason: null,
+    });
     expect(await productRow(product.id)).toMatchObject({ isHidden: false });
     expect((await getPublicProductBySlug('p-uno'))?.slug).toBe('p-uno');
   });
@@ -88,12 +98,22 @@ describe('setProductHidden (AC 26, 27, 4)', () => {
     await setProductHidden(product.id, true);
     const hiddenOnce = await tables();
 
-    expect(await setProductHidden(product.id, true)).toEqual({ id: product.id, hidden: true, publicNow: false });
+    expect(await setProductHidden(product.id, true)).toEqual({
+      id: product.id,
+      hidden: true,
+      publicNow: false,
+      reason: 'product_hidden',
+    });
     expect(await tables()).toEqual(hiddenOnce);
 
     await setProductHidden(product.id, false);
     const clearOnce = await tables();
-    expect(await setProductHidden(product.id, false)).toEqual({ id: product.id, hidden: false, publicNow: true });
+    expect(await setProductHidden(product.id, false)).toEqual({
+      id: product.id,
+      hidden: false,
+      publicNow: true,
+      reason: null,
+    });
     expect(await tables()).toEqual(clearOnce);
   });
 
@@ -110,7 +130,12 @@ describe('setOfferHidden (AC 28, 29, 4)', () => {
   it('hides and unhides an offer, so the public page and /go lose it and get it back', async () => {
     const { near, far, product } = await world();
 
-    expect(await setOfferHidden(near, true)).toEqual({ id: near, hidden: true, publicNow: false });
+    expect(await setOfferHidden(near, true)).toEqual({
+      id: near,
+      hidden: true,
+      publicNow: false,
+      reason: 'offer_hidden',
+    });
     expect((await getPublicProductBySlug('p-uno'))?.offers.map((offer) => offer.priceCents)).toEqual([2000]);
     expect(await getRedirectTarget(near)).toBeNull();
     expect(await getRedirectTarget(far)).not.toBeNull();
@@ -119,7 +144,7 @@ describe('setOfferHidden (AC 28, 29, 4)', () => {
       publicNow: false,
     });
 
-    expect(await setOfferHidden(near, false)).toEqual({ id: near, hidden: false, publicNow: true });
+    expect(await setOfferHidden(near, false)).toEqual({ id: near, hidden: false, publicNow: true, reason: null });
     expect((await getPublicProductBySlug('p-uno'))?.offers.map((offer) => offer.priceCents)).toEqual([1000, 2000]);
     expect(await getRedirectTarget(near)).not.toBeNull();
   });
@@ -128,7 +153,12 @@ describe('setOfferHidden (AC 28, 29, 4)', () => {
     const { near } = await world();
     await setOfferHidden(near, true);
     const hiddenOnce = await tables();
-    expect(await setOfferHidden(near, true)).toEqual({ id: near, hidden: true, publicNow: false });
+    expect(await setOfferHidden(near, true)).toEqual({
+      id: near,
+      hidden: true,
+      publicNow: false,
+      reason: 'offer_hidden',
+    });
     expect(await tables()).toEqual(hiddenOnce);
     expect(await setOfferHidden(near + 500, true)).toBeNull();
     expect(await tables()).toEqual(hiddenOnce);
@@ -138,7 +168,12 @@ describe('setOfferHidden (AC 28, 29, 4)', () => {
     const { near, far, product } = await world();
     await setOfferHidden(near, true);
     expect((await getPublicProductBySlug('p-uno'))?.offers).toHaveLength(1);
-    expect(await setOfferHidden(far, true)).toEqual({ id: far, hidden: true, publicNow: false });
+    expect(await setOfferHidden(far, true)).toEqual({
+      id: far,
+      hidden: true,
+      publicNow: false,
+      reason: 'offer_hidden',
+    });
     expect(await getPublicProductBySlug('p-uno')).toBeNull();
     // The product's own flag is untouched, and the admin read says it is not public now.
     expect(await readProductForAdmin(product.id)).toMatchObject({ hidden: false, publicNow: false });
@@ -193,8 +228,20 @@ describe('an unhide returns an item to where it would be had it never been hidde
     await insertOffer({ productId: cases.unmapped.id, feedId: live });
     await insertOffer({ productId: cases.review.id, feedId: live, inReview: true });
 
-    for (const { id, slug } of Object.values(cases)) {
-      expect(await setProductHidden(id, false), slug).toEqual({ id, hidden: false, publicNow: false });
+    const reasonOf = {
+      feedOff: 'offers_feed_not_approved',
+      shopOff: 'offers_shop_not_approved',
+      unmapped: 'product_no_category',
+      review: 'offers_in_review',
+    };
+    for (const name of Object.keys(cases) as (keyof typeof cases)[]) {
+      const { id, slug } = cases[name];
+      expect(await setProductHidden(id, false), slug).toEqual({
+        id,
+        hidden: false,
+        publicNow: false,
+        reason: reasonOf[name],
+      });
       expect(await getPublicProductBySlug(slug), slug).toBeNull();
     }
   });
@@ -211,8 +258,14 @@ describe('an unhide returns an item to where it would be had it never been hidde
       await insertOffer({ productId: product.id, feedId: live, isHidden: true, inReview: true }),
     ];
 
-    for (const id of hiddenOffers) {
-      expect(await setOfferHidden(id, false), String(id)).toEqual({ id, hidden: false, publicNow: false });
+    const reasons = ['offer_feed_not_approved', 'offer_shop_not_approved', 'offer_in_review'];
+    for (const [index, id] of hiddenOffers.entries()) {
+      expect(await setOfferHidden(id, false), String(id)).toEqual({
+        id,
+        hidden: false,
+        publicNow: false,
+        reason: reasons[index],
+      });
       expect(await getRedirectTarget(id)).toBeNull();
     }
     expect((await getPublicProductBySlug('p-mixto'))?.offers.map((offer) => offer.priceCents)).toEqual([5000]);
@@ -222,7 +275,12 @@ describe('an unhide returns an item to where it would be had it never been hidde
     const { product, near } = await world();
     await setProductHidden(product.id, true);
     await setOfferHidden(near, true);
-    expect(await setOfferHidden(near, false)).toEqual({ id: near, hidden: false, publicNow: false });
+    expect(await setOfferHidden(near, false)).toEqual({
+      id: near,
+      hidden: false,
+      publicNow: false,
+      reason: 'product_hidden',
+    });
     expect(await getRedirectTarget(near)).toBeNull();
   });
 });

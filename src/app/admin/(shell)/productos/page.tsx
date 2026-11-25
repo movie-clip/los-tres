@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { ProductRow } from '@/components/admin/ProductRow';
 import { ProductsPage } from '@/components/admin/ProductsPage';
+import { reasonLabels } from '@/components/admin/product-reason-labels';
 import { getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
 import {
@@ -11,7 +12,12 @@ import {
   parseAdminProductListQuery,
   type AdminProductListQuery,
 } from '@/server/admin/product-rules';
-import { listProductsForAdmin, type AdminProductList, type AdminProductRow } from '@/server/admin/products';
+import {
+  listProductsForAdmin,
+  type AdminProductList,
+  type AdminProductRow,
+  type NotPublicReason,
+} from '@/server/admin/products';
 import { requireAdminPage } from '@/server/auth/guard';
 
 export const dynamic = 'force-dynamic';
@@ -63,7 +69,12 @@ function emptyState(list: AdminProductList, query: AdminProductListQuery, t: Tra
   return null;
 }
 
-function row(product: AdminProductRow, query: AdminProductListQuery, t: Translate) {
+function row(
+  product: AdminProductRow,
+  query: AdminProductListQuery,
+  t: Translate,
+  reasons: Record<NotPublicReason, string>,
+) {
   const identifiers = [
     product.brand !== null ? { label: t('brandLabel'), value: product.brand, testId: 'product-row-brand' } : null,
     product.partNumber !== null
@@ -86,6 +97,8 @@ function row(product: AdminProductRow, query: AdminProductListQuery, t: Translat
         publicLabel: t('publicNowLabel'),
         publicYes: t('publicNowYes'),
         publicNo: t('publicNowNo'),
+        reasonLabel: t('reasonLabel'),
+        reason: product.reason === null ? null : reasons[product.reason],
       }}
       identifiers={identifiers}
     />
@@ -105,6 +118,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
   const [t, list] = await Promise.all([getTranslations('Admin.Products'), listProductsForAdmin(query)]);
 
   const empty = emptyState(list, query, t);
+  const reasons = reasonLabels(t);
   // With a term or the filter on, a way back to the bare list sits in the count line, unless the
   // empty state already carries it as its button. With no products at all there is nothing to count.
   const filtered = list.term !== '' || list.hiddenOnly;
@@ -155,7 +169,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
       empty={empty}
       pager={pager}
     >
-      {list.rows.map((product) => row(product, query, t))}
+      {list.rows.map((product) => row(product, query, t, reasons))}
     </ProductsPage>
   );
 }
