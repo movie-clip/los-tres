@@ -5,9 +5,12 @@ import { DEMO_SHOP_HOSTS } from '../fixtures/demo';
 import { CAR, carName, cocheValues, queryOf, scriptedControl, selectedText } from '../support/car';
 
 // US-5.7 T5.7.5 (L3t), ACs 43 to 48, journey J7 of 0006 rule 12: while a car is selected every internal link on
-// a public page carries `coche=<slug>` once, last. The one exception is /go/<offer>. The crawl reads the
-// rendered anchors, so a new link that forgets withCar fails here whichever page it is on. The helpers and the
-// components are unit/car-links-seo.test.ts and car-links-components.test.ts.
+// a public page carries `coche=<slug>` once, last. Amended AC 43 names four exceptions: the link to /go/<offer>,
+// which carries no car (asserted below); the car control's own change and remove links (the sweep leaves that
+// group out); the fit-change-car link of the all-left-out empty state (unit/fit-change-car-link.test.ts, which
+// this journey never renders); and the vehicle list's tiles, links to their own car (checked below, outside the
+// sweep). The crawl reads the rendered anchors, so a new link that forgets withCar fails here whichever page it
+// is on. The helpers and the components are unit/car-links-seo.test.ts and car-links-components.test.ts.
 
 const ROOT = '/categoria/mantenimiento-del-coche';
 
