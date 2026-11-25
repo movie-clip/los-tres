@@ -86,7 +86,7 @@ The list of compatible vehicles
 
 Links
 
-22. The links the page already carries keep `coche` as S5.7 requires (S5.7 ACs 43 to 47), with a selected car and with an unrecognised one: the breadcrumb links, the link of AC 3 and the header. The only link whose `coche` is not the selected car is a list row (AC 18). A page with no `coche` and no selected car carries no `coche` on any link except the list rows.
+22. The links the page already carries keep `coche` as S5.7 requires (S5.7 ACs 43 to 47), with a selected car and with an unrecognised one: the breadcrumb links, the link of AC 3 and the header. The only link whose `coche` is not the selected car is a list row (AC 18), apart from the car control's change and remove links, which S5.7 AC 43 excepts. A page with no `coche` and no selected car carries no `coche` on any link except the list rows.
 23. A link to a shop, `/go/<offer>`, carries no `coche` and no other fit information, with or without a car (spec rule 5), and following a list row or the link of AC 3 does not write the browser's stored car (spec rule 4).
 
 Unchanged by this story
