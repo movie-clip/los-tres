@@ -696,34 +696,87 @@ const SWALLOW_ALLOWED: Record<string, string[]> = {
   ],
 };
 
-describe('the copy job runs what the gate job runs', () => {
-  const gate = (): Job => jobNamed(workflowText(GATE_FILE), 'gate');
-  const copy = (): Job => jobNamed(workflowText(REPEAT_FILE), 'copy');
+/**
+ * The three working jobs of gate.yml (#340), each with the gate-repeat job that copies it: the copy runs the
+ * same steps, so a repeat of the gate exercises what CI exercises. `gate` is the fourth job of gate.yml, the
+ * aggregator and the required check, and it has no copy.
+ */
+const PAIRS = [
+  ['static', 'copy-static'],
+  ['integration', 'copy-integration'],
+  ['e2e', 'copy-e2e'],
+] as const;
+const AGGREGATOR = 'gate';
 
-  it('its steps are the gate job steps, step by step, but for the ref its checkout takes', () => {
-    const expected = stepsOf(gate());
-    const { steps, removed } = withoutCopyRef(stepsOf(copy()));
-    expect(steps).toEqual(expected);
-    // The allowed difference is there, once: without it `pr` would test the dispatched ref.
-    expect(removed).toBe(1);
-    // The comparison holds the steps the gate is made of, or an empty pair would pass.
-    expect(expected.length).toBeGreaterThan(5);
-    // The gate job runs the gate itself: the whole line, so `npm run gate:<anything>` fails it.
-    expect(expected.flat().map((line) => line.trim())).toContain('run: npm run gate');
+/** The `npm run` scripts each working job runs, in order: the leaves of the local gate, spread over three jobs. */
+const NPM_RUNS: Record<string, string[]> = {
+  static: ['env:init', 'lint', 'typecheck', 'test:unit'],
+  integration: ['env:init', 'db:up', 'test:integration'],
+  e2e: ['env:init', 'test:e2e'],
+};
+
+const gateJobIds = (): string[] => jobsOf(workflowText(GATE_FILE)).map((job) => job.id);
+const gateJobOf = (id: string): Job => jobNamed(workflowText(GATE_FILE), id);
+const copyJobOf = (id: string): Job => jobNamed(workflowText(REPEAT_FILE), id);
+
+/** The script names a job's steps run, in order: one per `run: npm run <name>` line. */
+function npmRunNames(job: Job): string[] {
+  return stepsOf(job)
+    .flat()
+    .flatMap((line) => {
+      const match = /^run: npm run ([\w:.-]+)$/.exec(line.trim().replace(/^- /, ''));
+      return match ? [match[1] ?? ''] : [];
+    });
+}
+
+/** The lines that run the local gate or the local check as one command: CI calls the leaf scripts instead. */
+const localEntryLines = (lines: string[]): string[] =>
+  lines.filter((line) => /\bnpm run (?:gate|check)(?![\w:.-])/.test(line)).map((line) => line.trim());
+
+describe('each working job of gate.yml and the job of gate-repeat.yml that copies it run the same steps', () => {
+  it('every working job has a copy: the pairs are the jobs of gate.yml but the aggregator, in file order', () => {
+    const working = gateJobIds().filter((id) => id !== AGGREGATOR);
+    expect(working.length).toBeGreaterThan(0);
+    expect(PAIRS.map(([id]) => id)).toEqual(working);
   });
 
-  it('its runner, timeout and every other job setting equal the gate job, apart from name, needs and strategy', () => {
-    const settings = jobSettings(gate());
-    expect(Object.keys(settings)).toEqual(expect.arrayContaining(['runs-on', 'timeout-minutes']));
-    expect(jobSettings(copy())).toEqual(settings);
-  });
+  for (const [id, copyId] of PAIRS) {
+    describe(`${id} and ${copyId}`, () => {
+      const job = (): Job => gateJobOf(id);
+      const copy = (): Job => copyJobOf(copyId);
 
-  it('its timeout is the gate job timeout', () => {
-    expect(Number.isInteger(timeoutOf(gate()))).toBe(true);
-    expect(timeoutOf(copy())).toBe(timeoutOf(gate()));
-  });
+      it(`${id} runs the npm scripts it is named for, in order`, () => {
+        expect(npmRunNames(job())).toEqual(NPM_RUNS[id]);
+      });
 
-  it('neither workflow sets env or defaults for all its jobs, which would reach the copy and not the gate, or the reverse', () => {
+      it('its steps are the job steps, step by step, but for the ref its checkout takes', () => {
+        const expected = stepsOf(job());
+        const { steps, removed } = withoutCopyRef(stepsOf(copy()));
+        expect(steps).toEqual(expected);
+        // The allowed difference is there, once: without it `pr` would test the dispatched ref.
+        expect(removed).toBe(1);
+        // The comparison holds the steps the job is made of, or an empty pair would pass.
+        expect(expected.length).toBeGreaterThan(5);
+      });
+
+      it('its runner, timeout and every other job setting equal the job, apart from name, needs and strategy', () => {
+        const settings = jobSettings(job());
+        expect(Object.keys(settings)).toEqual(expect.arrayContaining(['runs-on', 'timeout-minutes']));
+        expect(jobSettings(copy())).toEqual(settings);
+      });
+
+      it('its timeout is the job timeout, a whole number of minutes', () => {
+        expect(Number.isInteger(timeoutOf(job()))).toBe(true);
+        expect(timeoutOf(copy())).toBe(timeoutOf(job()));
+      });
+
+      it('its check name is repeat <attempt> <part>', () => {
+        expect(checkNameOf(copy())).toBe(`repeat \${{ matrix.attempt }} ${id}`);
+      });
+    });
+  }
+
+  it('neither workflow sets env or defaults for all its jobs, which would reach a copy and not its job, or the reverse', () => {
     for (const file of [GATE_FILE, REPEAT_FILE]) {
       const keys = blocksAt(codeLines(workflowText(file)), 0).map((block) => block.key);
       expect(keys, file).toContain('jobs');
@@ -733,11 +786,58 @@ describe('the copy job runs what the gate job runs', () => {
   });
 });
 
+describe("CI runs the local gate's steps, split over its jobs (#340)", () => {
+  const scripts = (): Record<string, string> => (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts;
+
+  it('the scripts of static, integration and e2e are the steps of npm run gate, with test split into its two projects', () => {
+    const ci = PAIRS.flatMap(([id]) => npmRunNames(gateJobOf(id)))
+      .filter((name) => name !== 'env:init')
+      .sort();
+    const local = steps(scripts(), 'gate')
+      .flatMap((name) => (name === 'test' ? ['test:unit', 'test:integration'] : [name]))
+      .sort();
+    // The comparison holds real steps, or two empty lists would pass.
+    expect(local.length).toBe(6);
+    expect(ci).toEqual(local);
+  });
+
+  it('test:unit and test:integration are the two Vitest projects, which together are all of `npm test`', () => {
+    expect(scripts()['test:unit']).toBe('vitest run --project unit');
+    expect(scripts()['test:integration']).toBe('vitest run --project integration');
+  });
+
+  it('no line of gate.yml runs npm run gate or npm run check: CI calls the leaf scripts', () => {
+    const lines = codeLines(workflowText(GATE_FILE));
+    // The scan sees the workflow, or an empty file would pass.
+    expect(lines.length).toBeGreaterThan(20);
+    expect(localEntryLines(lines)).toEqual([]);
+  });
+
+  it('the helpers can fail: they read a script name from a run line and find the local entry points', () => {
+    const job = jobNamed(
+      ['jobs:', '  a:', '    runs-on: x', '    steps:', '      - run: npm run lint', '      - name: T', '        run: npm run test:unit', '      - run: npx playwright test', '      - run: npm test'].join('\n'),
+      'a',
+    );
+    expect(npmRunNames(job)).toEqual(['lint', 'test:unit']);
+    for (const line of ['run: npm run gate', '- run: npm run check', 'run: npm run gate && echo', '  run: npm run check  ']) {
+      expect(localEntryLines([line]), line).toEqual([line.trim()]);
+    }
+    for (const line of ['run: npm run gate:ci', 'run: npm run check:static', 'run: npm run lint', 'run: npm run gated', 'name: Gate']) {
+      expect(localEntryLines([line]), line).toEqual([]);
+    }
+  });
+});
+
 describe('no copy can be mistaken for the required check', () => {
-  it('the required check is the gate job of gate.yml, and no job of gate-repeat.yml is named or called gate', () => {
-    expect(jobsOf(workflowText(GATE_FILE)).map(checkNameOf)).toEqual(['gate']);
+  it('gate.yml has the working jobs and then the aggregator gate, the one required check, and each id is its check name', () => {
+    const jobs = jobsOf(workflowText(GATE_FILE));
+    expect(jobs.map(checkNameOf)).toEqual(['static', 'integration', 'e2e', 'gate']);
+    expect(jobs.map((job) => job.id)).toEqual(['static', 'integration', 'e2e', 'gate']);
+  });
+
+  it('gate-repeat.yml has plan, one copy job for each working job, and timing, and no job of it is named or called gate', () => {
     const jobs = jobsOf(workflowText(REPEAT_FILE));
-    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['plan', 'copy', 'timing']));
+    expect(jobs.map((job) => job.id)).toEqual(['plan', 'copy-static', 'copy-integration', 'copy-e2e', 'timing']);
     for (const job of jobs) {
       expect(job.id, `the id of ${job.id}`).not.toBe('gate');
       expect(checkNameOf(job), `the check name of ${job.id}`).not.toBe('gate');
@@ -768,7 +868,16 @@ describe('only the timing job may swallow a failing command or run the timing su
     const jobs = otherJobs();
     // The sweep reaches the gate job, the copy job and plan, or an empty list would pass.
     expect(jobs.map(({ key }) => key)).toEqual(
-      expect.arrayContaining([`${GATE_FILE}#gate`, `${REPEAT_FILE}#copy`, `${REPEAT_FILE}#plan`]),
+      expect.arrayContaining([
+        `${GATE_FILE}#static`,
+        `${GATE_FILE}#integration`,
+        `${GATE_FILE}#e2e`,
+        `${GATE_FILE}#${AGGREGATOR}`,
+        `${REPEAT_FILE}#copy-static`,
+        `${REPEAT_FILE}#copy-integration`,
+        `${REPEAT_FILE}#copy-e2e`,
+        `${REPEAT_FILE}#plan`,
+      ]),
     );
     for (const { key, job } of jobs) expect(swallowingLines(job.body), key).toEqual(SWALLOW_ALLOWED[key] ?? []);
   });
@@ -861,7 +970,7 @@ describe('what the pr input tests', () => {
 
   it('every checkout of the copy and timing jobs takes the ref plan resolved, so all test one commit', () => {
     const jobs = jobsOf(workflowText(REPEAT_FILE)).filter((job) => job.id !== 'plan');
-    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['copy', 'timing']));
+    expect(jobs.map((job) => job.id)).toEqual(expect.arrayContaining(['copy-static', 'copy-integration', 'copy-e2e', 'timing']));
     for (const job of jobs) expect(checkoutRefProblems(job), job.id).toEqual([]);
   });
 });
@@ -941,10 +1050,331 @@ describe('the manual workflow gets read access and no secret', () => {
   });
 });
 
-describe('the copy jobs run side by side and one red copy does not stop the others', () => {
-  it('the copy strategy keeps fail-fast false and the matrix from plan, and sets no max-parallel', () => {
-    expect(strategyProblems(jobNamed(workflowText(REPEAT_FILE), 'copy'))).toEqual([]);
+describe('gate.yml gets read access and no job sets its own (#340)', () => {
+  it('its top-level permissions are exactly contents: read, and no job sets its own', () => {
+    expect(permissionProblems(workflowText(GATE_FILE))).toEqual([]);
   });
+});
+
+/**
+ * What is wrong with the aggregator job of gate.yml, one line each. A required check that is `skipped` counts as
+ * passing, so the job must run always (`if: always()`), needs every working job, and fail on anything but
+ * `success` (`failure`, `cancelled` and `skipped` alike). It is one `run` step with no action, and each result
+ * reaches the shell through `env:`, never through `${{ }}` inside the script.
+ */
+function aggregatorProblems(job: Job, needIds: string[]): string[] {
+  const problems: string[] = [];
+  const needs = job.keys.find((key) => key.key === 'needs')?.inline ?? '';
+  const flow = /^\[(.*)\]$/.exec(needs);
+  if (!flow) problems.push(`needs is not a flow list: '${needs}'`);
+  else {
+    const listed = (flow[1] ?? '').split(',').map(unquote).filter(Boolean);
+    for (const id of needIds) if (!listed.includes(id)) problems.push(`needs does not list ${id}`);
+    for (const id of listed) if (!needIds.includes(id)) problems.push(`needs lists ${id}, which is not a working job`);
+    for (const id of listed) if (listed.indexOf(id) !== listed.lastIndexOf(id)) problems.push(`needs lists ${id} twice`);
+  }
+  const condition = job.keys.find((key) => key.key === 'if')?.inline;
+  if (condition !== 'always()') problems.push(`if is ${condition === undefined ? 'missing' : `'${condition}'`}, not always()`);
+  if (!job.keys.some((key) => key.key === 'steps')) return [...problems, 'no steps'];
+  const steps = stepsOf(job);
+  if (steps.length !== 1) problems.push(`${steps.length} steps, expected exactly one`);
+  const lines = steps.flat().map((line) => line.trim().replace(/^- /, ''));
+  if (lines.some((line) => line.startsWith('uses:'))) problems.push('a step uses an action');
+  if (!lines.includes('env:')) problems.push('no env: block');
+  const vars = needIds.map((id) => id.toUpperCase().replaceAll('-', '_'));
+  needIds.forEach((id, at) => {
+    const line = `${vars[at]}: \${{ needs.${id}.result }}`;
+    if (!lines.includes(line)) problems.push(`no env line '${line}'`);
+  });
+  const loop = `for result in ${vars.map((name) => `"$${name}"`).join(' ')}; do`;
+  if (!lines.includes(loop)) problems.push(`no line '${loop}'`);
+  const check = lines.indexOf('if [ "$result" != success ]; then');
+  if (check < 0) problems.push("no line 'if [ \"$result\" != success ]; then'");
+  else if (!lines.slice(check + 1, check + 3).includes('exit 1')) problems.push('the != success check does not exit 1');
+  return problems;
+}
+
+describe('the aggregator job gate fails unless every working job succeeded (#340)', () => {
+  it('needs every working job, runs always, and exits 1 on any result but success', () => {
+    const needIds = gateJobIds().filter((id) => id !== AGGREGATOR);
+    // The check is made against the working jobs, or an empty list would pass.
+    expect(needIds.length).toBeGreaterThan(0);
+    expect(aggregatorProblems(gateJobOf(AGGREGATOR), needIds)).toEqual([]);
+  });
+
+  describe('the aggregator check is not vacuous', () => {
+    const base = [
+      'jobs:',
+      '  gate:',
+      '    name: gate',
+      '    needs: [static, integration, e2e]',
+      '    if: always()',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - name: Static, integration and e2e all succeeded',
+      '        env:',
+      '          STATIC: ${{ needs.static.result }}',
+      '          INTEGRATION: ${{ needs.integration.result }}',
+      '          E2E: ${{ needs.e2e.result }}',
+      '        run: |',
+      '          echo "static=$STATIC integration=$INTEGRATION e2e=$E2E"',
+      '          for result in "$STATIC" "$INTEGRATION" "$E2E"; do',
+      '            if [ "$result" != success ]; then',
+      '              echo "::error title=gate::all three must be success."',
+      '              exit 1',
+      '            fi',
+      '          done',
+    ].join('\n');
+    const ids = ['static', 'integration', 'e2e'];
+    const problems = (text: string): string[] => aggregatorProblems(jobNamed(text, 'gate'), ids);
+    const swap = (from: string, to: string): string => {
+      expect(base, `the base text has ${from}`).toContain(from);
+      return base.replace(from, to);
+    };
+
+    it('accepts the layout of the design', () => {
+      expect(problems(base)).toEqual([]);
+    });
+
+    it('finds a job that does not always run, however it is written', () => {
+      expect(problems(swap('    if: always()\n', ''))).toEqual(["if is missing, not always()"]);
+      expect(problems(swap('if: always()', 'if: success()'))).toEqual(["if is 'success()', not always()"]);
+      expect(problems(swap('if: always()', 'if: ${{ !cancelled() }}'))).toHaveLength(1);
+      expect(problems(swap('if: always()', 'if: failure()'))).toHaveLength(1);
+    });
+
+    it('finds a needs list that misses a working job, adds another, is not a flow list or repeats one', () => {
+      expect(problems(swap('[static, integration, e2e]', '[static, integration]'))).toEqual(['needs does not list e2e']);
+      expect(problems(swap('[static, integration, e2e]', '[static, integration, e2e, lint]'))).toEqual([
+        'needs lists lint, which is not a working job',
+      ]);
+      expect(problems(swap('[static, integration, e2e]', '[static, integration, e2e, e2e]'))).toHaveLength(2);
+      expect(problems(swap('needs: [static, integration, e2e]', 'needs: static'))).toHaveLength(1);
+      expect(problems(swap('    needs: [static, integration, e2e]\n', ''))).toHaveLength(1);
+    });
+
+    it('finds a result that is not in env, or not in the loop', () => {
+      expect(problems(swap('          E2E: ${{ needs.e2e.result }}\n', ''))).toEqual(["no env line 'E2E: ${{ needs.e2e.result }}'"]);
+      expect(problems(swap('          STATIC: ${{ needs.static.result }}', '          STATIC: ${{ needs.integration.result }}'))).toHaveLength(1);
+      expect(problems(swap('"$STATIC" "$INTEGRATION" "$E2E"; do', '"$STATIC" "$INTEGRATION"; do'))).toHaveLength(1);
+      expect(problems(swap('"$STATIC" "$INTEGRATION" "$E2E"; do', '"$E2E" "$STATIC" "$INTEGRATION"; do'))).toHaveLength(1);
+    });
+
+    it('finds a test that passes a cancelled or skipped job, and a failure that does not exit 1', () => {
+      expect(problems(swap('!= success', '== failure'))).toHaveLength(1);
+      expect(problems(swap('!= success', '!= failure'))).toHaveLength(1);
+      expect(problems(swap('              exit 1\n', ''))).toEqual(['the != success check does not exit 1']);
+    });
+
+    it('finds a step that uses an action, a second step and a job with no steps', () => {
+      expect(problems(swap('        run: |', '        uses: actions/checkout@v4\n        run: |'))).toEqual(['a step uses an action']);
+      expect(problems(`${base}\n      - run: echo done`)).toEqual(['2 steps, expected exactly one']);
+      expect(problems(['jobs:', '  gate:', '    needs: [static, integration, e2e]', '    if: always()'].join('\n'))).toEqual(['no steps']);
+    });
+  });
+});
+
+const LOCK_VERSION_EXPRESSION = "require('./package-lock.json').packages['node_modules/@playwright/test'].version";
+const CACHE_PATH_LINE = 'path: ~/.cache/ms-playwright';
+const CACHE_KEY_LINE = 'key: playwright-${{ runner.os }}-chromium-${{ steps.playwright.outputs.version }}';
+const PLAYWRIGHT_INSTALL_LINE = 'run: npx playwright install --with-deps chromium';
+
+/** The steps of a job as trimmed lines, the list dash taken off the first. */
+const stepLines = (job: Job): string[][] => stepsOf(job).map((step) => trimmed(step).map((line) => line.replace(/^- /, '')));
+
+/**
+ * What is wrong with the Playwright browser cache in a job, one line each. In this order: a step that reads the
+ * locked @playwright/test version from package-lock.json (not the range of package.json) and refuses anything
+ * but x.y.z; the cache step with exactly the browser folder and a key made of that version, and no
+ * `restore-keys`, which would restore an older revision; the one unconditional install; the e2e run.
+ */
+function playwrightCacheProblems(job: Job): string[] {
+  const problems: string[] = [];
+  const steps = stepLines(job);
+  const find = (test: (lines: string[]) => boolean): number => steps.findIndex(test);
+  const readAt = find((lines) => lines.includes('id: playwright'));
+  const cacheAt = find((lines) => lines.includes('uses: actions/cache@v4'));
+  const installAt = find((lines) => lines.includes(PLAYWRIGHT_INSTALL_LINE));
+  const testAt = find((lines) => lines.includes('run: npm run test:e2e'));
+
+  const versionStep = steps[readAt];
+  if (!versionStep) problems.push('no step with id: playwright');
+  else {
+    if (!versionStep.some((line) => line.includes(LOCK_VERSION_EXPRESSION))) problems.push('the version step does not read the lock file version');
+    const check = wholeValueCheck(versionStep, 'version');
+    if (!check) problems.push('no whole-value check of $version');
+    else {
+      for (const value of ['1.64.1', '10.0.0']) if (!check.test(value)) problems.push(`the version check refuses ${JSON.stringify(value)}`);
+      for (const value of ['', '^1.64.1', '1.64', '1.64.1\n', '\n1.64.1', 'latest']) {
+        if (check.test(value)) problems.push(`the version check takes ${JSON.stringify(value)}`);
+      }
+    }
+    const at = versionStep.findIndex((line) => line.startsWith('if ! [[ $version =~'));
+    if (at >= 0 && !(versionStep[at + 1]?.startsWith('echo "::error') && versionStep[at + 2] === 'exit 1')) problems.push('the version check does not end in an error line and exit 1');
+    if (!versionStep.includes('echo "version=$version" >> "$GITHUB_OUTPUT"')) problems.push('the version step does not set its version output');
+  }
+
+  const cache = steps[cacheAt];
+  if (!cache) problems.push('no step uses actions/cache@v4');
+  else {
+    const withAt = cache.indexOf('with:');
+    const withLines = withAt < 0 ? [] : cache.slice(withAt + 1);
+    if (JSON.stringify(withLines) !== JSON.stringify([CACHE_PATH_LINE, CACHE_KEY_LINE])) problems.push(`the cache with: is '${withLines.join(' | ')}'`);
+    if (cache.some((line) => line.startsWith('restore-keys'))) problems.push('the cache sets restore-keys');
+  }
+  if (installAt < 0) problems.push(`no step '${PLAYWRIGHT_INSTALL_LINE}'`);
+  if (testAt < 0) problems.push("no step 'run: npm run test:e2e'");
+  const at = [readAt, cacheAt, installAt, testAt];
+  if (at.every((index) => index >= 0) && at.some((index, i) => i > 0 && index <= (at[i - 1] ?? 0))) {
+    problems.push('the version, cache, install and e2e steps are not in that order');
+  }
+  return problems;
+}
+
+/** The `name:` line of the `with:` of each upload-artifact step of a job. */
+function uploadArtifactNames(job: Job): string[] {
+  return stepLines(job)
+    .filter((lines) => lines.some((line) => line.startsWith('uses: actions/upload-artifact@')))
+    .map((lines) => {
+      const at = lines.indexOf('with:');
+      return at < 0 ? '(no with:)' : (lines.slice(at + 1).find((line) => line.startsWith('name:')) ?? '(no name:)');
+    });
+}
+
+/** The lines of a job that run Docker Compose, which in a job of the e2e run would address the development project. */
+const dockerComposeLines = (job: Job): string[] => job.body.filter((line) => /\bdocker[ -]compose\b/.test(line)).map((line) => line.trim());
+
+describe('the e2e job caches the Playwright browser on the locked version, and owns no Compose project (#340)', () => {
+  const e2e = (): Job => gateJobOf('e2e');
+
+  it('reads the locked version, caches ~/.cache/ms-playwright on it with no restore-keys, installs, then runs the e2e', () => {
+    expect(playwrightCacheProblems(e2e())).toEqual([]);
+  });
+
+  it('the locked version the step reads is in package-lock.json, as x.y.z', () => {
+    const lock = JSON.parse(read('package-lock.json')) as { packages: Record<string, { version?: string }> };
+    expect(lock.packages['node_modules/@playwright/test']?.version).toMatch(/^\d+\.\d+\.\d+$/);
+    // The path in the step is the one tested here.
+    expect(LOCK_VERSION_EXPRESSION).toContain("packages['node_modules/@playwright/test'].version");
+  });
+
+  it('neither static nor integration names the cache action or Playwright', () => {
+    for (const id of ['static', 'integration']) {
+      expect(gateJobOf(id).body.filter((line) => /actions\/cache|playwright/i.test(line)), id).toEqual([]);
+    }
+  });
+
+  it('the upload step on failure names its artifact by attempt, with gate when the job has no matrix', () => {
+    expect(uploadArtifactNames(e2e())).toEqual(["name: playwright-test-results-${{ matrix.attempt || 'gate' }}-${{ github.run_attempt }}"]);
+  });
+
+  it('no line of it runs docker compose: the e2e global setup and teardown own the stack and its log', () => {
+    // The scan sees the job, or an empty body would pass.
+    expect(e2e().body.length).toBeGreaterThan(10);
+    expect(dockerComposeLines(e2e())).toEqual([]);
+  });
+
+  describe('the cache, upload and compose checks are not vacuous', () => {
+    const blocks: Record<string, string[]> = {
+      checkout: ['      - uses: actions/checkout@v4'],
+      read: [
+        '      - name: Read the locked Playwright version',
+        '        id: playwright',
+        '        run: |',
+        `          version="$(node -p "${LOCK_VERSION_EXPRESSION}")"`,
+        '          if ! [[ $version =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then',
+        '            echo "::error title=gate::no locked @playwright/test version in package-lock.json."',
+        '            exit 1',
+        '          fi',
+        '          echo "version=$version" >> "$GITHUB_OUTPUT"',
+      ],
+      cache: ['      - name: Cache the Playwright browser', '        uses: actions/cache@v4', '        with:', `          ${CACHE_PATH_LINE}`, `          ${CACHE_KEY_LINE}`],
+      install: ['      - name: Install Playwright chromium', `        ${PLAYWRIGHT_INSTALL_LINE}`],
+      test: ['      - name: E2E tests', '        run: npm run test:e2e'],
+    };
+    const jobOf = (order: string[], edit: (text: string) => string = (text) => text): Job =>
+      jobNamed(
+        edit(['jobs:', '  e2e:', '    runs-on: ubuntu-latest', '    steps:', ...order.flatMap((name) => ['', ...(blocks[name] ?? [])])].join('\n')),
+        'e2e',
+      );
+    const full = ['checkout', 'read', 'cache', 'install', 'test'];
+    const edited = (from: string, to: string): string[] =>
+      playwrightCacheProblems(
+        jobOf(full, (text) => {
+          expect(text, `the good text has ${from}`).toContain(from);
+          return text.replaceAll(from, to);
+        }),
+      );
+
+    it('accepts the layout of the design', () => {
+      expect(playwrightCacheProblems(jobOf(full))).toEqual([]);
+    });
+
+    it('finds a missing step, and steps out of order', () => {
+      expect(playwrightCacheProblems(jobOf(['checkout', 'cache', 'install', 'test']))).toContain('no step with id: playwright');
+      expect(playwrightCacheProblems(jobOf(['checkout', 'read', 'install', 'test']))).toContain('no step uses actions/cache@v4');
+      expect(playwrightCacheProblems(jobOf(['checkout', 'read', 'cache', 'test']))).toContain(`no step '${PLAYWRIGHT_INSTALL_LINE}'`);
+      expect(playwrightCacheProblems(jobOf(['checkout', 'read', 'cache', 'install']))).toContain("no step 'run: npm run test:e2e'");
+      expect(playwrightCacheProblems(jobOf(['checkout', 'cache', 'read', 'install', 'test']))).toHaveLength(1);
+      expect(playwrightCacheProblems(jobOf(['checkout', 'read', 'install', 'cache', 'test']))).toHaveLength(1);
+      expect(playwrightCacheProblems(jobOf(['checkout', 'read', 'cache', 'test', 'install']))).toHaveLength(1);
+    });
+
+    it('finds a version that is not the locked one, or a check that does not refuse a range', () => {
+      expect(edited('package-lock.json', 'package.json')).toContain('the version step does not read the lock file version');
+      expect(edited('^[0-9]+\\.[0-9]+\\.[0-9]+$', '^.*$').length).toBeGreaterThan(0);
+      expect(edited('^[0-9]+\\.[0-9]+\\.[0-9]+$', '[0-9]+\\.[0-9]+\\.[0-9]+').length).toBeGreaterThan(0);
+      expect(edited('if ! [[ $version =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "if ! printf '%s' \"$version\" | grep -Eq '^[0-9.]+$'; then")).toContain(
+        'no whole-value check of $version',
+      );
+      expect(edited('            exit 1\n', '')).toContain('the version check does not end in an error line and exit 1');
+      expect(edited('echo "version=$version" >> "$GITHUB_OUTPUT"', 'echo done')).toContain('the version step does not set its version output');
+    });
+
+    it('finds a cache with another path, another key, a restore-keys line, another action version or no with:', () => {
+      expect(edited('~/.cache/ms-playwright', '~/.cache')).toHaveLength(1);
+      expect(edited('outputs.version }}', 'outputs.version }}-x')).toHaveLength(1);
+      expect(edited('chromium-${{', 'firefox-${{')).toHaveLength(1);
+      expect(edited(CACHE_KEY_LINE, `${CACHE_KEY_LINE}\n          restore-keys: playwright-`)).toEqual([
+        expect.stringMatching(/^the cache with:/),
+        'the cache sets restore-keys',
+      ]);
+      expect(edited('actions/cache@v4', 'actions/cache@v3')).toContain('no step uses actions/cache@v4');
+      expect(edited('        with:\n', '')).toHaveLength(1);
+    });
+
+    it('finds an install that skips the OS packages, and an e2e run that is another command', () => {
+      expect(edited('--with-deps ', '')).toContain(`no step '${PLAYWRIGHT_INSTALL_LINE}'`);
+      expect(edited('run: npm run test:e2e', 'run: npm run gate')).toContain("no step 'run: npm run test:e2e'");
+    });
+
+    it('reads an upload artifact name, and finds a missing name or with', () => {
+      const upload = (...lines: string[]): Job =>
+        jobNamed(['jobs:', '  e2e:', '    runs-on: x', '    steps:', '      - uses: actions/upload-artifact@v4.6.2', ...lines].join('\n'), 'e2e');
+      expect(uploadArtifactNames(upload('        with:', '          name: a-${{ matrix.attempt }}', '          path: x'))).toEqual(['name: a-${{ matrix.attempt }}']);
+      expect(uploadArtifactNames(upload('        with:', '          path: x'))).toEqual(['(no name:)']);
+      expect(uploadArtifactNames(upload('        name: Upload'))).toEqual(['(no with:)']);
+      expect(uploadArtifactNames(jobOf(full))).toEqual([]);
+    });
+
+    it('finds a docker compose line in any spelling, and none in a job without one', () => {
+      const compose = (line: string): Job => jobNamed(['jobs:', '  e2e:', '    runs-on: x', '    steps:', `      - run: ${line}`].join('\n'), 'e2e');
+      for (const line of ['docker compose logs --no-color', 'docker compose down --volumes', 'docker-compose up -d']) {
+        expect(dockerComposeLines(compose(line)), line).toEqual([`- run: ${line}`]);
+      }
+      expect(dockerComposeLines(compose('npm run test:e2e'))).toEqual([]);
+      expect(dockerComposeLines(jobOf(full))).toEqual([]);
+    });
+  });
+});
+
+describe('the copy jobs run side by side and one red copy does not stop the others', () => {
+  for (const [, copyId] of PAIRS) {
+    it(`the ${copyId} strategy keeps fail-fast false and the matrix from plan, and sets no max-parallel`, () => {
+      expect(strategyProblems(copyJobOf(copyId))).toEqual([]);
+    });
+  }
 });
 
 describe('the workflow checks are not vacuous', () => {
@@ -1497,9 +1927,9 @@ describe('the e2e run owns its stack: one project, set in the config (#363)', ()
 
 // CI and the local gate run the same browser tests (#339). The `@layout` tag, `test:e2e:ci`, `gate:ci` and the
 // config's `cliGrepInvert()` existed so CI could skip the geometry specs written against Windows font metrics;
-// those specs are gone (0006 rule 11), and both workflows run `npm run gate`. This pin fails when any piece of
-// a CI-only subset comes back. The workflow step itself is pinned above (the gate job's step is `npm run gate`,
-// the copy job's steps equal the gate job's).
+// those specs are gone (0006 rule 11), and the workflows run the gate's steps. This pin fails when any piece of
+// a CI-only subset comes back. The workflow steps themselves are pinned above (the jobs run the gate's steps as npm leaf
+// scripts, and each gate-repeat copy job's steps equal its gate.yml job's).
 
 /** The lines of a source that are not blank and not whole-line `//` or `#` comments. */
 const codeOnly = (text: string): string =>
