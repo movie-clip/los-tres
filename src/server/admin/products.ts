@@ -8,7 +8,18 @@ import { feeds, offers, products, shops } from '../../db/schema';
 import { eanCandidate, parseSearchTerm } from '../catalogue/search-query';
 import { driverErrorCode } from '../error-code';
 import { normalizePartNumber } from '../matching';
-import { visibleOfferWhere, visibleProductWhere } from '../visibility';
+import {
+  OFFER_NOT_PUBLIC_REASONS,
+  offerNotPublicReasonSql,
+  PRODUCT_NOT_PUBLIC_REASONS,
+  productNotPublicReasonSql,
+  toNotPublicReason,
+  visibleOfferWhere,
+  visibleProductWhere,
+  type NotPublicReason,
+  type OfferNotPublicReason,
+  type ProductNotPublicReason,
+} from '../visibility';
 import { ADMIN_PRODUCTS_PAGE_SIZE, type AdminProductListQuery } from './product-rules';
 
 // The admin's view of products and their offers, and the only writer of the
@@ -21,6 +32,11 @@ import { ADMIN_PRODUCTS_PAGE_SIZE, type AdminProductListQuery } from './product-
 // returned (AC 24). A failed read logs one fixed line with a code and throws a
 // fixed error with no cause, because Drizzle's own message embeds the bound
 // search term (guardrail 5); the writers log nothing and let the action catch.
+// Why a row is not public is likewise only selected here, never built: the
+// reason is computed in the visibility scope from the same rules (US-2.5).
+
+// Type-only, for the admin components (they import from this file only).
+export type { NotPublicReason, OfferNotPublicReason, ProductNotPublicReason } from '../visibility';
 
 /** One product of the admin list or page. `id` is for links only and is never printed. */
 export type AdminProductRow = {
@@ -37,6 +53,8 @@ export type AdminProductRow = {
   hidden: boolean;
   /** The public product page answers with this product now. */
   publicNow: boolean;
+  /** Why it does not, from the shared scope; null exactly when `publicNow` is true. */
+  reason: ProductNotPublicReason | null;
 };
 
 /** Why a list is empty: no product at all, none hidden, or none matching the term. */
@@ -71,13 +89,15 @@ export type AdminOfferRow = {
   hidden: boolean;
   /** The public product page lists this offer now. */
   publicNow: boolean;
+  /** Why it does not, from the shared scope; null exactly when `publicNow` is true. */
+  reason: OfferNotPublicReason | null;
 };
 
 /** A product with every one of its offers, whatever their state; `offers` may be empty. */
 export type AdminProductDetail = AdminProductRow & { offers: AdminOfferRow[] };
 
 /** What a writer stored, read back in the same transaction. */
-export type HiddenStored = { id: number; hidden: boolean; publicNow: boolean };
+export type HiddenStored = { id: number; hidden: boolean; publicNow: boolean; reason: NotPublicReason | null };
 
 /** The public product page answers with the product: the shared scope, as a boolean. */
 const productPublicNow = (): SQL<boolean> => sql<boolean>`${visibleProductWhere()}`;
@@ -100,6 +120,7 @@ const productColumns = () => ({
   ean: products.ean,
   hidden: products.isHidden,
   publicNow: productPublicNow(),
+  reason: productNotPublicReasonSql(),
 });
 
 function toProductRow(row: {
@@ -111,6 +132,7 @@ function toProductRow(row: {
   ean: string | null;
   hidden: boolean;
   publicNow: boolean;
+  reason: unknown;
 }): AdminProductRow {
   return {
     id: row.id,
@@ -121,6 +143,7 @@ function toProductRow(row: {
     ean: blankToNull(row.ean),
     hidden: row.hidden,
     publicNow: row.publicNow,
+    reason: toNotPublicReason(row.reason, PRODUCT_NOT_PUBLIC_REASONS),
   };
 }
 
@@ -204,6 +227,7 @@ export async function readProductForAdmin(id: number): Promise<AdminProductDetai
         priceCents: offers.priceCents,
         hidden: offers.isHidden,
         publicNow: offerPublicNow(),
+        reason: offerNotPublicReasonSql(),
       })
       .from(offers)
       .innerJoin(feeds, eq(offers.feedId, feeds.id))
@@ -211,7 +235,10 @@ export async function readProductForAdmin(id: number): Promise<AdminProductDetai
       .innerJoin(products, eq(offers.productId, products.id))
       .where(eq(offers.productId, id))
       .orderBy(asc(offers.priceCents), asc(shops.name), asc(offers.id));
-    return { ...toProductRow(product), offers: found };
+    return {
+      ...toProductRow(product),
+      offers: found.map((offer) => ({ ...offer, reason: toNotPublicReason(offer.reason, OFFER_NOT_PUBLIC_REASONS) })),
+    };
   } catch (error) {
     return readFailed(error);
   }
@@ -232,10 +259,15 @@ export async function setProductHidden(productId: number, hidden: boolean): Prom
       .returning({ id: products.id, hidden: products.isHidden });
     if (updated.length === 0) return null;
     const [seen] = await tx
-      .select({ publicNow: productPublicNow() })
+      .select({ publicNow: productPublicNow(), reason: productNotPublicReasonSql() })
       .from(products)
       .where(eq(products.id, productId));
-    return { id: updated[0].id, hidden: updated[0].hidden, publicNow: seen.publicNow };
+    return {
+      id: updated[0].id,
+      hidden: updated[0].hidden,
+      publicNow: seen.publicNow,
+      reason: toNotPublicReason(seen.reason),
+    };
   });
 }
 
@@ -253,12 +285,17 @@ export async function setOfferHidden(offerId: number, hidden: boolean): Promise<
       .returning({ id: offers.id, hidden: offers.isHidden });
     if (updated.length === 0) return null;
     const [seen] = await tx
-      .select({ publicNow: offerPublicNow() })
+      .select({ publicNow: offerPublicNow(), reason: offerNotPublicReasonSql() })
       .from(offers)
       .innerJoin(feeds, eq(offers.feedId, feeds.id))
       .innerJoin(shops, eq(feeds.shopId, shops.id))
       .innerJoin(products, eq(offers.productId, products.id))
       .where(eq(offers.id, offerId));
-    return { id: updated[0].id, hidden: updated[0].hidden, publicNow: seen.publicNow };
+    return {
+      id: updated[0].id,
+      hidden: updated[0].hidden,
+      publicNow: seen.publicNow,
+      reason: toNotPublicReason(seen.reason),
+    };
   });
 }
