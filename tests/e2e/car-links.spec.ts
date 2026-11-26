@@ -2,12 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
 import { DEMO_SHOP_HOSTS } from '../fixtures/demo';
-import { CAR, carName, cocheValues, queryOf, selectedText } from '../support/car';
+import { CAR, carName, cocheValues, queryOf, scriptedControl, selectedText } from '../support/car';
 
 // US-5.7 T5.7.5 (L3t), ACs 43 to 48, journey J7 of 0006 rule 12: while a car is selected every internal link on
-// a public page carries `coche=<slug>` once, last. The one exception is /go/<offer>. The crawl reads the
-// rendered anchors, so a new link that forgets withCar fails here whichever page it is on. The helpers and the
-// components are unit/car-links-seo.test.ts and car-links-components.test.ts.
+// a public page carries `coche=<slug>` once, last. Amended AC 43 names four exceptions: the link to /go/<offer>,
+// which carries no car (asserted below); the car control's own change and remove links (the sweep leaves that
+// group out; their hrefs are pinned by unit/car-return-path.test.ts and unit/car-control.test.ts); the
+// fit-change-car link of the all-left-out empty state (unit/fit-change-car-link.test.ts, which
+// this journey never renders); and the vehicle list's tiles, links to their own car (checked below, outside the
+// sweep). The crawl reads the rendered anchors, so a new link that forgets withCar fails here whichever page it
+// is on. The helpers and the components are unit/car-links-seo.test.ts and car-links-components.test.ts.
 
 const ROOT = '/categoria/mantenimiento-del-coche';
 
@@ -21,21 +25,24 @@ test.describe('with a car: listing, product, click-out journey (#339)', () => {
   /**
    * Every internal anchor outside the car control and the vehicle list: it ends in `coche=<slug>`, once, and is not
    * a /go link. The list's tiles are the one link whose car is not the selected one, so they are not in this sweep.
+   *
+   * Two things keep the read from catching the page mid-change (#381). It waits for the hydrated control first: a
+   * page that is a document load starts with the header's change action as a link and swaps it for a button when
+   * React hydrates, and a sweep during the swap reads a transient DOM. And it collects and filters in one
+   * `page.evaluate`: `locator.evaluateAll` queries in one round trip and filters in a second, and a node the
+   * hydration detaches between them has no ancestor, so `closest()` finds no group and the filter keeps it.
    */
   async function expectCarried(page: Page, name: string): Promise<void> {
-    const hrefs = await page
-      .locator('a[href]')
-      .evaluateAll(
-        (nodes, label) =>
-          nodes
-            .filter(
-              (node) =>
-                node.closest(`[role="group"][aria-label="${label}"]`) === null &&
-                node.closest('[data-testid="vehicle-list"]') === null,
-            )
-            .map((node) => node.getAttribute('href') ?? ''),
-        messages.Car.groupLabel,
-      );
+    await scriptedControl(page, true);
+    const hrefs = await page.evaluate((label) => {
+      return Array.from(document.querySelectorAll('a[href]'))
+        .filter(
+          (node) =>
+            node.closest(`[role="group"][aria-label="${label}"]`) === null &&
+            node.closest('[data-testid="vehicle-list"]') === null,
+        )
+        .map((node) => node.getAttribute('href') ?? '');
+    }, messages.Car.groupLabel);
     const carried = hrefs.filter((href) => isInternal(href) && !href.startsWith('/go/'));
     // Not vacuous: the logo and the three footer links are on every page.
     expect(carried.length, name).toBeGreaterThanOrEqual(4);

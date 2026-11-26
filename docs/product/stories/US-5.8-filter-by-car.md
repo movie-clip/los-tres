@@ -81,7 +81,7 @@ Sort, brand filter and pagination
 14. The brand filter applies to both groups. A brand with products in one group only shows that group; a brand with products in neither shows the existing no-match state.
 15. (A-1.) Each brand chip carries the number of that brand's products the page lists for the car (fits plus no data, not the left out), and that number does not change when a brand is selected or the sort changes, as chip counts do not today.
 16. Pagination runs over the combined list, the fits group first, at the page size it has today. A page can hold the end of one group and the start of the next. The number of pages, and the "page n of m" text, are computed from the products the page lists and do not include left-out products.
-17. Every link and form on the grouped category page, including any that this story adds, keeps `coche` as S5.7 requires (S5.7 ACs 43 to 47): pagination, brand chips, the sort form and the change-car action.
+17. Every link and form on the grouped category page, including any that this story adds, keeps `coche` as S5.7 requires (S5.7 ACs 43 to 47): pagination, brand chips and the sort form; the change-car action carries the car in `volver`, as S5.7 AC 43 names.
 18. With a selected car, `?pagina=n` past the last page of the combined list answers 404, as a page past the end does today, and page 1 of a category that exists never answers 404, including when every product in it is left out. The decision is the same whether made by the page or by the check that runs before it.
 
 Empty and degraded category states

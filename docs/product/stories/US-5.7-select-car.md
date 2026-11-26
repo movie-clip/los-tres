@@ -33,7 +33,7 @@ In:
 - the car control in the header of every public page, in both states (spec rule 6), and on the 404 and error pages (D-5);
 - the picker, make then model then engine: as a dialog with JavaScript, and as GET steps on `/mi-coche` without it, returning to the origin page through `volver` (spec rule 7);
 - the read-only options the picker needs, from server-rendered lists or a read-only JSON route (the tech lead chooses); only makes and models with at least one active vehicle are listed;
-- `coche` carried on every internal link and on the search and sort forms while a car is selected, except `/go/<offer>` (spec rule 4; D-2, D-3);
+- `coche` carried on every internal link and on the search and sort forms while a car is selected, except the exceptions of AC 43: `/go/<offer>` and the links that change or remove the car (spec rule 4; D-2, D-3);
 - the browser keeping the choice under `localStorage` key `mi-coche` (D-21): written on selection, restored on a page opened without `coche`, cleared on "Quitar" (spec rules 5 and 6; OD-S2);
 - the notice for an unknown or retired car, the page rendered as without a car (spec rule 4);
 - `noindex` on pages opened with `coche`, canonical without it, `coche` never in the sitemap (spec rule 4);
@@ -118,7 +118,11 @@ An unknown or retired car
 
 `coche` on links and forms (T5.7.5; subject to the design comparison in Open decisions item 1)
 
-43. While a car is selected, every internal link on a public page carries `coche=<slug>`: the header, breadcrumb, category tiles, cards, pagination, brand chips, sort, the empty-state and not-found links, the home page's links and the footer. The one exception is the link to `/go/<offer>`.
+43. While a car is selected, every internal link on a public page carries `coche=<slug>`: the header, breadcrumb, category tiles, cards, pagination, brand chips, sort, the empty-state and not-found links, the home page's links and the footer. Four kinds of link are exceptions, and each is pinned by a test (amended 2026-11-25, #381, D-2 of run `2026-11-25-381-car-links-flake`; before, the one named exception was `/go/<offer>`, which contradicted ACs 15 and 34):
+    - the link to `/go/<offer>` carries no `coche` (ACs 48 to 50; J7, `tests/e2e/car-links.spec.ts`);
+    - the car control's own links, in the header group (change, remove): the change link goes to `/mi-coche` with the current make and model and carries the car only inside `volver`, never as a top-level `coche` (AC 15); the remove link is the current page without `coche` (AC 34). pinned by `tests/unit/car-return-path.test.ts` and `tests/unit/car-control.test.ts`; J7's sweep only leaves that group out (`car-links.spec.ts`, `expectCarried`);
+    - the "change car" link of the all-left-out empty state of the category and search pages (test id `fit-change-car`): the same shape as the control's change link, `/mi-coche?marca=<make>&modelo=<model>&volver=<page path and query, with coche, encoded>`, no top-level `coche`. Pinned by `tests/unit/fit-change-car-link.test.ts`; J7 never renders that state;
+    - the tiles of the vehicle list on the product page are links to the category for their own car, not the selected one: the category path with that car's `coche` once and nothing else (US-5.9 AC 18; J7 checks their shape separately and leaves them out of the sweep).
 44. While a car is selected, submitting the search form lands on `/buscar` with the term and `coche`.
 45. While a car is selected, submitting the sort form lands on the category with the new order, `coche`, and the brand that was already chosen.
 46. With no car selected, or an unrecognised one, no internal link carries `coche`, and a submitted form does not add one, not even an empty one.
