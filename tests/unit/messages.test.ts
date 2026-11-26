@@ -573,3 +573,16 @@ function signInWordingOffenders(adminTree: Record<string, unknown>): string[] {
     .filter(([, value]) => /olvid|registr|recuérd|recuerd|restablec/i.test(value))
     .map(([key]) => key);
 }
+
+describe('messages/es-ES.json Theme namespace (#398)', () => {
+  const theme = (messages as unknown as Record<string, Record<string, string>>).Theme;
+
+  it('has exactly one string, the switch name, because the icon switch shows no other word', () => {
+    expect(Object.keys(theme ?? {})).toEqual(['toggleLabel']);
+  });
+
+  it('names the switch Tema oscuro, a fixed name that takes no placeholder and no tag', () => {
+    expect(lookup('Theme.toggleLabel')).toBe('Tema oscuro');
+    expect(lookup('Theme.toggleLabel')).not.toMatch(/[{}<>]/);
+  });
+});

@@ -94,3 +94,45 @@ describe('SiteHeader hiding rule and wiring', () => {
     expect(header).not.toMatch(/SearchForm|SiteHeader/);
   });
 });
+
+// #398: the switch joins row 1. These pin the CSS rules the layout and the no-script path rest on; the header's
+// markup order is tests/unit/theme.test.ts and the one browser journey is J13 (tests/e2e/theme.spec.ts).
+describe('SiteHeader theme switch rules (#398)', () => {
+  it('hides the switch until the head script has set data-theme on html, and shows it only then', () => {
+    const css = read('src/components/ThemeSwitch.module.css');
+    expect(css).toMatch(/^\.switch\s*\{\s*display:\s*none;/m);
+    expect(css).toMatch(/:global\(html\[data-theme\]\)\s+\.switch\s*\{[^}]*display:\s*(?!none)[a-z-]+;/);
+  });
+
+  it('keys the switch on the attribute alone, never on a media query, so no script shows no switch', () => {
+    expect(read('src/components/ThemeSwitch.module.css')).not.toMatch(/@media/);
+  });
+
+  it('sizes the switch by the tap-target token, width and height', () => {
+    const css = read('src/components/ThemeSwitch.module.css');
+    expect(css).toMatch(/:global\(html\[data-theme\]\)\s+\.switch\s*\{[^}]*width:\s*var\(--tap-target\);/);
+    expect(css).toMatch(/:global\(html\[data-theme\]\)\s+\.switch\s*\{[^}]*height:\s*var\(--tap-target\);/);
+  });
+
+  it('gives the phone search box a 10rem basis and keeps 14rem from 40rem', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    expect(css).toMatch(/\.search\s*\{[^}]*flex:\s*1\s+1\s+10rem;/);
+    expect(css).toMatch(/@media \(min-width: 40rem\)\s*\{[\s\S]*?\.search\s*\{[^}]*flex-basis:\s*14rem;/);
+  });
+
+  it('places the trailing group against the right edge as one unit, and lets the car control size itself inside it', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    expect(css).toMatch(/\.trailing\s*\{[^}]*flex:\s*none;[^}]*margin-left:\s*auto;/);
+    expect(css).toMatch(/\.carInline\s*\{[^}]*min-width:\s*0;/);
+  });
+
+  it('has the public chrome read the Theme messages and hand the header its label', () => {
+    const chrome = read('src/app/PublicChrome.tsx');
+    expect(chrome).toContain("getTranslations('Theme')");
+    expect(chrome).toMatch(/themeLabel=\{\w+\('toggleLabel'\)\}/);
+  });
+
+  it('leaves the admin header without the switch', () => {
+    expect(read('src/components/admin/AdminHeader.tsx')).not.toMatch(/ThemeSwitch|theme-storage/);
+  });
+});
