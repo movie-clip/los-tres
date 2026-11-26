@@ -44,6 +44,7 @@ widths (390, 360, 195) and raise no visual-only finding on them: spacing,
 alignment, looks and taste are out. Review them at desktop width for function,
 the guardrails and copy correctness, and the other checks of this pack still
 apply. Public screens keep their full bar: phone and desktop, every state.
+Admin always renders the dark set (owner ruling #397 D-15), with no switch; review it in dark only.
 
 ## Where the design lives
 
@@ -96,6 +97,8 @@ already installs:
 npx playwright screenshot --viewport-size=390,844 --full-page --lang=es-ES <url> <run_dir>/screens/<nn>-<screen>-phone.png
 npx playwright screenshot --viewport-size=1280,800 --full-page --lang=es-ES <url> <run_dir>/screens/<nn>-<screen>-desktop.png
 ```
+
+Dark scheme: add `--color-scheme=dark` to `npx playwright screenshot`, or `colorScheme: 'dark'` in a script context. A stored choice: `context.addInitScript(() => localStorage.setItem('tema','oscuro'))`; `claro` the same.
 
 To see the configured legal pages export fake `OWNER_NAME`, `OWNER_NIF`, `OWNER_ADDRESS`, `CONTACT_EMAIL` (and `OWNER_REGISTRY`, empty or set) in the shell, run `docker compose up -d app`, then unset and run it again; the host `.env` `OWNER_*` are blank so `/aviso-legal` and `/privacidad` return 500 until then.
 
@@ -197,7 +200,14 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | car picker, steps without script | a Playwright context with `javaScriptEnabled: false`, open any page, press the car link: it lands on `/mi-coche?volver=...`; the make and model steps add `marca` and `modelo` (`/mi-coche?marca=seat&modelo=seat-leon-iii`; slugs are `makeSlug` and `modelSlug` in `src/db/vehicle-catalogue.ts`) |
 | car picker, dialog | with script, click `[data-testid=car-select]` (or `car-change` with a car); wait for `aria-haspopup="dialog"` first, since before hydration it is a link |
 | car header on the 404 and error page | with a stored car, the page reloads once to `?coche=` (D-18); the error page cannot resolve a car without a database, so it is not e2e-reachable with one |
-| car header heights | no car: one 64 px row with the control at its right edge (glyph only from 352 to 639 px); below 352 px the control wraps to its own row (112 px at 320 and 351); a selected car adds a 44 px row 2 (112 to 112.8 px at 352 to 1280; at 320 and 351 the label sits above the buttons: 138.4 px, 160.8 px at 320 with the longest car) |
+| car header heights | no car (category page), measured on 0d1f931: one 64 px row from 390 px up (field 79.9 px at 390, placeholder "Buscar" whole, car glyph and switch on the row), 112 px two rows from 352 to 389 px with car and switch right-aligned on row 2, and the same 112 px below 352 down to 22rem (320, 340); home and `/mi-coche` stay one 64 px row at 360 and 390 (no header search); a selected car adds a 44 px row 2 (112 to 112.8 px at 352 to 1280; at 320 and 351 the label sits above the buttons: 138.4 px, 160.8 px at 320 with the longest car) |
+| dark by system setting | `--color-scheme=dark` on the CLI (or `colorScheme: 'dark'` in a script context), empty storage |
+| dark by stored choice | init script `localStorage.setItem('tema','oscuro')`, light system |
+| light by stored choice | init script `tema=claro`, dark system |
+| theme switch absent | a context with `javaScriptEnabled: false` |
+| theme storage refused | init script making `localStorage.getItem` and `setItem` throw |
+| theme stored junk | init script `tema=otro` (follows the system setting) |
+| admin dark | signed in, light system, `tema=claro`: the admin still renders the dark set |
 | secondary button wrapped | `/buscar?q=zzzz` at 195 (wraps at 261 and below), `/categoria/filtros-de-aire?marca=no-existe` at 195, `/buscar?q=bosch%20aire&coche=<car>` at 195; two lines, 66 px tall |
 | retired car | not producible on the demo database (no retired vehicle in the shipped list); report not checked |
 | product, banner fits (S5.9; `<car>` is `seat-leon-iii-2012-2020-1-6-tdi-115cv`, `<bosch>` is `demo-filtro-de-aceite-bosch-of-3306`) | `/producto/<bosch>?coche=<car>` |

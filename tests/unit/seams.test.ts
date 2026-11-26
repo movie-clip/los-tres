@@ -1410,3 +1410,112 @@ describe('seams (guardrail 1, US-2.5 the not-public reason)', () => {
     }
   });
 });
+
+describe('seams (guardrail 5, #398 theme choice)', () => {
+  // The visitor's theme lives in this browser only: `localStorage` key `tema`, read by the head script and
+  // written by the switch, both client side. It is never a cookie, never a request, and the server never
+  // reads it. theme-storage.ts is the one file that names the key and the stored words.
+  const STORAGE = 'src/components/theme-storage.ts';
+  const code = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+  const KEY = /\btema\b/;
+  const STORED_WORDS = /['"`](claro|oscuro)['"`]/;
+  const importsStorage = /\btheme-storage\b/;
+  const importsSwitch = /\bThemeSwitch\b/;
+  const inDir = (file: string, dir: string) => file.startsWith(dir);
+
+  it('finds the files it pins, so the rules below are not vacuous', () => {
+    expect(code(STORAGE)).toMatch(/\bTHEME_STORAGE_KEY\b/);
+    expect(code('src/app/layout.tsx').length).toBeGreaterThan(0);
+    expect(code('src/components/ThemeSwitch.tsx').length).toBeGreaterThan(0);
+    expect(code('src/app/admin/layout.tsx').length).toBeGreaterThan(0);
+    expect(sources().filter(({ file }) => inDir(file, 'src/server/')).length).toBeGreaterThan(20);
+  });
+
+  it('names the key tema in theme-storage.ts and in no other file under src', () => {
+    expect(code(STORAGE)).toMatch(/'tema'/);
+    expect(offenders(KEY, (file) => file === STORAGE)).toEqual([]);
+  });
+
+  it('names the stored words claro and oscuro in theme-storage.ts and in no other file under src', () => {
+    expect(code(STORAGE)).toMatch(/claro/);
+    expect(code(STORAGE)).toMatch(/oscuro/);
+    expect(offenders(STORED_WORDS, (file) => file === STORAGE)).toEqual([]);
+  });
+
+  it('sees the key, a stored word and an import planted in a file that may not hold them', () => {
+    expect(KEY.test("localStorage.getItem('tema')")).toBe(true);
+    expect(KEY.test('const temas = 1')).toBe(false);
+    for (const planted of ["x === 'claro'", 'y === "oscuro"', 'z === `oscuro`']) expect(STORED_WORDS.test(planted), planted).toBe(true);
+    expect(STORED_WORDS.test("'Oscuro'")).toBe(false);
+    expect(importsStorage.test("import { chooseScheme } from '@/components/theme-storage';")).toBe(true);
+    expect(importsSwitch.test("import { ThemeSwitch } from './ThemeSwitch';")).toBe(true);
+  });
+
+  it('never names a cookie, a request or a beacon in theme-storage.ts', () => {
+    const storage = code(STORAGE);
+    expect(storage.length).toBeGreaterThan(0);
+    for (const word of [/cookie/i, /\bfetch\b/, /XMLHttpRequest/, /sendBeacon/, /WebSocket/, /\bnavigator\b/, /\bheaders\b/]) {
+      expect(storage, String(word)).not.toMatch(word);
+    }
+  });
+
+  it('writes document.cookie nowhere under src', () => {
+    expect(offenders(/document\s*\.\s*cookie/, () => false)).toEqual([]);
+  });
+
+  it('has the server read nothing of the scheme: no server file or proxy imports the storage module, and no src code but the storage module and the admin wrapper names the attribute or the media query', () => {
+    const serverSide = (file: string) => inDir(file, 'src/server/') || file === 'src/proxy.ts';
+    const serverImports = sources().filter(({ file, code: text }) => serverSide(file) && importsStorage.test(text));
+    expect(serverImports.map(({ file }) => file)).toEqual([]);
+    expect(offenders(/prefers-color-scheme/i, (file) => file === STORAGE)).toEqual([]);
+    expect(offenders(/\bdata-theme\b/, (file) => file === STORAGE || file === 'src/app/admin/layout.tsx')).toEqual([]);
+  });
+
+  it('lets only the root layout and the switch import theme-storage, and only the header import the switch', () => {
+    const importers = sources().filter(({ code: text }) => importsStorage.test(text));
+    expect(importers.map(({ file }) => file).sort()).toEqual(['src/app/layout.tsx', 'src/components/ThemeSwitch.tsx']);
+    const app = importers.filter(({ file }) => inDir(file, 'src/app/'));
+    expect(app.map(({ file }) => file)).toEqual(['src/app/layout.tsx']);
+    const switchUsers = sources().filter(({ file, code: text }) => importsSwitch.test(text) && file !== 'src/components/ThemeSwitch.tsx');
+    expect(switchUsers.map(({ file }) => file)).toEqual(['src/components/SiteHeader.tsx']);
+  });
+
+  it('puts the head script in the root layout as the constant, beside suppressHydrationWarning on html', () => {
+    const layout = code('src/app/layout.tsx');
+    expect(layout).toMatch(/\bTHEME_SCRIPT\b/);
+    expect(layout).toMatch(/__html:\s*THEME_SCRIPT\s*\}/);
+    expect(layout).toMatch(/\bsuppressHydrationWarning\b/);
+    expect(offenders(/\bTHEME_SCRIPT\b/, (file) => file === STORAGE || file === 'src/app/layout.tsx')).toEqual([]);
+  });
+
+  it('CR-3: reruns the head script through next/script afterInteractive, in head after the blocking one, for a document React renders on the client', () => {
+    const layout = code('src/app/layout.tsx');
+    expect(layout).toMatch(/import Script from 'next\/script';/);
+    const head = layout.slice(layout.indexOf('<head>'), layout.indexOf('</head>'));
+    expect(head.length).toBeGreaterThan(0);
+    const blocking = head.indexOf('<script ');
+    const rerun = head.indexOf('<Script ');
+    expect(blocking).toBeGreaterThan(-1);
+    expect(rerun).toBeGreaterThan(blocking);
+    const blockingTag = head.slice(blocking, head.indexOf('/>', blocking));
+    expect(blockingTag).toMatch(/__html:\s*THEME_SCRIPT\s*\}/);
+    expect(blockingTag).not.toMatch(/\b(async|defer)\b/);
+    const rerunTag = head.slice(rerun, head.indexOf('/>', rerun));
+    expect(rerunTag).toMatch(/\bid="[\w-]+"/);
+    expect(rerunTag).toMatch(/strategy="afterInteractive"/);
+    expect(rerunTag).toMatch(/__html:\s*THEME_SCRIPT\s*\}/);
+    expect(rerunTag).not.toMatch(/beforeInteractive|lazyOnload|worker/);
+    // Both run the one constant; neither builds script text from the request.
+    expect(head.match(/THEME_SCRIPT/g)).toHaveLength(2);
+    expect(head.match(/<script\b/g)).toHaveLength(1);
+    expect(head.match(/<Script\b/g)).toHaveLength(1);
+  });
+
+  it('keeps the admin dark by a server-rendered wrapper attribute, with no switch and no theme storage in any admin file', () => {
+    expect(code('src/app/admin/layout.tsx')).toMatch(/<div\b[^>]*\bdata-theme="dark"/);
+    const admin = sources().filter(({ file }) => ['src/app/admin/', 'src/components/admin/', 'src/server/admin/'].some((dir) => inDir(file, dir)));
+    expect(admin.length).toBeGreaterThan(20);
+    const named = admin.filter(({ code: text }) => importsStorage.test(text) || importsSwitch.test(text) || /\blocalStorage\b/.test(text));
+    expect(named.map(({ file }) => file)).toEqual([]);
+  });
+});

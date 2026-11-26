@@ -1,0 +1,16 @@
+/* The admin dark wrapper (issue 398). It carries data-theme="dark", so it stands in for body
+   inside admin: the body's own fill and text colour come from the root's tokens. It keeps
+   the body's flex column, so main still takes the slack under a short page. */
+.scheme {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  width: 100%;
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+.scheme > main {
+  flex: 1 0 auto;
+  width: 100%;
+}

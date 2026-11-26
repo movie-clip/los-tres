@@ -16,7 +16,7 @@
   flex: 1 1 10rem;
   max-width: max-content;
   min-width: 0;
-  color: var(--color-on-ink-muted);
+  color: var(--color-on-frame-muted);
   font-size: var(--text-md);
   font-weight: var(--weight-regular);
   line-height: var(--leading-snug);
@@ -25,7 +25,7 @@
 
 /* The car name is the bold part: light text, heavier weight. */
 .label strong {
-  color: var(--color-on-ink);
+  color: var(--color-on-frame);
   font-weight: var(--weight-medium);
 }
 
@@ -50,10 +50,10 @@
   max-width: 100%;
   min-height: var(--tap-target);
   padding: var(--space-0) var(--space-2);
-  border: 1px solid var(--color-on-ink-muted);
+  border: 1px solid var(--color-on-frame-muted);
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--color-on-ink);
+  color: var(--color-on-frame);
   font: inherit;
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
@@ -149,7 +149,7 @@
 }
 
 .button:hover {
-  background: var(--color-on-ink-line);
+  background: var(--color-on-frame-line);
   text-decoration: underline;
 }
 

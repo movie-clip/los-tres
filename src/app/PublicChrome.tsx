@@ -62,7 +62,7 @@ export async function getPickerLabels(): Promise<CarStrings['dialog']['picker']>
  * error boundary its finished strings. Not a route file.
  */
 export async function PublicChrome({ children }: { children: React.ReactNode }) {
-  const [t, tError, tNotFound, tSearch, tCar, tPicker, car, options, pickerLabels] =
+  const [t, tError, tNotFound, tSearch, tCar, tPicker, tTheme, car, options, pickerLabels] =
     await Promise.all([
       getTranslations('Footer'),
       getTranslations('Error'),
@@ -70,6 +70,7 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
       getTranslations('Search'),
       getTranslations('Car'),
       getTranslations('CarPicker'),
+      getTranslations('Theme'),
       getCarContext(),
       getPickerOptions(),
       getPickerLabels(),
@@ -146,6 +147,7 @@ export async function PublicChrome({ children }: { children: React.ReactNode }) 
         }}
         car={carControl}
         homeHref={withCar('/', slug)}
+        themeLabel={tTheme('toggleLabel')}
       />
       {children}
       <SiteFooter links={footerLinks} />

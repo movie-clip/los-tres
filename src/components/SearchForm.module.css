@@ -2,7 +2,7 @@
    hero (home band, on ink), page (the /buscar panel, on white) and header (the
    site header, on ink). Sizes here are this component's own, not global tokens:
    40rem the hero and page row width, 3.5rem their field and button height,
-   14rem and 26rem the header form basis and maximum, 5rem its field basis. */
+   14rem and 26rem the header form basis and maximum, 4.625rem its field basis. */
 .form {
   margin: 0;
 }
@@ -29,7 +29,7 @@
   flex: 1000 1 12rem;
   min-width: 0;
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
@@ -76,7 +76,7 @@
 }
 
 .hero .label {
-  color: var(--color-on-ink);
+  color: var(--color-on-frame);
 }
 
 .hero .input,
@@ -95,7 +95,7 @@
 }
 
 .form.hero .hint {
-  color: var(--color-on-ink-muted);
+  color: var(--color-on-frame-muted);
 }
 
 /* page: inside the white results panel. The field edge is the stronger border,
@@ -136,8 +136,11 @@
   min-width: 0;
 }
 
+/* 4.625rem (74 px) is the narrowest field that shows the placeholder word whole. It is
+   also the wrap threshold of the button: at 390 px with no car the box is about 171 px,
+   which holds 74 + 8 + the 84 px button on one line. */
 .header .input {
-  flex-basis: 5rem;
+  flex-basis: 4.625rem;
   font-size: var(--text-md);
   text-overflow: ellipsis;
 }
@@ -148,9 +151,11 @@
   opacity: 1;
 }
 
-/* The field is about 94px wide at 352px and the placeholder word "Buscar" needs more than
-   its text box leaves, so up to 22.5rem the field's inline padding is a step smaller. */
-@media (max-width: 22.5rem) {
+/* On phones the field can be as narrow as about 80 px (390 px, no car, one row), and the
+   placeholder word "Buscar" needs more than the text box a full padding leaves, so below
+   40rem the field's inline padding is a step smaller. The padding sits inside the field's
+   basis, so the row's wrap widths do not move. */
+@media (max-width: 39.99rem) {
   .header .input {
     padding-inline: var(--space-1);
   }

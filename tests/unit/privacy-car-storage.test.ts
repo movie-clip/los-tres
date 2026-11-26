@@ -23,8 +23,10 @@ const OWNER: OwnerIdentity = {
 // The ruled wording, typed out: the message file is not the oracle for itself.
 const D18 =
   `${SITE} no instala cookies en el navegador de los visitantes, por eso no verás ningún aviso de cookies. ` +
-  'Si eliges un coche, lo recordamos solo en tu propio navegador (almacenamiento local) para filtrar los productos; ' +
-  'no se envía a nuestros servidores ni se guarda en ellos, y puedes quitarlo cuando quieras desde el selector de coche.';
+  'Guardamos solo dos cosas en tu propio navegador (almacenamiento local), y solo cuando las eliges: ' +
+  'el coche, para filtrar los productos, y el tema claro u oscuro, para mostrarte el sitio como lo prefieres. ' +
+  'Ninguna de las dos se envía a nuestros servidores ni se guarda en ellos. ' +
+  'Puedes quitar el coche cuando quieras desde el selector de coche, y el tema, borrando los datos del sitio en tu navegador.';
 
 // D-22: the heading names both topics, so on its own it does not read as "nothing is stored".
 const HEADING = 'Cookies y almacenamiento local';

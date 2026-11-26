@@ -1,52 +1,154 @@
 # Design system
 
-Direction approved by the human on 2026-10-27 (S11.1, #242: "Q1 - Yes" on the direction, amber chosen by the designer, "ignore shadows and too complex effects for now"). The S5.1 and S5.2 system is the base. The tokens live in `src/app/globals.css` as CSS custom properties; where this document and that file differ, the file is the truth.
+> **Status, 2026-11-26.** This document records the system the owner approved in S14.1 (#397): Direction A, Taller, in a light and a dark scheme, with a theme switch (run `2026-11-26-397-ui-direction`, decisions D-1 to D-12). It is **approved, partly built**. #398 built the tokens, the dark set, the switch and the first paint with no flash; #399 builds the component and layout changes. Until #399 merges, the `*.module.css` files hold the **S11.1 layout values**, and where this document and the code differ, the code shows what ships today.
+>
+> **Built (#398):** the dark set in both of its forms (`html[data-theme='dark']` and the no-script media fallback); the tokens `--color-frame`, `--color-on-frame`, `--color-on-frame-muted`, `--color-on-frame-line`, `--color-scrim`, `--font-display`, `--font-mono`, `--elevation-1`, `--elevation-2`; the frame, scrim and field-edge colour swaps in the modules; the Theme switch with its first paint and storage; admin always dark; the header's trailing group (car control, then switch).
+>
+> **Not yet built (everything marked "A" below, #399):** the A values of spacing, radius, type and `--content-width`; the monospace part numbers; the list-row product card, the row category tile, the two-column home masthead, the 52 px header and the rest of the changed Site header, Car control, Search form, Offer panel, Chip, Primary and Secondary button, Footer, Page notice, Car picker dialog and Image placeholder rows. **Built today besides the above:** the S11.1 layout and every row of the S11.1 component table below. The light values of A equal the S11.1 values, apart from the new frame family, which equals the former ink fill of the frame.
+
+## Approval (S14.1, #397, run `2026-11-26-397-ui-direction`)
+
+The rulings this document relies on, stated here so it stands without the run:
+
+- **Direction (D-1):** the owner chose A, Taller, over B (Escaparate) and C (Catálogo), which were considered and not chosen.
+- **First visit (D-2):** follows the system setting (`prefers-color-scheme`); with no preference, light.
+- **Switch (D-3):** two states, Claro and Oscuro; there is no third "Sistema" state and no way back to following the system.
+- **Scope line (D-4):** recorded in `docs/product/mvp.md`: public site in light and dark, with a switch the visitor controls (choice kept in the browser only), in Direction A Taller.
+- **New tokens (D-5):** the frame family, `--color-scrim`, `--font-display` and `--font-mono`; the elevation tokens are `none` in A.
+- **Storage (D-6):** `localStorage` key `tema`, values `claro` and `oscuro`, written only on a press; no cookie, nothing sent to the server.
+- **First paint (D-7):** the right scheme shows with no flash (the mechanism is #398's); without script the page follows the system setting and the switch is not rendered.
+- **Filters place (D-8):** the E15 filter region is reserved, never a design; see § Reserved places.
+- **Assistant place (D-9):** the E16 assistant line is reserved, never a design; see § Reserved places.
+- **Review (D-10):** UX review of the build runs on #398 and #399 against the checks of the UX spec, not now. **Build split (D-11):** #398 tokens, dark set, switch, first paint; #399 the component deltas per page family.
+- **Dark values (D-12):** computed, not tried on a real screen; the owner is to look at the dark screens on a phone, and a value may change after that.
 
 ## Principles
 
 1. **Scan, then click.** The visitor knows what they want. Every list reads in one fixed order, in the same place on every row: what it is, then what it costs (or how much is there), then where it goes.
 2. **The price is the truth.** Prices are final, IVA included, and a page that shows prices says so once, near the top. No shipping, no totals. The price is the boldest type in its card or row and carries no colour of its own: a coloured price reads as a discount, and the site shows none.
-3. **Plain beats clever.** One typeface, one accent, one ink, no shadows, no motion. Trust comes from consistency.
-4. **The brand is the frame; the list is calm.** The bold elements are the ink frame (header, home masthead, footer) and the amber primary button (the shop link, and the search button on the home page). Nothing inside a list competes with the price.
+3. **Plain beats clever.** One typeface family (system-ui, with a monospace face for part numbers), one accent (amber), one strong colour (ink), no shadows, no motion. Trust comes from consistency. The two schemes carry the same hierarchy: only the values change. (A; S11.1 read: one typeface, one accent, one ink.)
+4. **The frame is the brand; the list is calm.** The bold elements are the frame (header, home masthead, footer) and the amber primary button (the shop link, and the search button on the home page). In dark the frame is the darkest surface on the page. Nothing inside a list competes with the price. (A; S11.1 called the frame "the ink frame".)
+5. **Two schemes, one system.** (A) Every colour is a token with a light and a dark value; no module writes a colour. Light is the fallback; a visitor with a dark system setting gets dark with no choice to make.
+
+## Schemes
+
+Built (#398). Light and dark are both complete; S11.1 was light only.
+
+- Light is in `:root` (`color-scheme: light`). Dark is `html[data-theme='dark']`, set by a blocking inline script in the `head` of the root layout before the body is parsed, so no frame shows the wrong scheme. The script always sets `data-theme` to `light` or `dark` when it runs; the attribute is absent only when there is no script.
+- The public 500 page is a client-rendered error shell, where a head inline script does not run: the root layout reruns the same script with `next/script` (`afterInteractive`, in `head`, so it takes effect before the switch reads the attribute). On a normal page the script therefore runs twice and the second run sets the value already there; nothing is written. The 500 page shows the switch and honours a stored `tema`.
+- The dark declarations are written twice in `globals.css`, identical and pinned equal by `tests/unit/styles.test.ts`: once for `:root[data-theme='dark']` and `[data-theme='dark']` (the second selector is what the admin wrapper uses), once under `@media (prefers-color-scheme: dark)` for `:root:not([data-theme])`. Every alias token (`--color-link`, `--color-focus`, `--color-on-ink-line`, `--focus-ring`, `--focus-ring-on-ink`) is redeclared in the dark block, so it resolves on any element that carries the attribute. `light-dark()` is not used: it is unsupported on iOS before 17.5 and would drop every colour there.
+- First order of choice at first paint: a stored `tema` (`claro` or `oscuro`) wins; otherwise `prefers-color-scheme`; no preference, or storage that is unreadable, or a stored value that is neither word, means the system setting, and with none, light. The script never writes storage.
+- The visitor's choice is kept in `localStorage` key `tema` (`claro` or `oscuro`), written only on a press of the switch, and nowhere else: no cookie, no server, no request carries it, nothing logs it (guardrail 5; the selected car is the only other browser-stored value). `src/components/theme-storage.ts` owns the key and the script; `tests/unit/seams.test.ts` pins that no other `src` file names it.
+- The page declares both schemes (`color-scheme` is `light` on `:root` and `dark` inside the dark set, so native controls, scrollbars and the select arrow follow).
+- Without script the page follows the system setting through the media fallback, and the switch is not rendered (it is hidden until `html[data-theme]` exists).
+- A change of the system setting during a page view is not followed; the next load follows it (#398 D-10). The switch reads the root attribute as its one source of state.
+- Admin: see § Components, Admin note below.
 
 ## Palette
 
-Light only: `color-scheme: light`. Every colour is a semantic token in one `:root`, so a later dark scheme redefines values and touches no component, provided no module writes a raw colour.
+Approved and built (#398). Every colour is a semantic token with a light and a dark value; the light column is the S11.1 value, except the five NEW tokens. Every colour stays a token: no module writes a raw colour.
 
-| Token | Value | Role | Contrast |
+| Token | Light | Dark | Role |
 |---|---|---|---|
-| `--color-bg` | `#ffffff` | surface: card, panel, input | n/a |
-| `--color-canvas` | `#f4f5f7` | page background behind the cards (the `body`) | n/a |
-| `--color-ink` | `#15181d` | header, masthead, footer, links, focus ring, card hover border | 17.8:1 on `--color-bg`, 16.3:1 on `--color-canvas` |
-| `--color-chip-bg` | `#e9ebef` | chip fill, home tile drawing box, image placeholder fill | n/a |
-| `--color-chip-text` | `#3b414a` | chip label | 8.6:1 on `--color-chip-bg` |
-| `--color-tile-bg` | `#f4f5f7` | defined; the home category tile no longer uses it (the tile is `--color-bg`) | n/a |
-| `--color-text` | `#1a1a1a` | headings, titles, body | 17.4:1 on `--color-bg`, 15.95:1 on `--color-canvas` |
-| `--color-muted` | `#555555` | secondary text: brand, counts, notes, dates | 7.5:1 on `--color-bg`, 6.8:1 on `--color-canvas` |
-| `--color-on-ink` | `#ffffff` | text on ink | 17.8:1 |
-| `--color-on-ink-muted` | `#c5cad3` | masthead tagline | 10.8:1 on `--color-ink` |
-| `--color-price` | `#15181d` | every price; its own token so it can change in one place | 17.8:1 on `--color-bg` |
-| `--color-border` | `#dcdfe4` | card outline, dividers | 1.3:1, decorative only (never the only cue) |
-| `--color-border-strong` | `#7d838e` | control edges and interactive chips | 3.8:1 on `--color-bg` |
-| `--color-on-ink-line` | `#2d323a` | hairline between header and masthead | decorative |
-| `--color-accent` | `#ffb800` | shop and search button fill, header rule, masthead bar, notice rule, focus ring on ink | 10.3:1 on `--color-ink` as a non-text mark |
-| `--color-accent-hover` | `#f0a800` | shop button hover fill | label 8.7:1 |
-| `--color-accent-active` | `#d99a00` | shop button pressed fill | label 7.3:1 |
-| `--color-accent-edge` | `#a06e00` | 1px edge on the shop button | 4.4:1 on `--color-bg` |
-| `--color-on-accent` | `#15181d` | label on amber | 10.3:1 on `--color-accent` |
-| `--color-link` | `var(--color-ink)` | links, admin filled-button fill, outlined control border and text, admin notice rule | as ink |
-| `--color-focus` | `var(--color-ink)` | focus ring on light surfaces | 17.8:1 on `--color-bg` |
-| `--color-success` / `--color-success-bg` | `#17603a` / `#e6f4ea` | state text on its tint | 6.7:1 |
-| `--color-warning` / `--color-warning-bg` | `#7a4a00` / `#fff3d1` | state text on its tint; the demo notice uses the tint | 6.8:1 |
-| `--color-danger` / `--color-danger-bg` | `#a8201a` / `#fdeceb` | state text on its tint | 6.4:1 |
-| `--color-info` / `--color-info-bg` | `#0b5cad` / `#e7f0fa` | state text on its tint | 5.8:1 |
-| `--color-disabled-bg` / `--color-disabled-text` | `#e4e6ea` / `#6b717b` | disabled control | 3.9:1, exempt while disabled |
+| `--color-bg` | `#ffffff` | `#171a1f` | surface: card, panel, input, dialog sheet |
+| `--color-canvas` | `#f4f5f7` | `#0f1114` | page background (the body) |
+| `--color-ink` | `#15181d` | `#e9ecf1` | strong text and strong fills: selected chip, best-price tag, secondary-button hover; NOT the frame any more |
+| `--color-chip-bg` | `#e9ebef` | `#252a32` | chip fill, drawing box, image placeholder |
+| `--color-chip-text` | `#3b414a` | `#d0d5dd` | chip label |
+| `--color-tile-bg` | `#f4f5f7` | `#0f1114` | defined, unused (as today) |
+| `--color-text` | `#1a1a1a` | `#eceef2` | headings, titles, body |
+| `--color-muted` | `#555555` | `#a4abb6` | secondary text |
+| `--color-on-ink` | `#ffffff` | `#101317` | text on an ink fill |
+| `--color-on-ink-muted` | `#c5cad3` | `#454d5a` | muted text on an ink fill (selected chip count) |
+| `--color-price` | `#15181d` | `#f5f7fa` | every price; its own token so it can change in one place |
+| `--color-border` | `#dcdfe4` | `#2a3039` | card outline, dividers (decorative) |
+| `--color-border-strong` | `#7d838e` | `#707987` | control edges, interactive chips, header search edge |
+| `--color-accent` | `#ffb800` | `#ffb800` | shop and search button fill, rules and bars |
+| `--color-accent-hover` | `#f0a800` | `#ffc733` | button hover fill |
+| `--color-accent-active` | `#d99a00` | `#e5a400` | button pressed fill |
+| `--color-accent-edge` | `#a06e00` | `#c98f00` | 1px edge of the primary button |
+| `--color-on-accent` | `#15181d` | `#15181d` | label on the primary button |
+| `--color-link` | `#15181d` | `#e9ecf1` | links, admin filled-button fill, outlined control border and text, admin notice rule |
+| `--color-focus` | `#15181d` | `#e9ecf1` | focus ring on page surfaces |
+| `--color-success` | `#17603a` | `#6bd49a` | state text |
+| `--color-success-bg` | `#e6f4ea` | `#10301f` | its tint |
+| `--color-warning` | `#7a4a00` | `#f2c35e` | state text |
+| `--color-warning-bg` | `#fff3d1` | `#33270a` | its tint; the demo notice fill |
+| `--color-danger` | `#a8201a` | `#ff8f87` | state text |
+| `--color-danger-bg` | `#fdeceb` | `#3a1513` | its tint |
+| `--color-info` | `#0b5cad` | `#8fbfff` | state text |
+| `--color-info-bg` | `#e7f0fa` | `#0f2842` | its tint |
+| `--color-disabled-bg` | `#e4e6ea` | `#20252c` | disabled control fill |
+| `--color-disabled-text` | `#6b717b` | `#7d8591` | disabled control text |
+| `--color-frame` | `#15181d` | `#08090b` | NEW. Fill of header, home masthead and footer |
+| `--color-on-frame` | `#ffffff` | `#f4f6f9` | NEW. Text on the frame |
+| `--color-on-frame-muted` | `#c5cad3` | `#aab1bc` | NEW. Muted text and control edge on the frame |
+| `--color-on-frame-line` | `#2d323a` | `#272c34` | NEW. Hairline on the frame; hover fill of frame controls (replaces `--color-on-ink-line`) |
+| `--color-scrim` | `rgba(10, 12, 16, 0.6)` | `rgba(0, 0, 0, 0.7)` | NEW. Dialog backdrop (replaces ink at opacity 0.6) |
 
-Amber is never text on a light surface (1.7:1 on white): it is a fill, a rule, or a ring on ink. The success and danger tokens are first used publicly by the Fit mark (S5.8): check on green for "Compatible", cross on red for "No compatible", each with its words, measured at the computed token values on a listing page. The info token is still defined for a later story; warning is consumed by the demo notice and the Listing note, and `--color-info` is the only place `#0b5cad` survives. There is no second link colour: links are ink, told apart by underline and weight. Admin keeps its rule that no colour alone says an error.
+**Why the frame is split from ink.** Today `--color-ink` is two things: the fill of header, masthead and footer, and the colour of links, the focus ring, selected chips, the best-price tag and the secondary-button hover. In dark those cannot share one value. So `--color-ink` keeps its name and becomes the strong colour (dark in light, light in dark) and no longer fills the frame; `--color-on-ink` and `--color-on-ink-muted` stay the text on an ink fill; the frame family carries the frame. `--color-on-ink-line` stays as an alias of `--color-on-frame-line` until the modules move. `--focus-ring-on-ink` keeps its name and means "ring on the frame": amber. The dark frame `#08090b` is darker than the canvas `#0f1114`, so header, masthead and footer stay a band under the amber top rule.
+
+**Contrast, computed (WCAG 2.1 relative luminance; 4.5:1 for text, 3:1 for component edges and rings).** The floor-bearing pairs of this table are enforced by `tests/unit/styles.test.ts` (#398), in the light block, the dark block and the media copy: the test types its own pair list and computes the ratios from the parsed values, so a value edit that keeps AA passes and one that falls below the floor fails. The decorative pairs and the disabled pair are not enforced. The lowest text pair is 5.79:1 in light and 6.24:1 in dark; the lowest component pair is 3.49:1 in light and 3.96:1 in dark. No pair is below AA. Light values are today's, so the S11.1 contrast figures stand for the light scheme.
+
+| Pair (on background) | Need | Light | Dark |
+|---|---|---|---|
+| `text` on `bg` | 4.5:1 | 17.40 | 15.02 |
+| `text` on `canvas` | 4.5:1 | 15.95 | 16.28 |
+| `text` on `warning-bg` (demo notice) | 4.5:1 | 15.74 | 12.60 |
+| `muted` on `bg` | 4.5:1 | 7.46 | 7.54 |
+| `muted` on `canvas` | 4.5:1 | 6.83 | 8.18 |
+| `muted` on `chip-bg` | 4.5:1 | 6.25 | 6.24 |
+| `chip-text` on `chip-bg` | 4.5:1 | 8.62 | 9.78 |
+| `price` on `bg` | 4.5:1 | 17.79 | 16.25 |
+| `link` on `bg` | 4.5:1 | 17.79 | 14.73 |
+| `link` on `canvas` | 4.5:1 | 16.31 | 15.97 |
+| `link` on `chip-bg` (pressed link) | 4.5:1 | 14.91 | 12.18 |
+| `on-frame` on `frame` (site name, footer links) | 4.5:1 | 17.79 | 18.40 |
+| `on-frame-muted` on `frame` (tagline, car label) | 4.5:1 | 10.81 | 9.22 |
+| `on-accent` on `accent` (primary button) | 4.5:1 | 10.26 | 10.26 |
+| `on-accent` on `accent-hover` | 4.5:1 | 8.73 | 11.41 |
+| `on-accent` on `accent-active` | 4.5:1 | 7.26 | 8.17 |
+| `on-ink` on `ink` (selected chip, best-price tag) | 4.5:1 | 17.79 | 15.73 |
+| `on-ink-muted` on `ink` (selected chip count) | 4.5:1 | 10.81 | 7.20 |
+| `success` on `success-bg` | 4.5:1 | 6.67 | 7.86 |
+| `warning` on `warning-bg` | 4.5:1 | 6.77 | 8.88 |
+| `danger` on `danger-bg` | 4.5:1 | 6.37 | 7.35 |
+| `info` on `info-bg` | 4.5:1 | 5.79 | 7.89 |
+| `border-strong` on `bg` (field, outlined chip) | 3:1 | 3.81 | 3.96 |
+| `border-strong` on `canvas` | 3:1 | 3.49 | 4.30 |
+| `focus` ring on `bg` | 3:1 | 17.79 | 14.73 |
+| `focus` ring on `canvas` | 3:1 | 16.31 | 15.97 |
+| ring on frame (amber) on `frame` | 3:1 | 10.26 | 11.49 |
+| `accent-edge` on `bg` (primary button edge) | 3:1 | 4.44 | 6.16 |
+| `accent` on `frame` (rule, bar; non-text) | 3:1 | 10.26 | 11.49 |
+| `on-frame` on `on-frame-line` (control hover fill) | 4.5:1 | 12.89 | 12.96 |
+| `on-frame-muted` on `frame` (car and theme control edge) | 3:1 | 10.81 | 9.22 |
+| `border-strong` on `frame` (header search field edge) | 3:1 | 4.67 | 4.53 |
+| `border` on `canvas` (card edge, decorative) | n/a | 1.22 | 1.42 |
+| `disabled-text` on `disabled-bg` (exempt while disabled) | 3:1 | 3.93 | 4.14 |
+
+Amber is never text on a light surface (1.7:1 on white): it is a fill, a rule, or a ring on the frame (in dark too). Card edges are decorative and carry no meaning alone. The success and danger tokens are first used publicly by the Fit mark (S5.8): check on green for "Compatible", cross on red for "No compatible", each with its words. The info token is still defined for a later story; warning is consumed by the demo notice and the Listing note. There is no second link colour: links are ink, told apart by underline and weight. Admin keeps its rule that no colour alone says an error. The scheme never carries meaning alone: a state is always in words.
 
 ## Type
 
-System-ui stack, `--font-sans`, the one swap point if a font is ever added (self-hosted only). No size below `--text-sm`. Weights are `--weight-regular` 400, `--weight-medium` 600 and `--weight-bold` 700 only.
+System-ui stack, `--font-sans`, the one swap point for the sans face if a font is ever added (self-hosted only). A adds `--font-display` (equal to `--font-sans`; the role per face, so a later swap touches one token) and `--font-mono` for part numbers and EANs. No size below `--text-sm`. Weights are `--weight-regular` 400, `--weight-medium` 600 and `--weight-bold` 700 only. No web font is loaded.
+
+**Approved (A, not built)**
+
+| Role | Token | Size | Weight | Where |
+|---|---|---|---|---|
+| Display | `--text-display` | 1.875rem at 390 up to 2.625rem at 1280 | 700, tight | home masthead h1; at 14rem and below the h1 uses `--text-title` |
+| Page title | `--text-xl` | 1.75rem | 700, tight | category, search, legal and admin h1 |
+| Product title | `--text-title` | 1.375rem at 390 up to 1.75rem at 1280 | 700, tight | product h1 |
+| Price | `--text-price` | 1.375rem (card), 1.5rem (offer row and product summary) | 700, tabular figures | every price |
+| Section title | `--text-lg` | 1.125rem | 700, snug | home "Elige una categoría", offers h2, empty-state heading, wordmark |
+| Body, card title, tile name | `--text-md` | 0.9375rem | 400; card title 600, tile name 700 | body `--leading-body` 1.5 |
+| Small | `--text-sm` | 0.875rem | 400; chip 600 | brand, "Desde", counts, notes, dates, footer, chip |
+| Part number, EAN | `--font-mono` | 0.875rem | 400 | "Ref." on cards, Referencia and EAN values; wraps with `overflow-wrap: anywhere` |
+
+`--font-mono` is `ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, 'Liberation Mono', monospace`.
+
+**S11.1 (built today; superseded by the table above)**
 
 | Role | Token | Size | Weight | Where |
 |---|---|---|---|---|
@@ -60,19 +162,83 @@ System-ui stack, `--font-sans`, the one swap point if a font is ever added (self
 
 ## Spacing, shape, layout
 
-- Spacing: `--space-0` 0.25rem, `--space-1` 0.5rem, `--space-2` 1rem, `--space-3` 1.5rem, `--space-4` 3rem. Fluid values are tokens: `--gutter` (page side padding, 1rem up to 1.5rem), `--page-pad-block` (`.page` top and bottom, 1.5rem up to 2.5rem), `--card-padding` (1rem up to 1.5rem), `--grid-gap` (1rem up to 1.5rem). They are `clamp()` values, so layout needs no media query for them.
-- Radius: `--radius-lg` (0.75rem) on cards, panels, sheets and the home category tile; `--radius-md` (0.5rem) on buttons, fields, the placeholder, the tile's drawing box and the category links of the root category page; `--radius-pill` on chips; `--radius-sm` (0.25rem) is used by the best-price tag and by the pressed fill of the text links (breadcrumb link, home root link). `--radius` is an alias of `--radius-md` so admin files compile unchanged. Admin buttons and text fields stay square (their files set `border-radius: 0`).
-- Page shell: `.page`, max width `--content-width` (64rem), `--page-pad-block` top and bottom, `--gutter` on the sides. Phone content is 358 px wide at 390; desktop content is 976 px wide at 1280.
+**Approved (A; #399 builds the values and the layout).** Built by #398: the last three rows of the table, `--font-display`, `--font-mono`, `--elevation-1` and `--elevation-2`. The other rows are not built.
+
+| Token | A value | S11.1 value (built today) |
+|---|---|---|
+| `--space-0` | 0.25rem | 0.25rem |
+| `--space-1` | 0.5rem | 0.5rem |
+| `--space-2` | 0.875rem | 1rem |
+| `--space-3` | 1.25rem | 1.5rem |
+| `--space-4` | 2.5rem | 3rem |
+| `--gutter` | clamp(0.875rem, 0.4rem + 2.2vw, 1.25rem) | clamp(1rem, 0.4rem + 2.4vw, 1.5rem) |
+| `--page-pad-block` | clamp(1rem, 0.75rem + 1.6vw, 1.75rem) | clamp(1.5rem, 1rem + 2vw, 2.5rem) |
+| `--card-padding` | clamp(0.75rem, 0.5rem + 1.4vw, 1rem) | clamp(1rem, 0.5rem + 2vw, 1.5rem) |
+| `--grid-gap` | 0.5rem | clamp(1rem, 0.6rem + 1.6vw, 1.5rem) |
+| `--content-width` | 72rem | 64rem |
+| `--tap-target` | 2.75rem (44 px floor unchanged) | 2.75rem |
+| `--radius-sm` | 0.125rem | 0.25rem |
+| `--radius-md` | 0.25rem | 0.5rem |
+| `--radius-lg` | 0.375rem | 0.75rem |
+| `--radius-pill` | 0.25rem | 999px |
+| `--leading-tight` | 1.15 | 1.2 |
+| `--leading-snug` | 1.35 | 1.4 |
+| `--leading-body` | 1.5 | 1.5 |
+| `--tracking-tight` | -0.015em | -0.01em |
+| `--font-display` | var(--font-sans) | (none) |
+| `--font-mono` | ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, 'Liberation Mono', monospace | (none) |
+| `--elevation-1`, `--elevation-2` | none | (none) |
+
+Type sizes are in § Type. Layout rules of A:
+
+- Radius: 2, 4 and 6 px; `--radius-pill` is 4 px, so chips are tags. `--radius` stays an alias of `--radius-md`. Admin buttons and text fields stay square.
+- Page shell: `.page` at `--content-width`, `--page-pad-block` top and bottom, `--gutter` on the sides; the header, masthead and footer inner elements share the column.
+- Result lists (category, search): one bordered container of rows with hairlines between them; no card grid. Phone: a row with a 3.25rem drawing box, the text and a footer row. From 40rem: four columns (box, text, shop chip, price).
+- Tile grid (home): one column below 40rem, two from 40rem, four from 64rem.
+- Home masthead: from 52rem two columns, headline left and the search in a panel right; below 52rem stacked.
+- Category page: from 64rem there may be a 15rem left column for filters (E15) when filters exist; with none, the list is full width and no empty column is drawn (see § Reserved places).
+- Product page: one column at every width, `--space-2` apart; from 52rem the hero is the drawing box (8rem), the text and a 15rem price column set off by a left edge.
+- No shadow and no motion, as today; hover and pressed are told apart by fill, border colour and underline only. `--elevation-1` and `--elevation-2` are `none` in A and exist so a later direction needs no new name.
+
+**S11.1 rules.** What follows is the S11.1 system, which `globals.css` holds today. A bullet whose lead says "(A: superseded)" is replaced by the approved values above once #398 and #399 merge; its measurements, in pixels, are S11.1 figures to be taken again on the build. Every other bullet carries over to A unchanged.
+
+- (A: superseded, values in the table above) Spacing: `--space-0` 0.25rem, `--space-1` 0.5rem, `--space-2` 1rem, `--space-3` 1.5rem, `--space-4` 3rem. Fluid values are tokens: `--gutter` (page side padding, 1rem up to 1.5rem), `--page-pad-block` (`.page` top and bottom, 1.5rem up to 2.5rem), `--card-padding` (1rem up to 1.5rem), `--grid-gap` (1rem up to 1.5rem). They are `clamp()` values, so layout needs no media query for them.
+- (A: superseded) Radius: `--radius-lg` (0.75rem) on cards, panels, sheets and the home category tile; `--radius-md` (0.5rem) on buttons, fields, the placeholder, the tile's drawing box and the category links of the root category page; `--radius-pill` on chips; `--radius-sm` (0.25rem) is used by the best-price tag and by the pressed fill of the text links (breadcrumb link, home root link). `--radius` is an alias of `--radius-md` so admin files compile unchanged. Admin buttons and text fields stay square (their files set `border-radius: 0`).
+- (A: superseded for the width, 72rem) Page shell: `.page`, max width `--content-width` (64rem), `--page-pad-block` top and bottom, `--gutter` on the sides. Phone content is 358 px wide at 390; desktop content is 976 px wide at 1280.
 - Header, masthead and footer share the column: their inner element uses the same max width and `--gutter`, so the site name lines up with the page content at every width (x = 16 at 390, x = 152 at 1280).
 - Canvas and cards: the `body` is `--color-canvas`; cards, panels and sheets are `--color-bg` with a 1px `--color-border`. Cards stand off the canvas by fill and border only.
-- Card grid: below 40rem one column; from 40rem `repeat(auto-fill, minmax(min(16rem, 100%), 1fr))`, gap `--grid-gap`: one column at 390, two at 768, three at 1280.
-- Tile grid (home): one column below 40rem; from 40rem `repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr))`, gap `--grid-gap`, each tile capped at 22rem. `auto-fit` drops empty tracks, so four tiles fill the row in four equal columns. The 9.5rem minimum, the 22rem cap and the 4rem and 5rem drawing boxes are constants of the tiles component, not global tokens.
-- Product page: the breadcrumb, the hero, the Fit banner (with a selected car), the offer panel, the Vehicle list (when the product has counted fitment) and the description card sit in one column at every width, `--grid-gap` apart. From 52rem the hero is three columns (image, text, a 15rem price column set off by a left edge); below it the hero is the image and text on top and the price group under a hairline. The two-column layout (`minmax(0, 1fr)` and `minmax(0, 26rem)`) is removed.
-- Car control and header: the no-car control adds two ranges, `min-width: 22rem` with `max-width: 39.99rem` (glyph alone) and `max-width: 21.99rem` (the control wraps onto its own row); a media query cannot use a token, so 22rem and 40rem are written as 21.99rem and 39.99rem ranges. The header's own row gap and search basis use 39.99rem and 40rem. The dialog uses 40rem. A selected car adds a third range, `min-width: 22rem` with `max-width: 23.43rem` (352 to 374 px; 23.43rem is 374.88 px, the width where the label's 10rem basis, the gap and the buttons first fit one row): the label (basis 0, two lines, then an ellipsis) and the buttons share one row, the buttons take `--space-1` inline padding and `--space-0` between them, so the header is 112.8 px as from 375 px. Below 22rem the label sits above the buttons.
+- (A: superseded for the category and search lists, which become rows; the grid stays for any other card list) Card grid: below 40rem one column; from 40rem `repeat(auto-fill, minmax(min(16rem, 100%), 1fr))`, gap `--grid-gap`: one column at 390, two at 768, three at 1280.
+- (A: superseded, two columns from 40rem and four from 64rem) Tile grid (home): one column below 40rem; from 40rem `repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr))`, gap `--grid-gap`, each tile capped at 22rem. `auto-fit` drops empty tracks, so four tiles fill the row in four equal columns. The 9.5rem minimum, the 22rem cap and the 4rem and 5rem drawing boxes are constants of the tiles component, not global tokens.
+- (A: the hero drawing box is 8rem; the rest carries over) Product page: the breadcrumb, the hero, the Fit banner (with a selected car), the offer panel, the Vehicle list (when the product has counted fitment) and the description card sit in one column at every width, `--grid-gap` apart. From 52rem the hero is three columns (image, text, a 15rem price column set off by a left edge); below it the hero is the image and text on top and the price group under a hairline. The two-column layout (`minmax(0, 1fr)` and `minmax(0, 26rem)`) is removed.
+- (A: the header is 52 px on one row at 390 and 1280, see Site header; the heights below are S11.1 measurements) Car control and header: the no-car control adds two ranges, `min-width: 22rem` with `max-width: 39.99rem` (glyph alone) and `max-width: 21.99rem` (the control wraps onto its own row); a media query cannot use a token, so 22rem and 40rem are written as 21.99rem and 39.99rem ranges. The header's own row gap and search basis use 39.99rem and 40rem. The dialog uses 40rem. A selected car adds a third range, `min-width: 22rem` with `max-width: 23.43rem` (352 to 374 px; 23.43rem is 374.88 px, the width where the label's 10rem basis, the gap and the buttons first fit one row): the label (basis 0, two lines, then an ellipsis) and the buttons share one row, the buttons take `--space-1` inline padding and `--space-0` between them, so the header is 112.8 px as from 375 px. Below 22rem the label sits above the buttons.
 - Media queries: public layout uses four. Pagination has one at `max-width: 24rem` (its grid fallback). The Car control adds one constant of its own, 23.43rem (374.88 px), the upper end of its 22rem to 23.43rem range for a selected car. The product page uses 52rem (hero columns), 40rem (offer row on one line) and 14rem (head stacks, detail terms stack above their values, the offer row becomes one column), all values already used elsewhere and no new value, and the home category tiles have two: `min-width: 40rem` (row becomes a vertical card) and `max-width: 14rem` (a phone at 200% zoom: drawing stacked above the name, count and chevron on one row, the count may wrap). The ranges never overlap. The category product card and grid add no new value: they reuse the tiles' 40rem and 14rem. The admin components have two more at `max-width: 40rem`. Everything else is fluid `clamp()` and `flex-wrap`.
 - No shadow: `box-shadow` is not used and no token exists for it. No motion: no `transition`, `transform` or `animation`; states change instantly and nothing moves or changes size on hover. Hover and pressed are told apart by fill colour, border colour and underline only. Chevrons are `clip-path` shapes on an empty `::after`, not rotated borders. The one icon on the site is the car glyph of the Car control, drawn the same way (an empty `aria-hidden` span clipped with `clip-path: path()`); no image, SVG file or icon font. A masthead is a normal full-width block, never `100vw`.
 
 ## Components
+
+### Approved Direction A rows (#399 builds them; the Theme switch is built, #398)
+
+For each component below, this row **wins** over the S11.1 row of the same name in the next table; the S11.1 row still supplies the states, measurements and rules this row does not restate. Rows of the S11.1 table that are not named here carry over unchanged, with one rename: where a carried-over row sits on the frame (Masthead apart from its two-column layout, Search form on the masthead, the Car picker's header row 2 and the Car control), read `--color-on-ink*` as `--color-on-frame*` once the build lands. Admin rows take the new token values and are not restyled.
+
+| Component | Anatomy and states |
+|---|---|
+| Site header | Fill `--color-frame`; a 3px `--color-accent` rule on its top edge (was 4) and a 1px `--color-on-frame-line` rule under it on every page (today only on home); one inner row at `--content-width` and `--gutter`, 52 px tall at 390 and 1280; site name link `--text-lg` 800 in `--color-on-frame` with a 0.625rem amber square before it, at least `--tap-target` tall; right: the header Search form (hidden on pages that carry their own), the Car control, then the Theme switch. The header search field always carries a 1px `--color-border-strong` edge (the dark frame needs it, 4.5:1 on frame). Phone, no car: name, search field (about 75 px wide at 390, placeholder "Buscar"), search button, car glyph button and theme toggle in one row; a selected car adds row 2 as today. **Built by #398 (the rest of this row is #399):** the car control (when no car is selected) and the switch sit in one trailing group, `.trailing`, that wraps as a unit and is never split; with a car selected the group holds the switch only and the car stays on row 2. The phone search basis is 10rem (was 11rem; 14rem from 40rem, unchanged), and the header field inside it has a basis of 4.625rem (74 px, was 5rem), so at 390 px the field, its gap and the button fit one line. With no car the header is one 64 px row from 390 px; from 352 to 389 px it is two rows, 112 px tall (the name and search on row 1, the group right-aligned on row 2), because the field cannot keep its placeholder whole beside the 44 px glyph button and the 44 px switch on one row (owner ruling, #398 D-6). The two rows are forced by a rule from 22rem to 24.37rem: `.trailing:has(> .carInline)` takes a flex basis of 100% and aligns right; the home and `/buscar` pages, which hide the header search, keep one row (flex basis auto). Below 22rem the group also sits on row 2. The 24.37rem breakpoint is fixed, not tied to the site name, so a much longer site name could still wrap the button at or just above 390 px; a browser without `:has()` (Firefox before 121) falls back to a 116 px header from 378 to 389 px. Measured on the built page, no car, category page: 112 px at 352, 375 and 389; 64 px at 390, 391, 640 and 1280; with a car selected the header is 112 to 112.8 px with the switch on row 1. The header field's inline padding is `--space-1` (8 px) below 40rem and 16 px from 40rem, so the placeholder "Buscar" (46.1 px) shows whole in the 80 px field at 390 (text box 62 px). The frame fill and name colour already use `--color-frame` and `--color-on-frame`; the 52 px height and the 3px rule are not built. States: link hover underline; focus-visible 3px `--focus-ring-on-ink`. |
+| Car control | As the S11.1 row, with `--color-on-frame*` tokens in place of `--color-on-ink*`: 1px `--color-on-frame-muted` border, transparent fill, `--color-on-frame` 600 `--text-md`, `--radius-md`, at least `--tap-target` tall; glyph only from 22rem to below 40rem, words from 40rem; hover fill `--color-on-frame-line`; pressed fill and border `--color-accent`, label `--color-on-accent`; ring `--focus-ring-on-ink` (amber). The Theme switch follows it. |
+| Theme switch (built, #398) | A `button`, 44 by 44, the last item of header row 1 at every width, right of the Car control. 1px `--color-on-frame-muted` border, `--radius-md`, a 20px half-filled circle glyph in `--color-on-frame` (an empty `aria-hidden` span; the filled half is on the left in light and on the right in dark, so the glyph shows the active scheme with no transform). Accessible name "Tema oscuro" from a visually hidden span, `aria-pressed="true"` when dark is active; the server markup carries no `aria-pressed`, which appears after hydration and reads the root `data-theme` attribute. Stored in `localStorage` key `tema` on a press only. Does not change the URL, scroll or move focus; focus stays on it after a press. Not drawn without script (hidden until `html[data-theme]` exists, so space is reserved from first paint when script runs). It is drawn on every public page and never in the admin area. States: default, hover (fill `--color-on-frame-line`), focus-visible (3px `--focus-ring-on-ink`, offset `--focus-offset`), on (dark active, glyph flipped). Tab order: site link, search field, search button, car control, theme control. |
+| Search form | Hero: from 52rem a panel at the right of the masthead (1px `--color-on-frame-line`, 3px amber top edge, `--radius-lg`, padding `--space-3`), below 52rem full width under the tagline; visible label `--text-md` 600 `--color-on-frame`, field and button 3rem tall (was 3.5rem), field `--color-bg` with 1px `--color-border-strong`, `--text-md`, hint `--color-on-frame-muted`. Page: as S11.1 at 3rem. Header: as S11.1 plus the 1px `--color-border-strong` edge. Primary button: amber, `--radius-md`. |
+| Category tile | A link in a `ul`: `--color-bg`, 1px `--color-border`, `--radius-lg`, 4.25rem tall, padding `--space-1` `--space-2`; a 3.25rem drawing box (`--color-chip-bg`, 1px `--color-border`, `--radius-md`, `aria-hidden`); name `--text-md` 700 over the count (`--text-sm`, `--color-muted`); a chevron except from 64rem. One column below 40rem, two from 40rem, four from 64rem; no vertical card. States as S11.1 (hover: 1px `--color-ink` border, name underlined; focus 3px `--focus-ring`). |
+| Product card (list row) | Rows in one container (`--color-bg`, 1px `--color-border`, `--radius-lg`, overflow hidden, 1px `--color-border` between rows); the whole row is one link, at least 44 px. Row padding `--space-1` `--space-2`. Phone: 3.25rem box, brand (`--text-sm` 600 muted, left out when null), title (600, 2 lines), `Ref.` line (`--font-mono` 0.875rem muted, left out when no part number), then a footer row: price group left (`Desde` and the price, `--text-price` 1.25rem), shop chip right. From 40rem: columns 3.5rem, 1fr, 6.5rem, 8rem: box, text, shop chip (right), price (right, "Desde" above) so prices share one x column. Fit mark, listing groups and states as S11.1. States: default, hover (fill `--color-canvas`, title underlined), pressed (same fill, title underlined), focus-visible (3px ring around the whole row), visited as default. |
+| Offer panel and row | White card; h2 "Dónde comprarlo"; ordered list; each row a 1px `--color-border` rule above, block padding `--space-1`. Shop name (600) with the best-price tag, price `--text-price` 1.5rem 700 right-aligned in a 9rem column, "Actualizado el" (`--text-sm` muted) under the name, and the Primary button. Below 40rem: shop and price on one line, date, full-width button. From 40rem: one line, price column 9rem, button 12rem. The best-price row has a `--color-canvas` band to the card's edges and the tag; no other emphasis. |
+| Chip | Static: `--color-chip-text` on `--color-chip-bg`, `--text-sm` 600, `--radius-pill` (4px, a tag). Interactive (brand filter): a link at least `--tap-target` tall, 1px `--color-border-strong` edge; selected: `--color-ink` fill, `--color-on-ink` text, check mark, count in `--color-on-ink-muted`; hover and pressed as S11.1. |
+| Primary button | Anchor or button, `--color-accent` fill, 1px `--color-accent-edge`, `--color-on-accent` 700, `--radius-md`, at least `--tap-target` tall. Dark: same fill and label, hover `#ffc733`, pressed `#e5a400`, edge `#c98f00`. Shop link label "Ir a la tienda", accessible name keeps the shop. |
+| Secondary button | `--color-bg` fill, 1px `--color-ink` border, `--color-ink` 600, `--radius-md`, at least 44 px; hover fill `--color-ink` with `--color-on-ink` text; pressed fill `--color-accent` with `--color-on-accent`. |
+| Footer | Fill `--color-frame`; one row of three links at `--text-sm` in `--color-on-frame`, each at least 44 px tall, wrapping on a phone; focus-visible `--focus-ring-on-ink`; no theme control here. |
+| Page notice (demo notice) | `role="note"`, `--color-warning-bg` fill, 1px `--color-border`, 0.25rem `--color-accent` left rule, `--radius-md`, one sentence in `--color-text`. Dark: `#33270a`, same rule. |
+| Car picker dialog | As S11.1 with `--color-scrim` for the backdrop (no opacity), `--color-bg` panel, `--radius-lg` from 40rem. Current option row: `--color-ink` fill with `--color-on-ink` text and `--color-on-ink-muted` second line (a light row with dark text in dark). `/mi-coche` is the same card on the canvas. |
+| Image placeholder and drawings | Drawing strokes use `--color-ink`, fills `--color-bg`, the box `--color-chip-bg`: in dark the strokes are light on a dark box. The `ring` badge (ink fill, bg stroke) and the `paper` shapes keep separating from the shape behind them in both schemes. |
+| Error page and empty results | The Empty state card keeps its anatomy (1px border, `--radius-lg`, h2 700, one muted sentence, Secondary button); on a list page it takes the place of the bordered row container, same width. No illustration. |
+
+### S11.1 rows (built today)
 
 | Component | Anatomy | States |
 |---|---|---|
@@ -154,19 +320,34 @@ System-ui stack, `--font-sans`, the one swap point if a font is ever added (self
 
 The S4.2 confirm is the existing Confirm panel inside the row's form, in place of the controls line; its failure is the existing Error block and the empty page is the Empty list block with a Link button. Not new.
 
-Admin components were not restyled in S11.1. They keep their look, and read the new token values: `--color-link` is ink, so live nav links, filled buttons, outlined controls and notice rules are ink rather than blue, and admin pages sit on the grey canvas with white boxes.
+Admin components were not restyled in S11.1. They keep their look, and read the new token values: `--color-link` is ink, so live nav links, filled buttons, outlined controls and notice rules are ink rather than blue, and admin pages sit on the grey canvas with white boxes (in the dark set, on the dark canvas with dark boxes).
+
+**Admin and the scheme (#398).** Admin pages always use the dark set, whatever the system setting or a stored `tema`; they carry no theme switch and never read or write `tema`. Their looks are not reviewed or polished (owner ruling 2026-11-26, #397 D-15). Admin is reviewed for function and readability only. It is dark on the server: `src/app/admin/layout.tsx` wraps every admin route in a `div` with `data-theme="dark"`, which stands in for the body (canvas fill and text colour), so it is dark with or without script. The head script also sets the root dark on an admin path without reading storage; with script off, the page area is dark but the scrollbar and overscroll may follow the system setting.
+
+## Reserved places (not designs)
+
+Two places are held for later work. Neither is designed here and nothing of either ships with #398 or #399.
+
+- **Category filters (E15).** Reserved: from 64rem a 15rem left column beside the results panel and the list, sticky 1rem from the top; on a phone a full-width bar 3.25rem tall between the title block and the results panel. The brand chips and sort stay in the results panel until E15 decides otherwise. The labelled placeholder box in the design mockups is a marker only and never ships: with no filters the list uses the full width and no empty column, dashed box or label is drawn (D-8).
+- **Assistant (E16).** Reserved: a slim full-width bar between the header and the page content on category, search and product pages, opening a sheet on a phone and a side drawer on desktop. One line of intent, not a design (D-9).
 
 ## Copy voice
 
 Spanish (`es-ES`), sentence case, *tú* form, plain verbs. A control says where it goes or what it does. Counts use real plurals. Prices read `1.234,50 €` with a non-breaking space before the euro sign. The site name is `{siteName}`, never typed.
 
+New string of the theme switch (built, #398; `messages/es-ES.json`, group `Theme`): `Theme.toggleLabel` "Tema oscuro", the accessible name of the icon toggle, with `aria-pressed`. Only this string ships (#398 D-9); the group label and the Claro and Oscuro segment strings of the earlier proposal were not added, because nothing renders them. `Privacy.cookiesBody` was reworded to say the theme choice is kept in the browser only. Every other string is unchanged.
+
 ## Accessibility floor
 
-Visible 3 px focus ring with a 2 px offset on every interactive element: ink (`--focus-ring`) on light surfaces, amber (`--focus-ring-on-ink`) on the header and footer; the card and home tile rings surround the whole element. Text contrast at least 4.5:1, control borders and the ring at least 3:1. Tap targets at least 44 px (`--tap-target`), including the header link, footer links, pagination links, tiles and every category row. Focus order is reading order, with no positive `tabindex`. No motion, so reduced-motion needs no special case. Amber is never the only cue and never text on a light surface. A pressed state is told apart by fill, border and underline only and never changes the box size; the keyboard has no pressed state, the focus ring is its cue. The 404 for a missing product, a missing category, or a page or brand past the last is served by the root not-found through `src/proxy.ts`, so its server HTML carries `lang`, the header, one `main` with the h1 and the footer, and the page looks the same with JavaScript off. No cookie banner and no consent UI (guardrail 5).
+**Approved (A), in both schemes; the colour part is built (#398), the layout part is #399.** As the S11.1 floor below, with: `--focus-ring` on page surfaces and `--focus-ring-on-ink` (amber) on the frame; text contrast at least 4.5:1 and component edges and rings at least 3:1, per token pair in § Palette (lowest text pair 5.79:1 light and 6.24:1 dark, lowest component pair 3.49:1 and 3.96:1); tap targets at least 44 px; focus order is reading order with no positive `tabindex`; no motion; amber never the only cue; the scheme never carries meaning alone. The theme switch has a fixed accessible name and `aria-pressed`. No cookie banner. A first visit with a dark system setting shows dark at first paint, and a stored `tema` of `claro` wins over a dark system setting. The contrast floors of § Palette are enforced by `tests/unit/styles.test.ts`. The dark focus ring and tap targets were specified by token and measured on mockups; the UX review of the build checks them on the built page.
+
+**S11.1 floor (built today).** Visible 3 px focus ring with a 2 px offset on every interactive element: ink (`--focus-ring`) on light surfaces, amber (`--focus-ring-on-ink`) on the header and footer; the card and home tile rings surround the whole element. Text contrast at least 4.5:1, control borders and the ring at least 3:1. Tap targets at least 44 px (`--tap-target`), including the header link, footer links, pagination links, tiles and every category row. Focus order is reading order, with no positive `tabindex`. No motion, so reduced-motion needs no special case. Amber is never the only cue and never text on a light surface. A pressed state is told apart by fill, border and underline only and never changes the box size; the keyboard has no pressed state, the focus ring is its cue. The 404 for a missing product, a missing category, or a page or brand past the last is served by the root not-found through `src/proxy.ts`, so its server HTML carries `lang`, the header, one `main` with the h1 and the footer, and the page looks the same with JavaScript off. No cookie banner and no consent UI (guardrail 5).
 
 ## Tokens
 
-All tokens live in `src/app/globals.css` `:root`, and nothing else may define a colour: no `*.module.css` writes a hex, `rgb()` or `hsl()` value, a `box-shadow`, a `transition`, a `transform` or an `animation` (a static test in `tests/unit` enforces it, comments included).
+**Approved (A); the tokens below and the dark set are built (#398), the A spacing, radius and type values are #399.** All tokens live in `src/app/globals.css`, in three blocks in this order: `:root` holds the light values; `:root[data-theme='dark'], [data-theme='dark']` holds the dark set, with every alias redeclared; and `@media (prefers-color-scheme: dark) { :root:not([data-theme]) }` holds a declaration-for-declaration copy of it, the no-script fallback (see § Schemes). `tests/unit/styles.test.ts` allows raw colours only inside those three blocks and pins the equality of the sets. No `*.module.css` writes a colour, `box-shadow`, `transition`, `transform` or `animation`. New in this system: `--color-frame`, `--color-on-frame`, `--color-on-frame-muted`, `--color-on-frame-line`, `--color-scrim`, `--font-display`, `--font-mono`, `--elevation-1`, `--elevation-2`. `--color-on-ink-line` stays as an alias of `--color-on-frame-line` until the modules move; `--color-tile-bg` stays unused. `--focus-ring` is `3px solid var(--color-focus)`, `--focus-ring-on-ink` is `3px solid var(--color-accent)` (the ring on the frame), `--focus-offset` 2px. The static test that forbids colour literals and the other forms in modules stays valid. The car picker dialog backdrop, which used ink at `opacity: 0.6`, is now `--color-scrim` (built, #398).
+
+**S11.1 (historical; the three blocks above supersede its location rule).** S11.1 kept every token in `:root` of `src/app/globals.css`; since #398 `:root` holds the light values and the dark set lives in the two dark blocks. The rest of this paragraph and the list below still hold: no `*.module.css` writes a hex, `rgb()` or `hsl()` value, a `box-shadow`, a `transition`, a `transform` or an `animation` (a static test in `tests/unit` enforces it, comments included).
 
 - Colour: the palette above, including the state colours, `--color-chip-text` and `--color-price`.
 - Spacing: `--space-0` to `--space-4`, `--gutter`, `--page-pad-block`, `--card-padding`, `--grid-gap`, `--content-width`, `--tap-target`.

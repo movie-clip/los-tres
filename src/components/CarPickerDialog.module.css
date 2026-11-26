@@ -2,8 +2,8 @@
    radius or visible backdrop. From 40rem: a centred panel with a border, rounded corners
    and a dimmed backdrop. Centring is the platform inset and auto margins, and the height is
    fixed so the panel does not resize between steps (an auto height would stretch between
-   the insets). Three constants live here and are not global tokens: the panel width, the
-   panel height (44rem, the tallest step, the make list) and the backdrop opacity. */
+   the insets). Two constants live here and are not global tokens: the panel width and the
+   panel height (44rem, the tallest step, the make list). The backdrop is the scrim token. */
 .dialog {
   width: 100%;
   height: 100%;
@@ -24,8 +24,7 @@
 }
 
 .dialog::backdrop {
-  background: var(--color-ink);
-  opacity: 0.6;
+  background: var(--color-scrim);
 }
 
 @media (min-width: 40rem) {

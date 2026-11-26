@@ -1,7 +1,7 @@
 /* The ink bar runs edge to edge; the links sit in the same column as the header. */
 .footer {
   padding: var(--space-1) 0;
-  background: var(--color-ink);
+  background: var(--color-frame);
 }
 
 .list {
@@ -18,7 +18,7 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);
-  color: var(--color-on-ink);
+  color: var(--color-on-frame);
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
   text-decoration: none;
