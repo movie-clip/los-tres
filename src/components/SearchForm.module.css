@@ -2,7 +2,7 @@
    hero (home band, on ink), page (the /buscar panel, on white) and header (the
    site header, on ink). Sizes here are this component's own, not global tokens:
    40rem the hero and page row width, 3.5rem their field and button height,
-   14rem and 26rem the header form basis and maximum, 5rem its field basis. */
+   14rem and 26rem the header form basis and maximum, 4.625rem its field basis. */
 .form {
   margin: 0;
 }
@@ -136,8 +136,11 @@
   min-width: 0;
 }
 
+/* 4.625rem (74 px) is the narrowest field that shows the placeholder word whole. It is
+   also the wrap threshold of the button: at 390 px with no car the box is about 171 px,
+   which holds 74 + 8 + the 84 px button on one line. */
 .header .input {
-  flex-basis: 5rem;
+  flex-basis: 4.625rem;
   font-size: var(--text-md);
   text-overflow: ellipsis;
 }

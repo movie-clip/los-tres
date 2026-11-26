@@ -68,6 +68,18 @@
   }
 }
 
+/* From 22rem to just under 390 px, with no car selected, row 1 cannot hold the name, the
+   search box with its button beside the field, the car control and the switch. The group
+   then takes row 2 whole, at the right edge, at every width of the range rather than at a
+   width that depends on the site name (D-6). With a car selected the group is the switch
+   alone and stays on row 1. */
+@media (min-width: 22rem) and (max-width: 24.37rem) {
+  .trailing:has(> .carInline) {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* A page that carries its own search form (the home hero, /buscar) shows one
    place to type, not two. The rule keys on the page form's marker, so a page
    without one, such as home with no categories, keeps the header box. If the
@@ -96,8 +108,9 @@
 }
 
 /* Without the header search (the home hero, /buscar) the group itself is pushed to the
-   right edge of row 1, at every width. */
+   right edge of row 1, at every width, and never takes a row of its own. */
 :global(body:has([data-search-page])) .trailing {
+  flex-basis: auto;
   margin-left: auto;
 }
 
