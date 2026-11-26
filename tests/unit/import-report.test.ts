@@ -15,6 +15,7 @@ function feed(overrides: Partial<FeedImportReport>): FeedImportReport {
     offersRemoved: 0,
     rejected: [],
     ownProducts: [],
+    eanFilled: 0,
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,

@@ -57,6 +57,8 @@ export type FeedImportReport = {
   rejected: RejectedRow[];
   /** Counted in productsCreated and offersCreated, never in rejected. Record order. */
   ownProducts: OwnProductRow[];
+  /** Products whose empty EAN this feed's import filled (S7.6). 0 when skipped or failed. */
+  eanFilled: number;
   /** Every unknown vehicle slug occurrence: one per accepted row per distinct slug. */
   unknownVehicles: number;
   /** Printable unknown slugs only, first-seen order, at most 20. */

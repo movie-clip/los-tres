@@ -4,8 +4,9 @@ import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
-import { matchProduct, normalizeBrand, normalizePartNumber, type MatchScope } from '../matching';
+import { matchProduct, normalizeBrand, normalizePartNumber, selectByEan, type MatchScope } from '../matching';
 import { slugify, uniqueSlug } from '../slug';
+import { decideEanFill, type EanFillDecision, type EanFillFacts } from './ean-fill';
 import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
 import { decideRemoval, REMOVAL_CHUNK } from './removal';
@@ -30,7 +31,8 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // The only writer of `offers.is_removed` (S3.3): set on this feed's offers that
 // are absent from an import that passed the removal guard (./removal.ts), and
 // cleared on every accepted row.
-// Product text is written once (TD-23). `products.category_id` is the one
+// Product text is written once (TD-23), except an empty EAN, which
+// `fillEmptyEan` may set once (S7.6). `products.category_id` is the one
 // product column it may set later, and only from null: the first mapped feed
 // category wins and nothing is ever cleared or overwritten (D-3). The admin
 // mapping writer (src/server/admin/category-mappings.ts, S4.2) is the second
@@ -51,6 +53,8 @@ type FeedRow = {
   sourceType: FeedSourceRef['sourceType'];
   isApproved: boolean;
   shopName: string;
+  /** The feed's shop approval, read once per run for the EAN fill (S7.6). */
+  shopApproved: boolean;
 };
 
 /**
@@ -92,6 +96,7 @@ async function loadFeeds(db: Executor, feedId: number | undefined): Promise<Feed
       sourceType: feeds.sourceType,
       isApproved: feeds.isApproved,
       shopName: shops.name,
+      shopApproved: shops.isApproved,
     })
     .from(feeds)
     .innerJoin(shops, eq(feeds.shopId, shops.id));
@@ -112,6 +117,7 @@ function emptyReport(feed: FeedRow): FeedImportReport {
     offersRemoved: 0,
     rejected: [],
     ownProducts: [],
+    eanFilled: 0,
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
@@ -214,6 +220,8 @@ async function importRecords(
     if (known) {
       await writeOffer(tx, feed.id, known.productId, row, startedAt);
       await assignCategory(tx, known.productId, mappedCategory(mappings, row), { markedRow });
+      const fill = decideEanFill(fillFacts(feed, row, markedRow, known.offer, known.product));
+      if (await fillEmptyEan(tx, known.productId, fill, { markedRow })) report.eanFilled += 1;
       fitmentsOfFeed.add(known.productId, row.fitment);
       report.offersUpdated += 1;
       continue;
@@ -237,6 +245,14 @@ async function importRecords(
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
     await assignCategory(tx, productId, mappedCategory(mappings, row), { markedRow });
+    // A created product already carries the row's EAN, or the row had none: only an attach may fill.
+    if (match.kind === 'attach' && row.eanNormalised !== null) {
+      const target = await readFillTarget(tx, productId);
+      if (target) {
+        const fill = decideEanFill(fillFacts(feed, row, markedRow, NEW_OFFER, target));
+        if (await fillEmptyEan(tx, productId, fill, { markedRow })) report.eanFilled += 1;
+      }
+    }
     fitmentsOfFeed.add(productId, row.fitment);
     report.offersCreated += 1;
   }
@@ -348,18 +364,111 @@ async function removeMissingOffers(
   }
 }
 
-async function findOffer(tx: Executor, feedId: number, externalId: string) {
+type FillTarget = EanFillFacts['product'];
+type FillOffer = EanFillFacts['offer'];
+
+/** A new offer's states: the insert sets neither, and the schema defaults both to false. */
+const NEW_OFFER: FillOffer = { isHidden: false, inReview: false };
+
+/** The four product columns the EAN fill decides on (S7.6), by product id. */
+const fillTargetColumns = {
+  ean: products.ean,
+  eanNormalised: products.eanNormalised,
+  isHidden: products.isHidden,
+  marked: products.isCollected,
+};
+
+/**
+ * This feed's stored offer for the external id, with its own states and the
+ * product it sits on (S7.6): one statement, the product joined by its key.
+ */
+async function findOffer(
+  tx: Executor,
+  feedId: number,
+  externalId: string,
+): Promise<{ productId: number; offer: FillOffer; product: FillTarget } | undefined> {
   const [found] = await tx
-    .select({ productId: offers.productId })
+    .select({
+      productId: offers.productId,
+      offerHidden: offers.isHidden,
+      offerInReview: offers.inReview,
+      ...fillTargetColumns,
+    })
     .from(offers)
+    .innerJoin(products, eq(offers.productId, products.id))
     .where(and(eq(offers.feedId, feedId), eq(offers.externalId, externalId)))
     .limit(1);
+  if (!found) return undefined;
+  return {
+    productId: found.productId,
+    offer: { isHidden: found.offerHidden, inReview: found.offerInReview },
+    product: {
+      ean: found.ean,
+      eanNormalised: found.eanNormalised,
+      isHidden: found.isHidden,
+      marked: found.marked,
+    },
+  };
+}
+
+/** The product a new offer attached to, as the EAN fill reads it (S7.6). */
+async function readFillTarget(tx: Executor, productId: number): Promise<FillTarget | undefined> {
+  const [found] = await tx.select(fillTargetColumns).from(products).where(eq(products.id, productId)).limit(1);
   return found;
 }
 
+/** The facts of one accepted row for `decideEanFill` (S7.6). */
+function fillFacts(
+  feed: FeedRow,
+  row: ValidRow,
+  markedRow: boolean,
+  offer: FillOffer,
+  product: FillTarget,
+): EanFillFacts {
+  return {
+    row: { ean: row.ean, eanNormalised: row.eanNormalised },
+    markedRow,
+    shopApproved: feed.shopApproved,
+    feedApproved: feed.isApproved,
+    offer,
+    product,
+  };
+}
+
 /**
- * Product text is written here only, once, and never updated (TD-23). So is the
- * collected marker (S12.2): `markedRow` is true for a row of a collected feed.
+ * Fills an empty EAN once (S7.6): never another column, never a set EAN. True
+ * when it wrote. No fill while another product the row's matching lookup can
+ * see holds the EAN, hidden ones included (D-4). The update repeats the
+ * product states another transaction can change, both EAN columns null and not
+ * hidden, as its own guard (DT-5).
+ */
+async function fillEmptyEan(
+  tx: Executor,
+  productId: number,
+  decision: EanFillDecision,
+  scope: MatchScope,
+): Promise<boolean> {
+  if (decision.kind === 'skip') return false;
+  if ((await selectByEan(tx, decision.eanNormalised, scope)).length > 0) return false;
+  const filled = await tx
+    .update(products)
+    .set({ ean: decision.ean, eanNormalised: decision.eanNormalised })
+    .where(
+      and(
+        eq(products.id, productId),
+        isNull(products.ean),
+        isNull(products.eanNormalised),
+        eq(products.isHidden, false),
+      ),
+    )
+    .returning({ id: products.id });
+  return filled.length === 1;
+}
+
+/**
+ * Product text is written here only, once, and never updated (TD-23), except
+ * an empty EAN, which `fillEmptyEan` may set once (S7.6). So is the collected
+ * marker (S12.2): `markedRow` is true for a row of a collected feed.
  */
 async function createProduct(
   tx: Executor,

@@ -220,7 +220,12 @@ describe('a convergence changes no product text (AC 10)', () => {
   const HEADER = 'id,title,brand,part_number,ean,price,currency,url,description';
   const csv = (row: string) => [HEADER, row, ''].join('\n');
 
-  it('leaves the stored row identical in every column, whatever the second feed says', async () => {
+  // S7.6 (US-7.6 AC 24) supersedes the EAN part: the second row's EAN now fills the empty EAN, and
+  // every other column, the text included, stays the first file's.
+  it.each([
+    ['carries an EAN: only the two EAN columns change', EAN.one, { ean: EAN.one, eanNormalised: EAN.one }],
+    ['carries no EAN: the stored row is identical', '', {}],
+  ])('the second feed %s, whatever its text says', async (_label, secondEan, eanColumns) => {
     const a = await aFeedOf();
     const b = await aFeedOf();
     await importText(
@@ -231,21 +236,22 @@ describe('a convergence changes no product text (AC 10)', () => {
     );
     const before = await allProducts();
 
-    // The second shop writes a different title, spelling, description and an EAN; the key still matches.
+    // The second shop writes a different title, spelling and description; the key still matches.
     const report = await importText(
       {
-        [b.feedId]: csv(`x-2,Otro titulo muy distinto,MARCA  UNO,pn-100,${EAN.one},9.00,EUR,https://tienda-b.example/p/2,Otra descripcion`),
+        [b.feedId]: csv(`x-2,Otro titulo muy distinto,MARCA  UNO,pn-100,${secondEan},9.00,EUR,https://tienda-b.example/p/2,Otra descripcion`),
       },
       { feedId: b.feedId },
     );
 
     expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 1, ownProducts: [] });
-    expect(await allProducts()).toEqual(before);
+    expect(await allProducts()).toEqual([{ ...before[0], ...eanColumns }]);
     expect(before[0]).toMatchObject({
       title: 'Titulo de la primera tienda',
       brand: 'Marca Uno',
       partNumber: 'PN 100',
       ean: null,
+      eanNormalised: null,
       description: 'Descripcion primera',
     });
   });
@@ -299,7 +305,7 @@ describe('an EAN on one side only (AC 14)', () => {
     expect(await allOffers()).toHaveLength(2);
   });
 
-  it('a row with a valid EAN no product holds converges on the key holder that has none', async () => {
+  it('a row with a valid EAN no product holds converges on the key holder that has none, and fills its EAN', async () => {
     const a = await aFeedOf();
     const b = await aFeedOf();
     await importRows({ [a.feedId]: [keyRow('x-1', KEY)] }, { feedId: a.feedId });
@@ -307,26 +313,33 @@ describe('an EAN on one side only (AC 14)', () => {
 
     const report = await importRows({ [b.feedId]: [keyRow('x-2', { ...KEY, ean: EAN.one })] }, { feedId: b.feedId });
 
-    expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 1, rejected: [], ownProducts: [] });
+    expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 1, rejected: [], ownProducts: [], eanFilled: 1 });
     expect(await allOffers()).toHaveLength(2);
-    // Product text is written once (AC 10): the attached offer's EAN does not reach the product.
-    expect(await allProducts()).toEqual(before);
+    // S7.6 (US-7.6 AC 24) supersedes "the product keeps no EAN": the attached row fills the empty
+    // EAN, and only the two EAN columns change.
     expect(before[0].ean).toBeNull();
     expect(before[0].eanNormalised).toBeNull();
+    expect(await allProducts()).toEqual([{ ...before[0], ean: EAN.one, eanNormalised: EAN.one }]);
   });
 
-  it('a later row with that EAN and the same key reaches the same product, through the key', async () => {
+  it('a later row with that EAN reaches the same product by EAN, whatever its part number', async () => {
     const a = await aFeedOf();
     const b = await aFeedOf();
     const c = await aFeedOf();
     await importRows({ [a.feedId]: [keyRow('x-1', KEY)] }, { feedId: a.feedId });
     await importRows({ [b.feedId]: [keyRow('x-2', { ...KEY, ean: EAN.one })] }, { feedId: b.feedId });
 
-    const report = await importRows({ [c.feedId]: [keyRow('x-3', { ...KEY, ean: EAN.one })] }, { feedId: c.feedId });
+    // Another part number, so no key matches: only the filled EAN can bring this row to the
+    // product. The brand stays the same, since a different known brand is an ean_brand_conflict.
+    const report = await importRows(
+      { [c.feedId]: [keyRow('x-3', { brand: KEY.brand, part: 'PN 999', ean: EAN.one })] },
+      { feedId: c.feedId },
+    );
 
-    expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 1, ownProducts: [] });
-    expect(await allProducts()).toHaveLength(1);
-    expect(await allOffers()).toHaveLength(3);
+    expect(report.feeds[0]).toMatchObject({ productsCreated: 0, offersCreated: 1, ownProducts: [], eanFilled: 0 });
+    const rows = await allProducts();
+    expect(rows).toHaveLength(1);
+    expect((await offersByProduct()).get(rows[0].id)).toEqual(['x-1', 'x-2', 'x-3']);
   });
 });
 
