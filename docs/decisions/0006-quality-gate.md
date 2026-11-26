@@ -6,7 +6,9 @@ levels, the fast check and budgets (the last section). Amended 2026-11-24
 (issue #363, owner rulings D-3 to D-6, D-9 to D-11 of run
 2026-11-24-363-e2e-own-stack): the e2e run builds, starts and removes a Compose
 project of its own, and the gate is `check` then the e2e run, with no
-`stack:up` step (rules 7, 8 and 13, and the closing section).
+`stack:up` step (rules 7, 8 and 13, and the closing section). Amended
+2026-11-26 (issue #398, owner ruling #397 D-14): the browser-test ceiling, rule
+16 (the last section).
 
 ## Decision
 
@@ -213,7 +215,7 @@ rules continue the numbering of the amendment above.
     (axe), because it is a new dependency. Existing specs are brought under the
     rule by issue #339: the `@layout` tag, `test:e2e:ci` and `gate:ci` are gone,
     and CI runs the same `npm run gate` as the local gate.
-12. **The journeys.** The e2e journeys are the list below, 12 entries; a new
+12. **The journeys.** The e2e journeys are the list below, 13 entries; a new
     journey is added by a story that names it. This list corrects the key flows
     the Decision first named: it keeps the first, corrects the second and
     removes two entries whose features are deferred.
@@ -257,6 +259,7 @@ Each entry names the spec that holds it today.
 | J10 | an admin maps a feed category | `admin-categories.spec.ts` |
 | J11 | an admin hides and unhides a product, and the public page follows | `admin-products.spec.ts` |
 | J12 | catalogue file: file placed, feed registered, two approvals, `import-feeds`, mapping, public product, removal | `catalogue-file-flow.spec.ts` |
+| J13 | theme: a first visit follows a dark system setting, a press of the switch, a reload keeps the choice (#398) | `theme.spec.ts` |
 
 J9 corrects the earlier second flow: approving a feed is live, but "Import now"
 and the stored import report are deferred (`CLAUDE.md` § Stack, data source;
@@ -286,3 +289,24 @@ no longer starts, refreshes or leaves up the development app.
 | 8 (lanes verify with it) | The work orders and the integration review. Nothing machine-checks which command a lane ran. |
 | 9, 10, 11, 12 | The integration review only. Nothing machine-checks the level of a test, its locators or the journey list. |
 | 13, 14, 15 | The integration review only. Nothing machine-checks a time or a count; the numbers are measured by the commands rule 13 names. |
+
+## Amendment 2026-11-26: the browser-test ceiling
+
+Owner ruling of 2026-11-26 (#397 D-14, carried into #398 as D-2 and D-3); issue
+#398. The rule continues the numbering above.
+
+16. **The browser-test ceiling is 76.** At most 76 browser tests exist, counted
+    as the `Total` line of `npx playwright test --list`. A story adds one only
+    by removing one or by an owner ruling. The ceiling was 75; the owner raised
+    it to 76 on 2026-11-26 for the one test of #398's theme journey (J13,
+    `tests/e2e/theme.spec.ts`: first visit under a dark system setting, a press
+    of the switch, a reload). `npx playwright test --list` printed
+    `Total: 76 tests in 26 files` after that test was added. No other rule of
+    this decision changes: budgets (13, 14), no retry, no sleep and no clock
+    stand.
+
+**What enforces it.**
+
+| Rule | Checked by |
+|---|---|
+| 16 | The integration review only. Nothing machine-checks the count; the review reads the `Total` line of `npx playwright test --list` (rule 15). |
