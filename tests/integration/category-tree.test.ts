@@ -4,10 +4,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closeDb, getDb } from '@/db/client';
 import { categories, products } from '@/db/schema';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
-import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
+import { getPublicCategoryTree, getPublicSubcategories } from '@/server/catalogue/category-tree';
 
 import { insertCategory, insertFeed, insertListedProduct, insertShop } from '../support/catalogue';
+import { fiveTargets, ROOT_SLUG } from '../support/categories';
 import { resetDatabase } from '../support/db';
+import { captureQueries } from '../support/query-count';
 
 beforeEach(resetDatabase);
 afterAll(closeDb);
@@ -229,5 +231,123 @@ describe('invariant I-1: the home count is the category page count', () => {
       expect(listed.has(slug)).toBe(false);
       expect((await getPublicCategoryPage(slug, 1, null, 'price-asc'))?.productCount).toBe(0);
     }
+  });
+});
+
+// #313: the root category page's links to its children. The read is a projection of the home tree's group
+// for that slug (D-2), so the cases below are about the shape, the order and the empty answers; what makes a
+// product public is the cases above and the two public sweeps.
+describe('getPublicSubcategories (S4.3)', () => {
+  /** One public product in each of the five fixed children but `except`; returns the five targets in tree order. */
+  async function fillAll(except: string[] = []) {
+    const targets = await fiveTargets();
+    for (const target of targets) {
+      if (!except.includes(target.slug)) await listIn(`producto-${target.slug}`, target.id);
+    }
+    return targets;
+  }
+
+  it('returns the five children of the fixed tree, in tree order, with exactly slug and name', async () => {
+    const targets = await fillAll();
+
+    const children = await getPublicSubcategories(ROOT_SLUG);
+
+    expect(children).toHaveLength(5);
+    expect(children).toEqual(targets.map(({ slug, name }) => ({ slug, name })));
+    for (const child of children) expect(Object.keys(child).sort()).toEqual(['name', 'slug']);
+  });
+
+  it('leaves out a child that holds no public product and closes the gap', async () => {
+    const empty = (await fiveTargets())[2];
+    const targets = await fillAll([empty.slug]);
+
+    const children = await getPublicSubcategories(ROOT_SLUG);
+
+    expect(children).toHaveLength(4);
+    expect(slugs(children)).toEqual(slugs(targets.filter((target) => target.slug !== empty.slug)));
+    expect(slugs(children)).not.toContain(empty.slug);
+  });
+
+  it('is the same set and order as the root group of the home tree, a hidden-only child included', async () => {
+    const targets = await fiveTargets();
+    await listIn('uno', targets[0].id);
+    await listIn('tres', targets[2].id);
+    await listIn('cinco', targets[4].id);
+    // A child that holds only a hidden product, and one that holds only an unmapped one, never show.
+    await insertListedProduct({ slug: 'oculto', prices: [100], categoryId: targets[1].id, isHidden: true });
+    await listIn('huerfano', null);
+
+    const children = await getPublicSubcategories(ROOT_SLUG);
+    const rootGroup = (await getPublicCategoryTree()).find((group) => group.slug === ROOT_SLUG);
+
+    expect(rootGroup).toBeDefined();
+    expect(slugs(children)).toEqual(slugs(rootGroup?.children ?? []));
+    // Non-vacuity: the comparison holds three children and leaves the hidden-only one out.
+    expect(slugs(children)).toEqual([targets[0].slug, targets[2].slug, targets[4].slug]);
+    expect(children.map((child) => child.name)).toEqual(
+      (rootGroup?.children ?? []).map((child) => child.name),
+    );
+  });
+
+  it('follows the next read when the only product of a child is hidden', async () => {
+    const targets = await fillAll();
+    expect(await getPublicSubcategories(ROOT_SLUG)).toHaveLength(5);
+
+    await getDb().update(products).set({ isHidden: true }).where(eq(products.categoryId, targets[3].id));
+
+    expect(slugs(await getPublicSubcategories(ROOT_SLUG))).toEqual(
+      slugs(targets.filter((target) => target.slug !== targets[3].slug)),
+    );
+  });
+
+  it('counts a product of a grandchild toward its child, as the tree does', async () => {
+    const targets = await fiveTargets();
+    const deeper = await insertCategory({ slug: 'mas-abajo', parentId: targets[0].id });
+    await listIn('en-el-fondo', deeper.id);
+
+    expect(slugs(await getPublicSubcategories(ROOT_SLUG))).toEqual([targets[0].slug]);
+  });
+
+  it('returns [] for the slug of a child, even one with public products of its own and below', async () => {
+    const targets = await fillAll();
+    const deeper = await insertCategory({ slug: 'mas-abajo', parentId: targets[0].id });
+    await listIn('en-el-fondo', deeper.id);
+
+    expect(await getPublicSubcategories(targets[0].slug)).toEqual([]);
+    expect(await getPublicSubcategories(deeper.slug)).toEqual([]);
+    // Non-vacuity: the root of the same data does answer.
+    expect(await getPublicSubcategories(ROOT_SLUG)).toHaveLength(5);
+  });
+
+  it('returns [] for an unknown slug', async () => {
+    await fillAll();
+
+    expect(await getPublicSubcategories('no-existe')).toEqual([]);
+  });
+
+  it('returns [] for a root with nothing public, and for one whose only product is hidden or unmapped', async () => {
+    const targets = await fiveTargets();
+    expect(await getPublicSubcategories(ROOT_SLUG)).toEqual([]);
+
+    await insertListedProduct({ slug: 'oculto', prices: [100], categoryId: targets[0].id, isHidden: true });
+    await listIn('huerfano', null);
+    expect(await getPublicSubcategories(ROOT_SLUG)).toEqual([]);
+
+    // Non-vacuity: one public product and the same read answers.
+    await listIn('publico', targets[1].id);
+    expect(slugs(await getPublicSubcategories(ROOT_SLUG))).toEqual([targets[1].slug]);
+  });
+
+  it('returns [] for a malformed slug and makes no query, while a well-formed one makes some', async () => {
+    await fillAll();
+
+    for (const malformed of ['', 'Mala Slug', 'a/b', 'MANTENIMIENTO-DEL-COCHE', '-x', 'a'.repeat(200)]) {
+      const { result, queries } = await captureQueries(() => getPublicSubcategories(malformed));
+      expect(result, JSON.stringify(malformed)).toEqual([]);
+      expect(queries, JSON.stringify(malformed)).toHaveLength(0);
+    }
+    const { result, queries } = await captureQueries(() => getPublicSubcategories(ROOT_SLUG));
+    expect(result).toHaveLength(5);
+    expect(queries.length).toBeGreaterThan(0);
   });
 });
