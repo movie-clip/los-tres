@@ -118,6 +118,8 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | not found | `/producto/no-existe` |
 | home, populated | `/` (the home lists only categories that hold products, so the empty fuel category is not on it; four of the five children are populated, so the five-tile home is not producible; report not checked) |
 | home, form | `/` (the hero form with the hint "Por nombre, referencia o EAN" and no header box); `/?q=filtro` renders the plain home, no note |
+| category root, subcategory links (S4.3) | `/categoria/mantenimiento-del-coche` shows four links (Aceite de motor, Filtros de aceite, Filtros de aire, Filtros de habitáculo; Filtros de combustible is empty so absent); five-link layout only by DOM-injecting a fifth `li` in a Playwright script (labelled synthetic) |
+| category root group heights | four links: 145 px at 390 (label 22.4, tiles 44 then 62.8, gaps 8), 164 at 360, 287 at 195, 74 at 1280; count line at y 690 at 390 with the demo notice |
 | search, results | `/buscar?q=filtro` (34 products on two pages) and `/buscar?q=OC1234` (1 product) |
 | search, three pages | `/buscar?q=demo` (confirmed: 50 products, pages of 24, 24, 2) |
 | search, no result | `/buscar?q=zzzz` (200, no results) |
