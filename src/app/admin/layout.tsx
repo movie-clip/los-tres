@@ -4,6 +4,8 @@ import { getTranslations } from 'next-intl/server';
 import { AdminFallbackProvider } from '@/components/admin/AdminFallbackContext';
 import { getSiteName } from '@/config/site';
 
+import styles from './layout.module.css';
+
 // No admin page is indexed (noindex also arrives as a response header, next.config.ts).
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('Admin.Meta');
@@ -17,6 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * Admin routes carry no public header or footer (the root layout is bare). This
  * layout only hands the error boundary its finished strings; each admin screen
  * draws its own header, so the signed-in shell can add the identity and the menu.
+ * Admin is always dark (#398): the wrapper carries data-theme="dark" in the server markup,
+ * so the dark set applies with or without script, whatever the visitor stored.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const [chrome, unavailable] = await Promise.all([
@@ -33,7 +37,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         retry: unavailable('retry'),
       }}
     >
-      {children}
+      <div data-theme="dark" className={styles.scheme}>
+        {children}
+      </div>
     </AdminFallbackProvider>
   );
 }

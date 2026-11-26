@@ -3,7 +3,7 @@
 .header {
   padding: var(--space-1) 0;
   border-top: var(--space-0) solid var(--color-accent);
-  background: var(--color-ink);
+  background: var(--color-frame);
 }
 
 /* A wrapping flex row: the name, then the search box beside it. When the box
@@ -27,22 +27,31 @@
   padding: 0 var(--gutter);
 }
 
-/* The box takes the room beside the name, from 11rem (phones) or 14rem up to
+/* The box takes the room beside the name, from 10rem (phones) or 14rem up to
    26rem. The search form inside fills it. min-width 0 lets it shrink on a narrow
    viewport instead of overflowing. */
 .search {
-  flex: 1 1 11rem;
+  flex: 1 1 10rem;
   max-width: 26rem;
   min-width: 0;
 }
 
-/* With no car selected the car control is the last item of row 1, against the
-   right edge of the column. It keeps its own size; below 22rem it is wide (words
-   showing) and wraps onto its own row, left aligned, capped at the column. */
-.carInline {
+/* The trailing group of row 1: the car control (with no car selected), then the theme
+   switch. It is the last item of row 1, against the right edge of the column, and wraps as
+   one unit. It keeps its own size; below 22rem the car control is wide (words showing)
+   and the group wraps onto its own row, left aligned, capped at the column. */
+.trailing {
+  display: flex;
   flex: none;
-  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
   margin-left: auto;
+}
+
+.carInline {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Phones: a tighter column gap in row 1 gives the 44 px control its room. */
@@ -53,7 +62,7 @@
 }
 
 @media (max-width: 21.99rem) {
-  .carInline {
+  .trailing {
     max-width: 100%;
     margin-left: 0;
   }
@@ -79,16 +88,16 @@
     margin-left: auto;
   }
 
-  /* The search form's own auto margin places the pair; the control follows it
+  /* The search form's own auto margin places the pair; the group follows it
      with the row gap between. */
-  .carInline {
+  .trailing {
     margin-left: 0;
   }
 }
 
-/* Without the header search (the home hero, /buscar) the control itself is pushed to the
+/* Without the header search (the home hero, /buscar) the group itself is pushed to the
    right edge of row 1, at every width. */
-:global(body:has([data-search-page])) .carInline {
+:global(body:has([data-search-page])) .trailing {
   margin-left: auto;
 }
 
@@ -97,7 +106,7 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);
-  color: var(--color-on-ink);
+  color: var(--color-on-frame);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   overflow-wrap: anywhere;

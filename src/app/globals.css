@@ -19,7 +19,7 @@
   /* lines */
   --color-border: #dcdfe4;
   --color-border-strong: #7d838e;
-  --color-on-ink-line: #2d323a;
+  --color-on-ink-line: var(--color-on-frame-line);
 
   /* the one accent */
   --color-accent: #ffb800;
@@ -43,6 +43,15 @@
   --color-info-bg: #e7f0fa;
   --color-disabled-bg: #e4e6ea;
   --color-disabled-text: #6b717b;
+
+  /* the frame: header, home masthead and footer fill, and what sits on it */
+  --color-frame: #15181d;
+  --color-on-frame: #ffffff;
+  --color-on-frame-muted: #c5cad3;
+  --color-on-frame-line: #2d323a;
+
+  /* dialog backdrop */
+  --color-scrim: rgba(10, 12, 16, 0.6);
 
   /* spacing */
   --space-0: 0.25rem;
@@ -71,6 +80,8 @@
 
   /* type */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, 'Liberation Mono', monospace;
   --text-sm: 0.875rem;
   --text-md: 1rem;
   --text-lg: 1.25rem;
@@ -85,6 +96,123 @@
   --weight-medium: 600;
   --weight-bold: 700;
   --tracking-tight: -0.01em;
+
+  /* elevation: none, the owner ruled out shadows */
+  --elevation-1: none;
+  --elevation-2: none;
+}
+
+/*
+ * The dark set (issue 398). The head script of the root layout sets data-theme on html
+ * whenever script runs; the admin wrapper carries data-theme="dark" itself. Every alias
+ * that reads a colour is declared again here, because an alias is computed where it is
+ * declared and the admin wrapper is not the root.
+ */
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg: #171a1f;
+  --color-canvas: #0f1114;
+  --color-ink: #e9ecf1;
+  --color-chip-bg: #252a32;
+  --color-chip-text: #d0d5dd;
+  --color-tile-bg: #0f1114;
+
+  --color-text: #eceef2;
+  --color-muted: #a4abb6;
+  --color-on-ink: #101317;
+  --color-on-ink-muted: #454d5a;
+  --color-price: #f5f7fa;
+
+  --color-border: #2a3039;
+  --color-border-strong: #707987;
+  --color-on-ink-line: var(--color-on-frame-line);
+
+  --color-accent: #ffb800;
+  --color-accent-hover: #ffc733;
+  --color-accent-active: #e5a400;
+  --color-accent-edge: #c98f00;
+  --color-on-accent: #15181d;
+
+  --color-link: var(--color-ink);
+  --color-focus: var(--color-ink);
+
+  --color-success: #6bd49a;
+  --color-success-bg: #10301f;
+  --color-warning: #f2c35e;
+  --color-warning-bg: #33270a;
+  --color-danger: #ff8f87;
+  --color-danger-bg: #3a1513;
+  --color-info: #8fbfff;
+  --color-info-bg: #0f2842;
+  --color-disabled-bg: #20252c;
+  --color-disabled-text: #7d8591;
+
+  --color-frame: #08090b;
+  --color-on-frame: #f4f6f9;
+  --color-on-frame-muted: #aab1bc;
+  --color-on-frame-line: #272c34;
+
+  --color-scrim: rgba(0, 0, 0, 0.7);
+
+  --focus-ring: 3px solid var(--color-focus);
+  --focus-ring-on-ink: 3px solid var(--color-accent);
+}
+
+/* With no script the attribute is absent and the system setting decides: the same
+   declarations as the dark set above, line for line. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --color-bg: #171a1f;
+    --color-canvas: #0f1114;
+    --color-ink: #e9ecf1;
+    --color-chip-bg: #252a32;
+    --color-chip-text: #d0d5dd;
+    --color-tile-bg: #0f1114;
+
+    --color-text: #eceef2;
+    --color-muted: #a4abb6;
+    --color-on-ink: #101317;
+    --color-on-ink-muted: #454d5a;
+    --color-price: #f5f7fa;
+
+    --color-border: #2a3039;
+    --color-border-strong: #707987;
+    --color-on-ink-line: var(--color-on-frame-line);
+
+    --color-accent: #ffb800;
+    --color-accent-hover: #ffc733;
+    --color-accent-active: #e5a400;
+    --color-accent-edge: #c98f00;
+    --color-on-accent: #15181d;
+
+    --color-link: var(--color-ink);
+    --color-focus: var(--color-ink);
+
+    --color-success: #6bd49a;
+    --color-success-bg: #10301f;
+    --color-warning: #f2c35e;
+    --color-warning-bg: #33270a;
+    --color-danger: #ff8f87;
+    --color-danger-bg: #3a1513;
+    --color-info: #8fbfff;
+    --color-info-bg: #0f2842;
+    --color-disabled-bg: #20252c;
+    --color-disabled-text: #7d8591;
+
+    --color-frame: #08090b;
+    --color-on-frame: #f4f6f9;
+    --color-on-frame-muted: #aab1bc;
+    --color-on-frame-line: #272c34;
+
+    --color-scrim: rgba(0, 0, 0, 0.7);
+
+    --focus-ring: 3px solid var(--color-focus);
+    --focus-ring-on-ink: 3px solid var(--color-accent);
+  }
 }
 
 *,

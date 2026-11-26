@@ -1,0 +1,57 @@
+/* The theme switch (issue 398): a 44 by 44 outline button on the header frame. Hidden until
+   the head script has set `data-theme` on html, so with script its space is held from the
+   first paint and nothing moves at hydration, and with no script it is absent with no gap. */
+.switch {
+  display: none;
+}
+
+:global(html[data-theme]) .switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 0;
+  border: 1px solid var(--color-on-frame-muted);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-on-frame);
+  cursor: pointer;
+}
+
+:global(html[data-theme]) .switch:hover {
+  background: var(--color-on-frame-line);
+}
+
+.switch:focus-visible {
+  outline: var(--focus-ring-on-ink);
+  outline-offset: var(--focus-offset);
+}
+
+/* A 20 px circle with one half filled: the left half in light, the right half in dark,
+   so the glyph shows the active scheme. Two colour stops, nothing turned or moved. */
+.glyph {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-on-frame);
+  border-radius: 50%;
+  background: linear-gradient(to right, var(--color-on-frame) 50%, transparent 50%);
+}
+
+:global(html[data-theme='dark']) .glyph {
+  background: linear-gradient(to left, var(--color-on-frame) 50%, transparent 50%);
+}
+
+/* Visually hidden, not removed: the words are the button's name. */
+.words {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
