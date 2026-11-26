@@ -34,7 +34,7 @@ In:
 - the search results page with a selected car: the same grouping and counts, and the exact EAN and exact part-number exception of D-1 (ACs 27 to 36);
 - what a missing page is when the page count depends on the car: the 404 decision of a page past the end follows the combined list (AC 18, AC 34);
 - the unavailable-car behaviour, as a proposal (OD-1);
-- keeping `coche` on every link and form the new views add, and every S5.7 guarantee about indexing, cookies and logs (ACs 37 to 39);
+- keeping `coche` on every link and form the new views add, except the exceptions of S5.7 AC 43 (`/go/<offer>` and the links that change or remove the car; the change-car link carries the car in `volver`), and every S5.7 guarantee about indexing, cookies and logs (ACs 37 to 39);
 - the layout and keyboard or screen-reader reading of the new elements (ACs 41 and 42);
 - a measurement of the cost of the filtered category listing on a large category (AC 43);
 - updating the existing tests that open a listing with `coche` and assert it is unfiltered.
