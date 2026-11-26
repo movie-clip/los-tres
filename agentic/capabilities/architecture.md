@@ -32,7 +32,7 @@ Whatever the stack, these boundaries exist. Every design pass names where each
 one lives in code:
 
 - **Public visibility** (`src/server/visibility.ts`; product read in
-  `src/server/catalogue/product-page.ts`, category listing in `category-page.ts`, home tree in `category-tree.ts`; all call `visibleProductWhere()`). One shared query scope decides what is public: an
+  `src/server/catalogue/product-page.ts`, category listing in `category-page.ts`, home tree in `category-tree.ts`, whose `getPublicSubcategories` (root category page) is a projection of `getPublicCategoryTree` and the root page's only children read; all call `visibleProductWhere()`). One shared query scope decides what is public: an
   offer from an approved feed of an approved shop that is not hidden, not in the matching queue and not removed by import (`offers.is_removed`, S3.3), and a product that is not
   hidden and not in the matching queue. Every public read (catalogue, search,
   product page, sitemap, `/go/<offer>`) goes through it (guardrail 1). Marked rows (S12.2) are excluded only inside `visibleOfferWhere`/`visibleProductWhere` via `collectedRowsShown()`; `indexableProductWhere` (`demo.ts`) excludes demo and collected alike, flag-independent. The not-public reason (US-2.5) is computed only in `visibility.ts`, from `offerRules`/`productRules`, the tables `visibleOfferWhere`/`visibleProductWhere` AND; admin files only select it. The same holds for counts (S2.6): `currentOfferWhere` (not removed) and `offerOnSiteWhere` (listed on the public product page) are exported from `visibility.ts`, and `src/server/admin/sources.ts` reads the `/admin/tiendas` counts through them, so the removed flag stays named only in the visibility module, schema, seed and importer.

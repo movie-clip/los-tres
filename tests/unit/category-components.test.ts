@@ -9,6 +9,8 @@ import { CategorySort } from '@/components/CategorySort';
 import { Pagination } from '@/components/Pagination';
 import { ProductCard, type ProductCardProps } from '@/components/ProductCard';
 import { ProductGrid } from '@/components/ProductGrid';
+import { SubcategoryLinks } from '@/components/SubcategoryLinks';
+import { FIXED_CATEGORY_TREE } from '@/db/category-tree';
 
 // The listing components take finished strings and hrefs only (C-5). These
 // cover the branches the e2e cannot reach with one page of demo data.
@@ -607,5 +609,71 @@ describe('CategoryResultsPanel (S11.4)', () => {
     const html = panel({ sort: false });
     expect(html).not.toContain('slot-sort');
     expect(html).toContain('category-summary');
+  });
+});
+
+describe('SubcategoryLinks (#313)', () => {
+  const LABEL = 'Ir a una categoría';
+  // The five children of the fixed tree: the full group the root page shows when all five hold a product.
+  const five: { key: string; href: string; name: string }[] = FIXED_CATEGORY_TREE.children.map((child) => ({
+    key: child.slug,
+    href: `/categoria/${child.slug}`,
+    name: child.name,
+  }));
+  const render = (links = five) => renderToStaticMarkup(createElement(SubcategoryLinks, { label: LABEL, links }));
+  const anchors = (html: string) =>
+    [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)].map(([, attributes, inner]) => ({
+      href: /href="([^"]*)"/.exec(attributes)?.[1],
+      testId: /data-testid="([^"]*)"/.exec(attributes)?.[1],
+      text: inner.replace(/<[^>]*>/g, ''),
+    }));
+
+  it('renders five links in the given order, with the given names and hrefs, and no number', () => {
+    const html = render();
+
+    expect(anchors(html)).toEqual(
+      five.map((link) => ({ href: link.href, testId: 'subcategory-link', text: link.name })),
+    );
+    expect(five.map((link) => link.name)).toEqual(FIXED_CATEGORY_TREE.children.map((child) => child.name));
+    // Counts are out of this group (D-7): nothing but names and the label is text.
+    expect(html.replace(/<[^>]*>/g, '')).not.toMatch(/\d/);
+  });
+
+  it('is one nav named by its visible label through aria-labelledby', () => {
+    const html = render();
+
+    expect(html.match(/<nav\b/g)).toHaveLength(1);
+    expect(html).toContain('data-testid="subcategory-links"');
+    const labelledBy = /<nav\b[^>]*aria-labelledby="([^"]*)"/.exec(html)?.[1];
+    expect(labelledBy).toBeTruthy();
+    const label = new RegExp(`<[a-z]+\\b[^>]*id="${labelledBy}"[^>]*>([^<]*)<`).exec(html);
+    expect(label?.[1]).toBe(LABEL);
+  });
+
+  it('lists the anchors in a list, each a plain link with an aria-hidden empty chevron', () => {
+    const html = render();
+
+    expect(html.match(/<li\b/g)).toHaveLength(five.length);
+    expect(html.match(/<span\b[^>]*aria-hidden="true"[^>]*><\/span>/g)).toHaveLength(five.length);
+    for (const tag of html.match(/<a\b[^>]*>/g) ?? []) {
+      expect(tag).not.toMatch(/\s(target|rel|onclick)=/);
+    }
+  });
+
+  it('keeps the href it is given, so a car on it is shown untouched', () => {
+    const [first] = anchors(render([{ key: 'a', href: '/categoria/a?coche=seat-leon', name: 'A' }]));
+
+    expect(first.href).toBe('/categoria/a?coche=seat-leon');
+  });
+
+  it('renders one link for one child, and the label with it', () => {
+    const html = render([five[0]]);
+
+    expect(anchors(html)).toHaveLength(1);
+    expect(html).toContain(LABEL);
+  });
+
+  it('renders nothing for an empty list (AC 8, at component level)', () => {
+    expect(render([])).toBe('');
   });
 });

@@ -91,3 +91,29 @@ export async function getPublicCategoryTree(): Promise<CategoryTreeGroup[]> {
   }
   return groups;
 }
+
+// The backend/frontend contract for the root category page's subcategory links
+// (#313, 04-design § Contract). A projection of getPublicCategoryTree(), so the
+// links and the home tiles share one rule, one body (D-2). No count, by design.
+
+export type PublicSubcategory = {
+  /** categories.slug; link target categoryPath(slug), page 1, no filter. Always well-formed. */
+  slug: string;
+  /** categories.name. Never empty. Display text, not a message key. */
+  name: string;
+};
+
+/**
+ * The direct children of the top-level category `slug` that the home page shows
+ * as tiles (D-2): the `children` of that slug's group in getPublicCategoryTree(),
+ * same order (position, name, id), count dropped. [] when the slug is malformed,
+ * unknown, not top-level, or its subtree holds no public product.
+ */
+export async function getPublicSubcategories(slug: string): Promise<PublicSubcategory[]> {
+  if (!isWellFormedSlug(slug)) return [];
+  return (
+    (await getPublicCategoryTree())
+      .find((group) => group.slug === slug)
+      ?.children.map(({ slug: childSlug, name }) => ({ slug: childSlug, name })) ?? []
+  );
+}

@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import messages from '../../messages/es-ES.json';
-import { DEMO_SHOP_HOSTS } from '../fixtures/demo';
+import { FIXED_CATEGORY_TREE } from '../../src/db/category-tree';
+import { DEMO_CATEGORY_COUNTS, DEMO_SHOP_HOSTS } from '../fixtures/demo';
 import { CAR, carName, cocheValues, queryOf, scriptedControl, selectedText } from '../support/car';
 
 // US-5.7 T5.7.5 (L3t), ACs 43 to 48, journey J7 of 0006 rule 12: while a car is selected every internal link on
@@ -71,6 +72,10 @@ test.describe('with a car: listing, product, click-out journey (#339)', () => {
     // The listing, then a compatible product from its first group.
     await page.goto(join(ROOT, `coche=${CAR.slug}`));
     await expectCarried(page, 'category');
+    // Not vacuous (#313): the sweep above read the root's subcategory links, one per demo child that holds a product.
+    await expect(page.getByRole('navigation', { name: messages.Category.subcategoriesLabel }).getByRole('link')).toHaveCount(
+      FIXED_CATEGORY_TREE.children.filter((child) => DEMO_CATEGORY_COUNTS[child.slug] > 0).length,
+    );
     const fits = page.getByRole('region', { name: messages.Fit.fitsHeading.replace('{car}', carName(CAR)) });
     await expect(fits).toBeVisible();
     await fits.getByRole('heading', { level: 3 }).first().getByRole('link').click();

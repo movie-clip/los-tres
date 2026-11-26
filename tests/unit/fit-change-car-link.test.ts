@@ -32,6 +32,7 @@ vi.mock('@/server/car/context', async () => {
 vi.mock('@/server/catalogue/category-page', () => ({
   getPublicCategoryPage: async () => categoryHolder.current,
 }));
+vi.mock('@/server/catalogue/category-tree', () => ({ getPublicSubcategories: async () => [] }));
 vi.mock('@/server/catalogue/search-page', () => ({
   getPublicSearchPage: async () => searchHolder.current,
 }));

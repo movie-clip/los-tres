@@ -4,7 +4,7 @@ import { closeDb } from '@/db/client';
 import { setOfferHidden, setProductHidden } from '@/server/admin/products';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { brandSlug } from '@/server/catalogue/category-query';
-import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
+import { getPublicCategoryTree, getPublicSubcategories } from '@/server/catalogue/category-tree';
 import { isMissingPublicPage } from '@/server/catalogue/missing-page';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
@@ -119,6 +119,8 @@ async function view(w: World) {
     card: card === null ? null : { lowestPriceCents: card.lowestPriceCents, offerCount: card.offerCount },
     homeRoot: rootGroup?.productCount ?? 0,
     homeChildren: rootGroup?.children.map((child) => child.slug) ?? [],
+    // #313: the links of the root category page, the same rule as the home tiles.
+    rootSubcategories: (await getPublicSubcategories('raiz')).map((child) => child.slug),
     searchState: search?.state ?? null,
     searchCount: search?.state === 'results' ? search.productCount : 0,
     searchCard: found === null ? null : { lowestPriceCents: found.lowestPriceCents, offerCount: found.offerCount },
@@ -145,6 +147,7 @@ const PUBLIC_A = {
   card: { lowestPriceCents: 1000, offerCount: 2 },
   homeRoot: 2,
   homeChildren: ['cat-a', 'cat-b'],
+  rootSubcategories: ['cat-a', 'cat-b'],
   searchState: 'results',
   searchCount: 1,
   searchCard: { lowestPriceCents: 1000, offerCount: 2 },
@@ -169,6 +172,7 @@ const ABSENT_A = {
   card: null,
   homeRoot: 1,
   homeChildren: ['cat-b'],
+  rootSubcategories: ['cat-b'],
   searchState: 'no-results',
   searchCount: 0,
   searchCard: null,
@@ -221,7 +225,10 @@ describe('a hidden product is on no public surface (AC 32 to 38)', () => {
   it('AC 34: the home category counts leave it out', async () => {
     const w = await world();
     await setProductHidden(w.a.id, true);
-    expect(await view(w)).toMatchObject({ homeRoot: 1, homeChildren: ['cat-b'] });
+    const v = await view(w);
+    expect(v).toMatchObject({ homeRoot: 1, homeChildren: ['cat-b'] });
+    // #313: the root category page's links leave the child it alone held out too, the home tiles' set.
+    expect(v.rootSubcategories).toEqual(v.homeChildren);
   });
 
   it('AC 35: search does not return or count it, and a term only it matches is the ordinary no-results', async () => {

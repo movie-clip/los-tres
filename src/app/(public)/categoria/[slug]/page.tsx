@@ -23,12 +23,14 @@ import { groupCopy } from '@/components/listing-group-copy';
 import { ListingNote } from '@/components/ListingNote';
 import { Pagination, type PaginationLink } from '@/components/Pagination';
 import { ProductGrid } from '@/components/ProductGrid';
+import { SubcategoryLinks } from '@/components/SubcategoryLinks';
 import { getPublicOrigin, getSiteName } from '@/config/site';
 import { LOCALE } from '@/i18n/locale';
 import { getCarContext, openedWithCoche, selectedSlug } from '@/server/car/context';
 import { carLinks } from '@/server/car/return-path';
 import { selectedVehicleId } from '@/server/car/state';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
+import { getPublicSubcategories } from '@/server/catalogue/category-tree';
 import {
   parseBrandParam,
   parseSortParam,
@@ -107,13 +109,16 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   );
   if (category === null) notFound();
 
-  const [t, tFit, tProduct, tNotFound, tDemo, tCar] = await Promise.all([
+  // The links to the children: only on a root that lists products; the read itself returns [] for any other slug.
+  const showsSubcategories = category.ancestors.length === 0 && category.state !== 'empty-category';
+  const [t, tFit, tProduct, tNotFound, tDemo, tCar, subcategories] = await Promise.all([
     getTranslations('Category'),
     getTranslations('Fit'),
     getTranslations('Product'),
     getTranslations('NotFound'),
     getTranslations('DemoNotice'),
     getTranslations('Car'),
+    showsSubcategories ? getPublicSubcategories(category.slug) : Promise.resolve([]),
   ]);
   // First child of every `main` below, ahead of the demo notice.
   const carNotice = car.state === 'unrecognised' ? <CarNotice text={tCar('unknownNotice')} /> : null;
@@ -344,6 +349,15 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         <h1 className={styles.title}>{category.name}</h1>
         <p className={styles.note}>{tProduct('vatIncluded')}</p>
       </div>
+      {/* Navigation to a child at page 1: only the car, never the brand, sort or page (D-4). */}
+      <SubcategoryLinks
+        label={t('subcategoriesLabel')}
+        links={subcategories.map((child) => ({
+          key: child.slug,
+          href: withCar(categoryPath(child.slug), carSlug),
+          name: child.name,
+        }))}
+      />
       <CategoryResultsPanel
         brands={brands}
         count={countsLine}

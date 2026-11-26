@@ -6,7 +6,7 @@ import { closeDb } from '@/db/client';
 import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
 import { brandSlug } from '@/server/catalogue/category-query';
-import { getPublicCategoryTree } from '@/server/catalogue/category-tree';
+import { getPublicCategoryTree, getPublicSubcategories } from '@/server/catalogue/category-tree';
 import { readProductFitState, readProductVehicles } from '@/server/catalogue/fit-state';
 import { isMissingPublicPage } from '@/server/catalogue/missing-page';
 import { buildProductJsonLd } from '@/server/catalogue/product-jsonld';
@@ -185,6 +185,8 @@ async function view(w: World) {
     catUCount: catU?.productCount ?? null,
     homeRoot: rootGroup?.productCount ?? 0,
     homeChildren: (rootGroup?.children.map((child) => child.slug) ?? []).sort(),
+    // #313: the links of the root category page, the same rule as the home tiles.
+    rootSubcategories: (await getPublicSubcategories('raiz')).map((child) => child.slug).sort(),
     carFit: carRoot?.fit === null || carRoot === null ? null : { fits: carRoot.fit.fitsCount, unknown: carRoot.fit.unknownCount },
     carCards: (carRoot?.products.map((card) => card.slug) ?? []).sort(),
     sitemapCategories: (await getSitemapCategorySlugs()).sort(),
@@ -236,6 +238,7 @@ const HIDDEN = {
   catUCount: 1,
   homeRoot: 2,
   homeChildren: ['cat-c', 'cat-u'],
+  rootSubcategories: ['cat-c', 'cat-u'],
   carFit: { fits: 2, unknown: 0 },
   carCards: ['producto-c', 'producto-u'],
 } as const;
@@ -267,6 +270,7 @@ const SHOWN = {
   catUCount: 1,
   homeRoot: 3,
   homeChildren: ['cat-c', 'cat-m', 'cat-u'],
+  rootSubcategories: ['cat-c', 'cat-m', 'cat-u'],
   // M is public with no counted fitment, so it is "unknown" for the selected car, never "fits".
   carFit: { fits: 2, unknown: 1 },
   carCards: ['producto-c', 'producto-m', 'producto-u'],
@@ -294,6 +298,9 @@ describe.each(['off', ...BACKSTOP_MODES] as LocalFlagMode[])('flag mode %s: mark
 
     expect(seen).toMatchObject(HIDDEN);
     expect(seen).toMatchObject(ALWAYS);
+    // #313: the root page's links are the home tiles' set, so a marked-only child gets no link either.
+    expect(seen.rootSubcategories).toEqual(seen.homeChildren);
+    expect(seen.rootSubcategories).not.toContain('cat-m');
   });
 
   it('AC 16: the page of M is not found, and the rewrite and a car-filtered address agree', async () => {
@@ -379,6 +386,9 @@ describe('flag on beside a loopback SITE_URL: marked rows show as any row, and n
 
     expect(seen).toMatchObject(SHOWN);
     expect(seen).toMatchObject(ALWAYS);
+    // #313: with the flag on beside a loopback origin the link to the marked child shows, as its home tile does.
+    expect(seen.rootSubcategories).toEqual(seen.homeChildren);
+    expect(seen.rootSubcategories).toContain('cat-m');
   });
 
   it('non-vacuity: every surface that holds M or the marked offer differs between flag off and flag on', async () => {

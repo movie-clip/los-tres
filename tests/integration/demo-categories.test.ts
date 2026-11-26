@@ -5,6 +5,7 @@ import { closeDb, getDb } from '@/db/client';
 import { FIXED_CATEGORY_TREE } from '@/db/category-tree';
 import { categories, offers } from '@/db/schema';
 import { getPublicCategoryPage } from '@/server/catalogue/category-page';
+import { getPublicSubcategories } from '@/server/catalogue/category-tree';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
 import { importFeeds } from '@/server/importer';
 import { seedDemoData } from '@/server/seed';
@@ -164,6 +165,12 @@ describe('demo data categories (AC 23, AC 24)', () => {
       products: [],
     });
     expect(await getPublicCategoryPage('filtros-de-combustible', 2, null, 'price-asc')).toBeNull();
+    // #313: so the root page links the four children that hold a product, in tree order, and not this one.
+    const populated = FIXED_CATEGORY_TREE.children.filter((child) => DEMO_CATEGORY_COUNTS[child.slug] > 0);
+    expect(populated).toHaveLength(FIXED_CATEGORY_TREE.children.length - 1);
+    expect(await getPublicSubcategories(ROOT)).toEqual(
+      populated.map(({ slug, name }) => ({ slug, name })),
+    );
   });
 
   it.each([DEMO_UNMAPPED_CATEGORY, DEMO_UNMAPPED_EMPTY, DEMO_DRILL, DEMO_WRENCHES])(
