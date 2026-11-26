@@ -40,7 +40,7 @@ one lives in code:
 - **Feed ingestion** (`src/server/importer/`, `source.ts` the only fetch and the only reader of `catalogue-files/` (S3.7) and `collected-files/` (S12.2), both through `readCatalogueFile`). One importer, `import-feeds`, is the only writer of
   products and offers from outside data. It reads only feeds registered in the
   database and has no code path that fetches a shop's web pages (guardrail 2).
-- **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The importer is its only caller; there is no merge or split in the MVP (mvp.md § Matching).
+- **Matching** (`src/server/matching.ts`). One matching module implements `docs/decisions/0008`. The importer is its only caller; there is no merge or split in the MVP (mvp.md § Matching). `selectByEan` is step 1's lookup and is shared with the importer's EAN-fill holder check (S7.6), so the holder's visibility is the matcher's own scope; the fill rule is decided in `importer/ean-fill.ts` (`decideEanFill`) and written only by `fillEmptyEan` in `importer/index.ts`.
 - **Role check.** Every server entry point declares whether it is public or
   admin, and admin entry points check the session on the server (guardrail 3). Role check (`src/server/auth/guard.ts`): `requireAdminPage`, `requireAdminAction`, `checkAdminSession`; the only reader of the session cookie.
 - **Money** (`src/server/money.ts`). One money helper, in integer cents, which

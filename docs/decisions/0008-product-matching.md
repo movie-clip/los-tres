@@ -1,6 +1,6 @@
 # 0008 — Matching offers to products
 
-Status: accepted, 2026-10-16. Amended in place 2026-11-22 (S7.1, owner ruling D-10 of run 2026-11-22-s7-1-matching): the text below is the decision as built. The queue, the alias table, merge, split and stored admin decisions of the original text are not built and are not in the MVP (`mvp.md` § Matching, owner ruling 2026-10-26).
+Status: accepted, 2026-10-16. Amended in place 2026-11-22 (S7.1, owner ruling D-10 of run 2026-11-22-s7-1-matching) and 2026-11-26 (S7.6, owner ruling of run 2026-11-26-333-converged-ean: a product with no EAN takes the EAN of an eligible row, see the paragraph "An offer with an EAN that no product holds" and the Consequences): the text below is the decision as built. The queue, the alias table, merge, split and stored admin decisions of the original text are not built and are not in the MVP (`mvp.md` § Matching, owner ruling 2026-10-26).
 
 ## Decision
 
@@ -45,9 +45,29 @@ text, and the run does not fail. The four cases:
 
 An offer with an EAN that no product holds attaches to a product with the same
 brand and part number that has no EAN, and an offer with no EAN attaches to one
-that has. Attaching never changes the product's text, so a product that
-converged a row carrying an EAN still has no EAN: a later row with that EAN and
-a different brand and part number does not reach the product by EAN.
+that has. Attaching never changes the product's text, with one exception (S7.6):
+a product with no EAN (both EAN columns empty) takes the valid EAN of an eligible
+row of its own, so a later row with that EAN and a different brand and part
+number reaches the product by EAN. The row may be new and attach to the product,
+or a known offer already on it, on the next ordinary import. The EAN is written
+as creation writes it (the trimmed cell and its digit form) and nothing else on
+the product changes. The limits:
+
+- The row must be eligible: its shop and its feed are approved, its offer is not
+  hidden and not in review, and the product is not hidden by the admin. The local
+  collected-data flag never decides a fill.
+- The row and the product are on the same side of the collected wall: a collected
+  row fills only a product made from a collected row, and a hand-written row only
+  one made from a hand-written row, never across (decision 0017).
+- No fill while another product holds that EAN, hidden products included, among
+  the products the row's own EAN lookup can see (a hand-written row does not see
+  collected products). The offer stays where it is; nothing is merged or moved.
+- The first eligible row wins. An EAN, once set, is never changed or cleared. A
+  new row with a different EAN than the product now holds is its own product
+  (`brand_part_number_ean_conflict`); a known offer with a different EAN stays
+  where it is and prints nothing.
+- A fill creates, approves, hides, unhides and maps nothing, and publishes
+  nothing: approvals, hiding and category mapping are unchanged (guardrail 1).
 
 Matching decides which product an offer belongs to and publishes nothing:
 approvals, hiding and category mapping are unchanged (guardrail 1).
@@ -65,15 +85,24 @@ approvals, hiding and category mapping are unchanged (guardrail 1).
 
 - A conflict can leave two products with one EAN or one brand and part number.
   Rows that meet them later become their own products (`ambiguous_*`); the
-  duplicates are never healed. A duplicate is hidden by the admin.
+  duplicates are never healed. A duplicate is hidden by the admin. An EAN fill
+  creates none: it does not happen while a product holds the EAN. Two
+  `import-feeds` processes run at once could still each pass that check and fill
+  two products with one EAN; accepted like the other concurrent-import races.
 - A stored offer is never re-matched, and products already stored are never
   merged, so a repeat import creates nothing and lists no own-product row again.
-- The first feed's text wins: a product's title, brand, part number, EAN and
-  description are written once, when it is created.
+  A known offer may fill its product's empty EAN (S7.6); once filled, a repeat
+  import prints nothing more, and the first import after S7.6 ships may fill
+  stored products.
+- The first feed's text wins: a product's title, brand, part number and
+  description are written once, when it is created. The EAN is written then too,
+  except that an empty one may be filled once by an eligible row (S7.6) and is
+  never changed or cleared after.
 - The lookup in step 2 is served by the existing index on the normalised part
   number; no uniqueness is enforced on any of brand, part number or EAN.
 - Two `import-feeds` processes run at once can each create a product for one
   new key; the command is manual and this is accepted.
 - An offer from an approved feed that converges onto a product created by a feed
   since disabled makes that product public with the first feed's text; flagged
-  to the owner, not addressed.
+  to the owner, not addressed. The EAN fill is gated by the approvals of the
+  row's own shop and feed, never by those of the feed that made the product.
