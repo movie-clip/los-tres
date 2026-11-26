@@ -136,3 +136,43 @@ describe('SiteHeader theme switch rules (#398)', () => {
     expect(read('src/components/admin/AdminHeader.tsx')).not.toMatch(/ThemeSwitch|theme-storage/);
   });
 });
+
+// #398 review fixes (CR-1, CR-2): the header holds one 64 px row from 390 px and two rows, 112 px, from 352 to
+// 389 px with no car. A height is a layout fact a unit test cannot measure (0006 rule 11), so these pin the rules
+// the measurement rests on; the order and nesting of the markup they select is tests/unit/theme.test.ts.
+describe('SiteHeader wrap rules of the review fixes (#398 CR-1, CR-2)', () => {
+  it('CR-1: gives the header search field a 4.625rem (74 px) basis, the width that keeps the button on the field row at 390', () => {
+    const css = read('src/components/SearchForm.module.css');
+    expect(css).toMatch(/\.header\s+\.input\s*\{[^}]*flex-basis:\s*4\.625rem;/);
+    expect(css).not.toMatch(/\.header\s+\.input\s*\{[^}]*flex-basis:\s*5rem;/);
+  });
+
+  it('CR-2: from 22rem to 24.37rem a trailing group that holds the inline car control takes row 2 whole, at the right edge', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    const rule = css.match(
+      /@media \(min-width: 22rem\) and \(max-width: 24\.37rem\)\s*\{\s*\.trailing:has\(> \.carInline\)\s*\{([^}]*)\}/,
+    );
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).toMatch(/flex-basis:\s*100%;/);
+    expect(rule?.[1]).toMatch(/justify-content:\s*flex-end;/);
+  });
+
+  it('CR-2: the range meets the rule below it and stops under 390 px, so no width between 22rem and 40rem is left to the old wrap', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    expect(css).toMatch(/@media \(max-width: 21\.99rem\)\s*\{\s*\.trailing\s*\{/);
+    // 24.37rem is 389.92 px: the group stays on row 1 from 390 px, where the row holds everything.
+    expect(24.37 * 16).toBeLessThan(390);
+    expect(24.37 * 16).toBeGreaterThan(389);
+  });
+
+  it('CR-2: keys the row-2 rule on the car control being inside the group, so a selected car (the switch alone) stays on row 1', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    expect(css).toContain('.trailing:has(> .carInline)');
+    expect(css).not.toMatch(/@media \(min-width: 22rem\) and \(max-width: 24\.37rem\)\s*\{\s*\.trailing\s*\{/);
+  });
+
+  it('CR-2: a page with its own search form (home, /buscar) keeps the group on row 1 at any width, basis auto', () => {
+    const css = read('src/components/SiteHeader.module.css');
+    expect(css).toMatch(/:global\(body:has\(\[data-search-page\]\)\)\s+\.trailing\s*\{[^}]*flex-basis:\s*auto;[^}]*margin-left:\s*auto;/);
+  });
+});

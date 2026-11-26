@@ -1488,6 +1488,29 @@ describe('seams (guardrail 5, #398 theme choice)', () => {
     expect(offenders(/\bTHEME_SCRIPT\b/, (file) => file === STORAGE || file === 'src/app/layout.tsx')).toEqual([]);
   });
 
+  it('CR-3: reruns the head script through next/script afterInteractive, in head after the blocking one, for a document React renders on the client', () => {
+    const layout = code('src/app/layout.tsx');
+    expect(layout).toMatch(/import Script from 'next\/script';/);
+    const head = layout.slice(layout.indexOf('<head>'), layout.indexOf('</head>'));
+    expect(head.length).toBeGreaterThan(0);
+    const blocking = head.indexOf('<script ');
+    const rerun = head.indexOf('<Script ');
+    expect(blocking).toBeGreaterThan(-1);
+    expect(rerun).toBeGreaterThan(blocking);
+    const blockingTag = head.slice(blocking, head.indexOf('/>', blocking));
+    expect(blockingTag).toMatch(/__html:\s*THEME_SCRIPT\s*\}/);
+    expect(blockingTag).not.toMatch(/\b(async|defer)\b/);
+    const rerunTag = head.slice(rerun, head.indexOf('/>', rerun));
+    expect(rerunTag).toMatch(/\bid="[\w-]+"/);
+    expect(rerunTag).toMatch(/strategy="afterInteractive"/);
+    expect(rerunTag).toMatch(/__html:\s*THEME_SCRIPT\s*\}/);
+    expect(rerunTag).not.toMatch(/beforeInteractive|lazyOnload|worker/);
+    // Both run the one constant; neither builds script text from the request.
+    expect(head.match(/THEME_SCRIPT/g)).toHaveLength(2);
+    expect(head.match(/<script\b/g)).toHaveLength(1);
+    expect(head.match(/<Script\b/g)).toHaveLength(1);
+  });
+
   it('keeps the admin dark by a server-rendered wrapper attribute, with no switch and no theme storage in any admin file', () => {
     expect(code('src/app/admin/layout.tsx')).toMatch(/<div\b[^>]*\bdata-theme="dark"/);
     const admin = sources().filter(({ file }) => ['src/app/admin/', 'src/components/admin/', 'src/server/admin/'].some((dir) => inDir(file, dir)));

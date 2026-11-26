@@ -64,10 +64,11 @@ const stored = (value: string | null): StorageWorld => ({
   values: value === null ? {} : { [THEME_STORAGE_KEY]: value },
 });
 
-/** Runs THEME_SCRIPT in a fresh context whose browser objects are stubs that record what the script does. */
-function run(world: Partial<World> = {}): Facts {
+const freshFacts = (): Facts => ({ attributes: [], reads: [], writes: 0, queries: [], cookieTouches: 0 });
+
+/** Runs THEME_SCRIPT in a fresh context whose browser objects are stubs that record what the script does. Pass `facts` to record a second run into the same record. */
+function run(world: Partial<World> = {}, facts: Facts = freshFacts()): Facts {
   const { path = '/', storage = stored(null), system = 'light' } = world;
-  const facts: Facts = { attributes: [], reads: [], writes: 0, queries: [], cookieTouches: 0 };
 
   const document = { documentElement: { setAttribute: (name: string, value: string) => facts.attributes.push([name, value]) } };
   Object.defineProperty(document, 'cookie', {
@@ -194,6 +195,27 @@ describe('THEME_SCRIPT: the scheme at first paint, one case per row of the desig
         expect(facts.writes, `${path} ${JSON.stringify(world)}`).toBe(0);
         expect(facts.cookieTouches, `${path} ${JSON.stringify(world)}`).toBe(0);
       }
+    }
+  });
+
+  it('CR-3: runs again over a document it already ran on, setting the value that is there and writing nothing', () => {
+    // The root layout reruns the script after the client render (next/script afterInteractive).
+    for (const [world, expected] of [
+      [{ system: 'dark' }, 'dark'],
+      [{ storage: stored('claro'), system: 'dark' }, 'light'],
+      [{ storage: stored('oscuro'), system: 'light' }, 'dark'],
+      [{ path: '/admin/tiendas', system: 'light' }, 'dark'],
+    ] as [Partial<World>, Scheme][]) {
+      const facts = freshFacts();
+      run(world, facts);
+      run(world, facts);
+      expect(facts.attributes, JSON.stringify(world)).toEqual([
+        ['data-theme', expected],
+        ['data-theme', expected],
+      ]);
+      expect(facts.writes).toBe(0);
+      expect(facts.cookieTouches).toBe(0);
+      expect(facts.reads.every((key) => key === THEME_STORAGE_KEY)).toBe(true);
     }
   });
 
@@ -443,6 +465,24 @@ describe('SiteHeader around the switch', () => {
       const html = render({ ...props, themeLabel: LABEL });
       expect(switchIn(group(html, 'trailing')), JSON.stringify(Object.keys(props))).toBe(true);
       expect(html).not.toContain('car-control');
+    }
+  });
+
+  it('CR-2: with no car the car control is a direct child of the trailing group, which is what the row-2 rule selects', () => {
+    const trailing = group(render({ car: car(false), themeLabel: LABEL }), 'trailing') ?? '';
+    expect(trailing.startsWith('<div class="_carInline_')).toBe(true);
+    // The switch is a sibling after the car control, not inside it.
+    const carInline = group(trailing, 'carInline') ?? '';
+    expect(carInline).toContain('data-testid="car-control"');
+    expect(carInline).not.toContain(LABEL);
+    expect(trailing.slice(trailing.indexOf(carInline) + carInline.length)).toContain(`>${LABEL}<`);
+  });
+
+  it('CR-2: with a car selected, or no car control at all, the group has no carInline child, so the row-2 rule does not match', () => {
+    for (const props of [{ car: car(true) }, { car: null }, { car: null, search: null }]) {
+      const trailing = group(render({ ...props, themeLabel: LABEL }), 'trailing');
+      expect(trailing, JSON.stringify(Object.keys(props))).not.toBeNull();
+      expect(trailing).not.toContain('_carInline_');
     }
   });
 
