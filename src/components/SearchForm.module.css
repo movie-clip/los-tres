@@ -151,9 +151,11 @@
   opacity: 1;
 }
 
-/* The field is about 94px wide at 352px and the placeholder word "Buscar" needs more than
-   its text box leaves, so up to 22.5rem the field's inline padding is a step smaller. */
-@media (max-width: 22.5rem) {
+/* On phones the field can be as narrow as about 80 px (390 px, no car, one row), and the
+   placeholder word "Buscar" needs more than the text box a full padding leaves, so below
+   40rem the field's inline padding is a step smaller. The padding sits inside the field's
+   basis, so the row's wrap widths do not move. */
+@media (max-width: 39.99rem) {
   .header .input {
     padding-inline: var(--space-1);
   }
