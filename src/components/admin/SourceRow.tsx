@@ -9,6 +9,7 @@ import { ConfirmPanel } from './ConfirmPanel';
 import { DemoMark } from './DemoMark';
 import { ErrorBlock } from './ErrorBlock';
 import { PendingButton } from './PendingButton';
+import { initialFeedbackMemo, nextFeedbackMemo, shownFeedback } from './source-row-feedback';
 import { StatusTag } from './StatusTag';
 import { TextLink } from './TextLink';
 import { ValueLine } from './ValueLine';
@@ -64,8 +65,23 @@ export type SourceRowProps = {
   paused: boolean;
   labels: SourceRowLabels;
   extras: SourceRowExtras;
-  /** The server action for this kind, passed down by the page. */
-  action: (previous: SourceActionState, form: FormData) => Promise<SourceActionState>;
+  /** The row's action, bound by `useSourceRowAction` in the component that renders it. */
+  control: SourceRowControl;
+  /**
+   * Feed only: its shop's current action state. A newer stored shop result ends
+   * this row's own result line and error block (#384). The shop row omits it.
+   */
+  shopResult?: SourceActionState;
+};
+
+/** The server action for one kind, passed down by the page. */
+export type SourceRowAction = (previous: SourceActionState, form: FormData) => Promise<SourceActionState>;
+
+/** One row's bound action: its current state, the form action and whether it is pending. */
+export type SourceRowControl = {
+  state: SourceActionState;
+  formAction: (form: FormData) => void;
+  pending: boolean;
 };
 
 const IDLE: SourceActionState = { status: 'idle' };
@@ -84,12 +100,10 @@ function doneLine(state: Extract<SourceActionState, { status: 'done' }>, labels:
 }
 
 /**
- * One shop or feed: its name, meta line, optional note, a state tag and one
- * action. Approving acts at once; disabling opens an inline confirmation first.
- * The tag and button always follow the stored flag the server last rendered, so
- * the row never claims a state the server has not stored.
+ * Binds one row's server action. Lives in the component that renders the row, so
+ * a parent can read a row's state and pass it to its siblings (ShopGroup, #384).
  */
-export function SourceRow({ kind, id, title, meta, note, approved, paused, labels, extras, action }: SourceRowProps) {
+export function useSourceRowAction(kind: 'shop' | 'feed', id: number, action: SourceRowAction): SourceRowControl {
   // A transport failure (a 500, a dropped connection) rejects the action's promise,
   // which would reach the error boundary and replace the page. It becomes a failed
   // result for this row instead. Next's own redirect (a session that has ended) is
@@ -104,6 +118,35 @@ export function SourceRow({ kind, id, title, meta, note, approved, paused, label
     }
   };
   const [state, formAction, pending] = useActionState(guardedAction, IDLE);
+  return { state, formAction, pending };
+}
+
+/**
+ * One shop or feed: its name, meta line, optional note, a state tag and one
+ * action. Approving acts at once; disabling opens an inline confirmation first.
+ * The tag and button always follow the stored flag the server last rendered, so
+ * the row never claims a state the server has not stored.
+ */
+export function SourceRow({
+  kind,
+  id,
+  title,
+  meta,
+  note,
+  approved,
+  paused,
+  labels,
+  extras,
+  control,
+  shopResult,
+}: SourceRowProps) {
+  const { state, formAction, pending } = control;
+  // A stored shop result newer than this row's answer ends it, in the same render
+  // that shows the shop's line: the memo is replaced during render, never in an effect.
+  const [memo, setMemo] = useState(() => initialFeedbackMemo(shopResult ?? null));
+  const nextMemo = nextFeedbackMemo(memo, shopResult ?? null, state);
+  if (nextMemo !== memo) setMemo(nextMemo);
+  const shown = shownFeedback(state, pending, nextMemo);
   // The panel is open only for the state it was opened in: any new result closes it.
   const [openedFor, setOpenedFor] = useState<SourceActionState | null>(null);
   const confirming = openedFor === state;
@@ -193,13 +236,13 @@ export function SourceRow({ kind, id, title, meta, note, approved, paused, label
         )}
       </div>
       <div role="status" className={styles.feedback}>
-        {!pending && state.status === 'done' ? (
+        {shown?.status === 'done' ? (
           <span className={styles.done} data-testid="source-done">
-            {doneLine(state, labels)}
+            {doneLine(shown, labels)}
           </span>
         ) : null}
       </div>
-      {!pending && state.status === 'failed' ? (
+      {shown?.status === 'failed' ? (
         <div className={styles.error}>
           <ErrorBlock title={labels.errorTitle} message={labels.errorBody} />
         </div>

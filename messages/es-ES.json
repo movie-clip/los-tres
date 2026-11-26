@@ -261,7 +261,7 @@
     },
     "Sources": {
       "heading": "Tiendas y feeds",
-      "intro": "Una oferta solo se muestra en el sitio si su tienda y su feed están aprobados. Un feed nuevo empieza sin aprobar y no se importa hasta que lo apruebes.",
+      "intro": "Una oferta solo se muestra en el sitio si su tienda y su feed están aprobados, su producto tiene categoría, la oferta y el producto no están ocultos y su feed la traía en la última importación. Las ofertas de un feed recopilado solo se muestran en el sitio local. Un feed nuevo empieza sin aprobar y no se importa hasta que lo apruebes.",
       "summary": "{shops, plural, one {# tienda} other {# tiendas}} y {feeds, plural, one {# feed} other {# feeds}}",
       "listLabel": "Tiendas y sus feeds",
       "createGroupLabel": "Añadir tienda o feed",
@@ -297,7 +297,7 @@
       "shopNotApproved": "No aprobada",
       "shopMeta": "{feeds, plural, =0 {Sin feeds} one {# feed} other {# feeds}} · {offers, plural, one {{offersText} oferta} other {{offersText} ofertas}}",
       "shopNotePaused": "La tienda no está aprobada: sus ofertas no se muestran en el sitio, aunque tenga feeds aprobados.",
-      "shopNoteNoApprovedFeed": "Ningún feed aprobado: la tienda aún no tiene ofertas en el sitio.",
+      "shopNoteNoApprovedFeed": "Ningún feed aprobado: las ofertas de esta tienda no se muestran en el sitio.",
       "shopApprove": "Aprobar tienda",
       "shopApproving": "Aprobando…",
       "shopDisable": "Desactivar tienda",

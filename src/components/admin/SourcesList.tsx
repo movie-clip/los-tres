@@ -1,5 +1,5 @@
 import { ShopGroup, type ShopGroupView } from './ShopGroup';
-import type { SourceRowProps } from './SourceRow';
+import type { SourceRowAction } from './SourceRow';
 import styles from './SourcesList.module.css';
 
 export type SourcesListProps = {
@@ -7,8 +7,8 @@ export type SourcesListProps = {
   label: string;
   shops: ShopGroupView[];
   /** The two server actions, passed down by the page: this component imports nothing from src/server. */
-  shopAction: SourceRowProps['action'];
-  feedAction: SourceRowProps['action'];
+  shopAction: SourceRowAction;
+  feedAction: SourceRowAction;
 };
 
 /** The shops, in the order given, each with its feeds. Display strings only. */
