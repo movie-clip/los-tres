@@ -74,14 +74,14 @@ Convergence on brand and part number
 7. A row with no brand, or a blank brand, is its own product and is never attached by this step, whatever products hold its part number (the issue's "both must be present").
 8. A row with no part number, or a blank one, is its own product and is never attached by this step.
 9. A stored product whose normalised brand or normalised part number is empty is never found by this step; the row is its own product and nothing fails (OD-3).
-10. When a row converges, nothing about the product's text changes: not its title, brand, part number, EAN or description. The first feed's text stays.
+10. When a row converges, nothing about the product's text changes: not its title, brand, part number, EAN or description. The first feed's text stays. *(The EAN part is superseded by US-7.6: an empty EAN may be filled once by an eligible row.)*
 11. (OD-4 (a).) Two rows of one feed with the same key and no EAN converge, the second onto the product the first created in the same import.
 
 EAN first, and the cases with an EAN
 
 12. (OD-1 (iii).) A row with a valid EAN held by exactly one product with a compatible brand attaches to that product whatever its brand and part number say; a different product holding that brand and part number gets nothing.
 13. The EAN rules that exist today hold unchanged: a present but invalid EAN is rejected as `invalid_ean` before matching; a missing brand on either side does not stop an EAN attach; the EAN with spaces or hyphens still matches its stored digit string.
-14. (OD-1 (i).) A row without an EAN converges on a product that has one when the key matches; a row with a valid EAN that no product holds converges on a product with the same key that has no EAN.
+14. (OD-1 (i).) A row without an EAN converges on a product that has one when the key matches; a row with a valid EAN that no product holds converges on a product with the same key that has no EAN. *(What the product then holds is superseded by US-7.6: it takes that EAN when the row is eligible.)*
 15. (OD-1 (ii).) A row with a valid EAN that no product holds does not converge on a product with the same key that carries a different valid EAN; it is its own product.
 
 A conflict keeps the offer as its own product (D-5)
@@ -95,7 +95,7 @@ A conflict keeps the offer as its own product (D-5)
 Repeat imports and what is already stored
 
 21. Running `import-feeds` again changes nothing except prices and dates: no product is created, no offer moves, and a row that became its own product by AC 15, 16, 19 or 20 stays attached to that product and is no longer listed as created.
-22. Offers and products that were stored before this change are not re-matched and not merged: two products that exist separately stay separate after any import, and an offer keeps the product it has.
+22. Offers and products that were stored before this change are not re-matched and not merged: two products that exist separately stay separate after any import, and an offer keeps the product it has. *(See US-7.6: a known offer may fill its product's empty EAN; nothing is re-matched or merged.)*
 
 Visibility and approvals (guardrail 1)
 
@@ -180,7 +180,7 @@ Listed for the docs lane, which reconciles from the actual diff. None is made by
 - **The reject of today is a decision of slice B, not an accident.** The row rejection is an owner-reviewed rule ("D-1 Q5", `src/server/matching.ts` line 59), and `mvp.md`, `CLAUDE.md` § Stack and D-5 all say the offer stays its own product. This story reverses the code to match them. 0008's older text (a queue, off the site until resolved) is the third version and is not adopted; D-5 ruled it by non-objection.
 - **The two existing tests the recon counted, plus two more.** AC 16 and, if OD-2 is ruled as recommended, AC 19 also reverse a test each; the plan names all four so the test lane does not find them by failing.
 - **A conflict now leaves two products with one EAN.** That is a consequence of D-5, not a defect: it is why OD-2 (a) exists. The recommendation avoids dropping the third offer.
-- **Products already in the owner's local database.** Offers stored before this story keep their separate products (AC 22). If the owner imported hand files with EAN-less rows before S7.1, those products do not converge when the files are imported again; they need a fresh local database or an admin hide. This matters for S9.4 and is the thing to say in the guide.
+- **Products already in the owner's local database.** Offers stored before this story keep their separate products (AC 22). If the owner imported hand files with EAN-less rows before S7.1, those products do not converge when the files are imported again; they need a fresh local database or an admin hide. This matters for S9.4 and is the thing to say in the guide. *(See US-7.6: an EAN-less stored product whose row now carries an EAN fills it on the next import.)*
 - **Same-shop duplicates.** Under OD-4 (a) a shop that lists one part under two ids shows twice on the product page. Whether the page should show one row per shop is not decided here.
 - **The step does not look at the shop or the feed.** It is blind to whether a product came from an approved feed; as with EAN today, an offer from an approved feed that converges onto a product created by a feed since disabled makes that product public with the first feed's text. Guardrail 1 is met on the offer side and unchanged on the product side; I did not find this recorded as a decision and flag it for the owner, not as a change to make here.
 - **Collected rows (S12.2).** When the collector's rows exist, convergence between a collected row and a public-feed row is that story's to gate. This story neither enables nor prevents it. *Update (S12.2, shipped on branch `306-collected-data-local-only`, pending merge): an unmarked row never attaches to a marked product, and a marked row may attach to an unmarked product as an offer only.*

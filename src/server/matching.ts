@@ -82,6 +82,15 @@ export type MatchResult =
   | { kind: 'none' }
   | { kind: 'own_product'; reason: OwnProductReason };
 
+/** Step 1's lookup, shared with the importer's EAN-fill holder check (S7.6). At most 2 rows. */
+export function selectByEan(db: Executor, eanNormalised: string, scope: MatchScope = UNMARKED_ROW) {
+  return db
+    .select({ id: products.id, brandNormalised: products.brandNormalised })
+    .from(products)
+    .where(and(eq(products.eanNormalised, eanNormalised), scopeWhere(scope)))
+    .limit(2);
+}
+
 /** Step 2's lookup, exported so a plan test explains this exact query. At most 2 rows. */
 export function selectByBrandPartNumber(
   db: Executor,
@@ -117,11 +126,7 @@ export async function matchProduct(
   scope: MatchScope = UNMARKED_ROW,
 ): Promise<MatchResult> {
   if (candidate.eanNormalised !== null) {
-    const found = await db
-      .select({ id: products.id, brandNormalised: products.brandNormalised })
-      .from(products)
-      .where(and(eq(products.eanNormalised, candidate.eanNormalised), scopeWhere(scope)))
-      .limit(2);
+    const found = await selectByEan(db, candidate.eanNormalised, scope);
     if (found.length > 1) return { kind: 'own_product', reason: 'ambiguous_ean' };
     if (found.length === 1) {
       const [product] = found;

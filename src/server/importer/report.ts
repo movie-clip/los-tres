@@ -16,6 +16,7 @@ function feedLines(feed: FeedImportReport): string[] {
       (row) => `  record ${row.record}: ${row.code}${row.field ? ` (${row.field})` : ''}`,
     ),
     ...feed.ownProducts.map((row) => `  record ${row.record}: own_product ${row.reason}`),
+    ...(feed.eanFilled > 0 ? [`  ean: filled=${feed.eanFilled}`] : []),
     ...feed.unknownVehicleSlugs.map(
       (unknown) => `  fitment: unknown vehicle ${unknown.slug} rows=${unknown.rows}`,
     ),
@@ -34,7 +35,8 @@ function feedLines(feed: FeedImportReport): string[] {
 /**
  * One line per feed, then a total line. Under an imported feed's line, indented
  * and in this order: its rejected rows, its own-product rows (`own_product
- * <reason>`), its unknown fitment vehicles, the not-shown fitment count, then
+ * <reason>`), the filled-EAN count (`ean: filled=<n>`, S7.6, only when n > 0),
+ * its unknown fitment vehicles, the not-shown fitment count, then
  * last the skipped removal (`removal: skipped <reason> missing=<n>
  * current=<n>`, S3.3), only when the guard skipped it. A skipped or failed
  * feed has its line only: a failed feed rolled back, removal included.

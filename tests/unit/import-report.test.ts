@@ -15,6 +15,7 @@ function feed(overrides: Partial<FeedImportReport>): FeedImportReport {
     offersRemoved: 0,
     rejected: [],
     ownProducts: [],
+    eanFilled: 0,
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
@@ -349,5 +350,127 @@ describe('formatImportReport, offer removal (S3.3, AC 19)', () => {
   it('prints no URL and no row text with a removal line', () => {
     const text = run({ removalSkipped: { reason: 'small_import', missing: 10, current: 19 } }).join('\n');
     expect(text).not.toMatch(/https?:|demo-feed:|\.example/);
+  });
+});
+
+describe('formatImportReport, filled EANs (S7.6, AC 17, 18, 19)', () => {
+  const lines = (overrides: Partial<FeedImportReport>) =>
+    formatImportReport({ startedAt, feeds: [feed({ rows: 3, productsCreated: 1, offersCreated: 3, ...overrides })] }).split('\n');
+
+  it.each([1, 3, 12])('prints one `  ean: filled=%i` line when %i products were filled', (n) => {
+    const out = lines({ eanFilled: n });
+    expect(out.filter((line) => line.includes('ean:'))).toEqual([`  ean: filled=${n}`]);
+    expect(out[1]).toBe(`  ean: filled=${n}`);
+  });
+
+  it('prints no ean line at 0, whatever else the feed reports', () => {
+    const out = lines({
+      eanFilled: 0,
+      rejected: [{ record: 4, code: 'invalid_ean', field: 'ean' }],
+      ownProducts: [{ record: 2, reason: 'ean_brand_conflict' }],
+      unknownVehicles: 1,
+      unknownVehicleSlugs: [{ slug: 'coche-x', rows: 1 }],
+      removalSkipped: { reason: 'small_import', missing: 10, current: 19 },
+    });
+    expect(out.filter((line) => line.includes('ean:'))).toEqual([]);
+  });
+
+  it('formats a report with eanFilled 0 byte for byte as one that does not have the field', () => {
+    const withField = feed({
+      rows: 3,
+      rejected: [{ record: 4, code: 'invalid_price', field: 'price' }],
+      ownProducts: [{ record: 2, reason: 'ambiguous_ean' }],
+      eanFilled: 0,
+    });
+    const without: Partial<FeedImportReport> = { ...withField };
+    delete without.eanFilled;
+    expect(formatImportReport({ startedAt, feeds: [without as FeedImportReport] })).toBe(
+      formatImportReport({ startedAt, feeds: [withField] }),
+    );
+    expect(formatImportReport({ startedAt, feeds: [withField] })).not.toContain('ean:');
+  });
+
+  it('puts the line after the rejected and own-product lines, before the fitment lines and the removal line', () => {
+    const out = lines({
+      eanFilled: 2,
+      rejected: [{ record: 4, code: 'invalid_price', field: 'price' }],
+      ownProducts: [
+        { record: 2, reason: 'ean_brand_conflict' },
+        { record: 3, reason: 'ambiguous_brand_part_number' },
+      ],
+      unknownVehicles: 5,
+      unknownVehicleSlugs: [{ slug: 'coche-x', rows: 2 }],
+      unknownVehiclesNotShown: 3,
+      removalSkipped: { reason: 'small_import', missing: 10, current: 19 },
+    });
+    expect(out.slice(1)).toEqual([
+      '  record 4: invalid_price (price)',
+      '  record 2: own_product ean_brand_conflict',
+      '  record 3: own_product ambiguous_brand_part_number',
+      '  ean: filled=2',
+      '  fitment: unknown vehicle coche-x rows=2',
+      '  fitment: unknown vehicle values not shown rows=3',
+      '  removal: skipped small_import missing=10 current=19',
+      'total: feeds=1 imported=1 skipped=0 failed=0',
+    ]);
+  });
+
+  it('leaves the feed head line without a new count', () => {
+    const [head] = lines({ eanFilled: 4 });
+    expect(head).toBe(
+      'feed 1 "Tienda Demo Uno": imported rows=3 products_created=1 offers_created=3 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+    );
+  });
+
+  it('carries nothing but the count: no record, product, EAN or row text', () => {
+    const [, line] = lines({ eanFilled: 7 });
+    expect(line).toMatch(/^ {2}ean: filled=\d+$/);
+  });
+
+  it('keeps each feed\'s line with its own feed when two feeds are printed', () => {
+    const text = formatImportReport({
+      startedAt,
+      feeds: [
+        feed({ rows: 1, eanFilled: 1 }),
+        feed({ feedId: 2, shopName: 'Tienda Demo Dos', rows: 1 }),
+        feed({ feedId: 3, shopName: 'Tienda Demo Tres', rows: 1, eanFilled: 5 }),
+      ],
+    }).split('\n');
+    expect(text).toEqual([
+      expect.stringMatching(/^feed 1 /),
+      '  ean: filled=1',
+      expect.stringMatching(/^feed 2 /),
+      expect.stringMatching(/^feed 3 /),
+      '  ean: filled=5',
+      'total: feeds=3 imported=3 skipped=0 failed=0',
+    ]);
+  });
+
+  it('never prints it for a skipped or failed feed, whatever the count holds', () => {
+    const report: ImportReport = {
+      startedAt,
+      feeds: [
+        feed({ feedId: 3, shopName: 'Tres', outcome: 'skipped', skipReason: 'not_approved', eanFilled: 4 }),
+        feed({ feedId: 4, shopName: 'Cuatro', outcome: 'failed', failure: 'database_error', eanFilled: 4 }),
+      ],
+    };
+    expect(formatImportReport(report)).toBe(
+      [
+        'feed 3 "Tres": skipped not_approved',
+        'feed 4 "Cuatro": failed database_error',
+        'total: feeds=2 imported=0 skipped=1 failed=1',
+      ].join('\n'),
+    );
+  });
+
+  it('does not change the exit code: a fill never fails a run, and a failed feed still does', () => {
+    expect(importExitCode({ startedAt, feeds: [feed({ eanFilled: 9 })] })).toBe(0);
+    expect(
+      importExitCode({ startedAt, feeds: [feed({ eanFilled: 9 }), feed({ feedId: 2, outcome: 'failed', failure: 'database_error' })] }),
+    ).toBe(1);
+  });
+
+  it('prints no URL and no row text with the line', () => {
+    expect(lines({ eanFilled: 2 }).join('\n')).not.toMatch(/https?:|demo-feed:|\.example/);
   });
 });
