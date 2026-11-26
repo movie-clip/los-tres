@@ -36,6 +36,14 @@ is no deadline.
 "Los Tres" is a code name. The public site name is configuration, not code, so
 the owner can change it without a code change.
 
+## Look and feel
+
+Owner ruling, 2026-11-26 (S14.1, #397): the public site comes in a light and
+a dark scheme, with a switch the visitor controls (the choice is kept in the
+browser only), in Direction A, Taller. A first visit follows the visitor's
+system setting. The approved system is `docs/design/system.md`; its build is
+#398 and #399, so until those merge the site is light only.
+
 ## Audience and language
 
 - Consumers and talleres (workshops): anyone who wants to buy.
