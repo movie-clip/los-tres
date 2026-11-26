@@ -101,7 +101,12 @@ that device until they change or remove it.
    filtering works without JavaScript and a link can be shared.
    - Every internal link the site renders (header, category tiles, cards,
      breadcrumb, pagination, sort, chips, search form) carries `coche` while
-     one is selected.
+     one is selected, with four exceptions (US-5.7 AC 43): the link to
+     `/go/<offer>`; the car control's change and remove links; the "change
+     car" link of the all-left-out empty state; and the tiles of the vehicle
+     list on the product page, which carry their own car's `coche`. The two
+     change links carry the car only inside `volver`, never as a top-level
+     `coche`.
    - An unknown or retired slug is ignored: the page renders unfiltered with a
      short notice "No reconocemos ese coche". The browser clears the stored
      value only when it is that very slug; a different stored car stays.
