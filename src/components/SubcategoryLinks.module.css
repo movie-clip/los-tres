@@ -1,0 +1,107 @@
+/* The root category page's links to its children (S4.3). Navigation, not a
+   filter: on the canvas, outside the Results panel, rectangles with a chevron.
+   The border, chevron, hover and focus values match the home tile
+   (CategoryTiles.module.css); they are restated here, not composed, so the
+   home tile can change without moving this group. */
+.group {
+  margin-bottom: var(--space-3);
+}
+
+/* A span set to block, not a p: `.page p` is muted. */
+.label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+/* Below 40rem: two equal columns. */
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  min-height: var(--tap-target);
+  height: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  text-decoration: none;
+}
+
+.name {
+  min-width: 0;
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+/* The chevron is a filled shape clipped from an empty box: decorative, no
+   text. 0.5rem by 0.875rem is the home tile's own size. */
+.chevron {
+  flex: none;
+  width: 0.5rem;
+  height: 0.875rem;
+  background: var(--color-ink);
+  clip-path: polygon(0 0, 35% 0, 100% 50%, 35% 100%, 0 100%, 65% 50%);
+}
+
+/* Same 1px width, so nothing shifts: only the colour changes. */
+.link:hover,
+.link:active {
+  border-color: var(--color-ink);
+}
+
+.link:active {
+  background: var(--color-canvas);
+}
+
+.link:hover .name,
+.link:active .name,
+.link:focus-visible .name {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* 14rem and below (a 390 phone at 200% zoom): one column. */
+@media (max-width: 14rem) {
+  .list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* From 40rem the links wrap by width: auto-fit drops empty tracks, so fewer
+   links fill fewer, wider columns. 10.5rem and 22rem are this component's own
+   sizes, not global tokens. */
+@media (min-width: 40rem) {
+  .list {
+    grid-template-columns: repeat(auto-fit, minmax(min(10.5rem, 100%), 1fr));
+  }
+
+  .item {
+    max-width: 22rem;
+  }
+}

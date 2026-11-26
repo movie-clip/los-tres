@@ -34,6 +34,7 @@
     "priceFrom": "Desde",
     "emptyHeading": "Aún no hay productos en esta categoría",
     "emptyBody": "Estamos añadiendo productos y tiendas. Vuelve pronto.",
+    "subcategoriesLabel": "Ir a una categoría",
     "brandGroupLabel": "Marca",
     "brandAll": "Todas las marcas",
     "brandChipLabel": "{brand}: {count, plural, one {# producto} other {# productos}}",
