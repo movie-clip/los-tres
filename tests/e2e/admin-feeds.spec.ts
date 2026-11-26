@@ -108,7 +108,15 @@ adminTest.describe('registering and approving a feed journey (#339)', () => {
     expect(stripScripts(await (await request.get('/producto/demo-filtro-de-aceite-oc-1234')).text())).toBe(productBefore);
     expect(await (await request.get(`/buscar?q=${JOURNEY.shop.slug}`)).text()).not.toContain(JOURNEY.shop.name);
 
-    // Disable the feed, then the shop, each behind its confirmation: nothing stays approved.
+    // Disable the shop, then the feed, each behind its confirmation: nothing stays approved. The shop goes first on
+    // purpose (#384): its stored result ends the "Feed aprobado" line its feed row still shows, in the same update
+    // that shows the shop's own line, and the feed row says what is true now through its own pause note. This is the
+    // only proof on the real action and the real revalidation; the rule itself is unit/source-row-feedback.test.ts.
+    await shop.getByRole('button', { name: copy.shopDisableName.replace('{shop}', JOURNEY.shop.name), exact: true }).click();
+    await shop.getByRole('button', { name: copy.confirmShopYes, exact: true }).click();
+    await expect(shop.getByText(copy.doneShopDisabled, { exact: true })).toBeVisible();
+    await expect(shop.getByText(copy.doneFeedApproved, { exact: true })).toHaveCount(0);
+    await expect(shop.getByText(copy.feedNotePaused, { exact: true })).toBeVisible();
     await shop
       .getByRole('button', {
         name: copy.feedDisableName.replace('{id}', feedId).replace('{shop}', JOURNEY.shop.name),
@@ -116,9 +124,8 @@ adminTest.describe('registering and approving a feed journey (#339)', () => {
       })
       .click();
     await shop.getByRole('button', { name: copy.confirmFeedYes, exact: true }).click();
+    // The feed's own answer shows as ever, and a feed press does not end the shop's line.
     await expect(shop.getByText(copy.doneFeedDisabled, { exact: true })).toBeVisible();
-    await shop.getByRole('button', { name: copy.shopDisableName.replace('{shop}', JOURNEY.shop.name), exact: true }).click();
-    await shop.getByRole('button', { name: copy.confirmShopYes, exact: true }).click();
     await expect(shop.getByText(copy.doneShopDisabled, { exact: true })).toBeVisible();
     await expect(shop.getByText(copy.shopNotApproved, { exact: true })).toBeVisible();
   });
