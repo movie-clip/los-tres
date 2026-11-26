@@ -171,6 +171,7 @@ Notes for the test lane:
 
 - The existing integration test already compares the Yes/No with the public page for the same slug; the new reason assertions sit beside it and reuse its fixtures (`tests/support/catalogue.ts`, `setOfferRemoved`, `tests/support/hide.ts`).
 - A fixture cannot be made for review by any real writer; set `in_review` directly, as `visibility.test.ts` does.
+- `Admin.Sources.intro` (`messages/es-ES.json`) lists the public conditions without `in_review` because nothing writes it; the story that adds a writer of `in_review` must add that clause to the intro.
 - The integration review states the measured `check`, integration, e2e and full-gate times against the budgets and the tests added and removed per level (rule 14 and 15); this story is expected to add unit and integration tests only.
 
 ## Tickets

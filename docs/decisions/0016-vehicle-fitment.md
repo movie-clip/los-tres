@@ -41,7 +41,18 @@ Amends `docs/product/mvp.md` § Catalogue scope ("No vehicle fitment") and
 - New tables for vehicles and product–vehicle fitments, and a `fitment` column
   in the demo feeds (shipped in S5.6; the import is the only writer of
   fitments).
-- Every internal link must carry `coche` while one is selected; a page with
-  `coche` is `noindex`.
+- Every internal link must carry `coche` while one is selected, except
+  four kinds named in US-5.7 AC 43: the link to `/go/<offer>`; the car
+  control's change and remove links; the "change car" link of the
+  all-left-out empty state; and the tiles of the vehicle list on the
+  product page, which carry their own car's `coche`. The two change
+  links carry the car only inside `volver`, never as a top-level `coche`.
+  A page with `coche` is `noindex`.
 - The privacy page names the stored car choice (local storage, kept only in the
   visitor's browser). Deferred in S5.7, done in S5.8 (D-18, D-22).
+
+> **Amended 2026-11-26 (#387, owner ruling D-1 of run
+> 2026-11-26-388-open-points).** The second Consequences bullet, "every internal
+> link must carry `coche`", is superseded as built: it now names the four
+> exceptions of `docs/product/stories/US-5.7-select-car.md` AC 43, which stays
+> the source for them. The decision itself is unchanged.
