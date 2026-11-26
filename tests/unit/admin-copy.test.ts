@@ -183,6 +183,25 @@ describe('no copy promises that approval publishes offers (AC 40, D-6)', () => {
     expect(copy.doneFeedApprovedPaused).not.toMatch(/ofertas ya se muestran/);
   });
 
+  // #385: the intro states the necessary conditions of the one public rule (visibility.ts) and the note states a
+  // present fact, so a later reword of either must fail a test. Whole values, as written in the UX spec.
+  it('pins the whole intro: the conditions of the public rule, the collected exception and the new-feed sentence (#385)', () => {
+    expect(messages.Admin.Sources.intro).toBe(
+      'Una oferta solo se muestra en el sitio si su tienda y su feed están aprobados, su producto tiene categoría, la oferta y el producto no están ocultos y su feed la traía en la última importación. Las ofertas de un feed recopilado solo se muestran en el sitio local. Un feed nuevo empieza sin aprobar y no se importa hasta que lo apruebes.',
+    );
+  });
+
+  it('pins the whole note of an approved shop with no approved feed, and that it names no time (#385, AC 6)', () => {
+    const note = messages.Admin.Sources.shopNoteNoApprovedFeed;
+    expect(note).toBe('Ningún feed aprobado: las ofertas de esta tienda no se muestran en el sitio.');
+
+    // JavaScript's \b is ASCII: after "ú" it needs a following word character, so /\baún\b/ never matches "aún no".
+    // Letter-aware edges instead, and the same pattern is shown to match the note this one replaced.
+    const TIME_WORD = /(?<![\p{L}])(?:aún|todavía|ya|pronto)(?![\p{L}])/iu;
+    expect(TIME_WORD.test('Ningún feed aprobado: la tienda aún no tiene ofertas en el sitio.')).toBe(true);
+    expect(note).not.toMatch(TIME_WORD);
+  });
+
   it('keeps the S3.1 notices free of any value: no name, slug or address placeholder', () => {
     for (const key of [
       'noticeNetworkCreated',

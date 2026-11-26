@@ -165,6 +165,7 @@ Ordered, contracts before consumers. Phases before the first ticket, dispatched 
 Listed for the docs lane, which reconciles from the actual diff. None is made by this story's drafting.
 
 - `docs/product/stories/US-2.5-admin-not-public-reason.md` AC 35 and OD-3: a reconcile line that S2.6 changed the count and kept the two notes.
+- Reconcile (#385): the two notes did not stay as they were. #385 reworded `shopNoteNoApprovedFeed` (the "aún" is gone) and the `Admin.Sources.intro` text of `/admin/tiendas`.
 - `docs/product/mvp.md` § Admin area: the docs lane judges whether the admin's list of what it can see gains a line.
 - `docs/design/system.md`: a row for the two-count line, from the UX pass.
 - `messages/es-ES.json` admin section: the new copy, from the UX pass; `shopMeta` and `feedMetaOffers` are the lines that change.

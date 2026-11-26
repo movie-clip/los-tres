@@ -7,7 +7,9 @@ import { CAR, carName, cocheValues, queryOf, scriptedControl, selectedText } fro
 // US-5.7 T5.7.5 (L3t), ACs 43 to 48, journey J7 of 0006 rule 12: while a car is selected every internal link on
 // a public page carries `coche=<slug>` once, last. Amended AC 43 names four exceptions: the link to /go/<offer>,
 // which carries no car (asserted below); the car control's own change and remove links (the sweep leaves that
-// group out; their hrefs are pinned by unit/car-return-path.test.ts and unit/car-control.test.ts); the
+// group out; their hrefs are pinned by unit/car-return-path.test.ts and unit/car-control.test.ts, and the
+// header's change link as PublicChrome renders it, with the page's path and query, by
+// unit/public-chrome-car-links.test.ts); the
 // fit-change-car link of the all-left-out empty state (unit/fit-change-car-link.test.ts, which
 // this journey never renders); and the vehicle list's tiles, links to their own car (checked below, outside the
 // sweep). The crawl reads the rendered anchors, so a new link that forgets withCar fails here whichever page it

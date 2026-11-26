@@ -1,4 +1,14 @@
-import { SourceRow, type SourceRowExtras, type SourceRowLabels, type SourceRowProps } from './SourceRow';
+'use client';
+
+import type { SourceActionState } from '@/app/admin/(shell)/tiendas/actions';
+
+import {
+  SourceRow,
+  useSourceRowAction,
+  type SourceRowAction,
+  type SourceRowExtras,
+  type SourceRowLabels,
+} from './SourceRow';
 import styles from './ShopGroup.module.css';
 
 /** One feed, with every string already translated. */
@@ -32,12 +42,44 @@ export type ShopGroupView = {
 
 export type ShopGroupProps = {
   shop: ShopGroupView;
-  shopAction: SourceRowProps['action'];
-  feedAction: SourceRowProps['action'];
+  shopAction: SourceRowAction;
+  feedAction: SourceRowAction;
 };
 
-/** A shop in an outlined box, with its feeds as rows inside the same box. */
+type FeedRowProps = {
+  feed: FeedRowView;
+  feedAction: SourceRowAction;
+  /** The shop's current action state: a newer stored result ends this feed's own feedback (#384). */
+  shopResult: SourceActionState;
+};
+
+/** One feed row, bound to its own action and told its shop's current state. */
+function FeedRow({ feed, feedAction, shopResult }: FeedRowProps) {
+  const control = useSourceRowAction('feed', feed.id, feedAction);
+  return (
+    <SourceRow
+      kind="feed"
+      id={feed.id}
+      title={feed.title}
+      meta={feed.meta}
+      note={feed.note}
+      approved={feed.approved}
+      paused={feed.paused}
+      labels={feed.labels}
+      extras={feed.extras}
+      control={control}
+      shopResult={shopResult}
+    />
+  );
+}
+
+/**
+ * A shop in an outlined box, with its feeds as rows inside the same box. It holds
+ * the shop row's action state, so the shop's stored result reaches its feed rows
+ * in the same render (#384).
+ */
 export function ShopGroup({ shop, shopAction, feedAction }: ShopGroupProps) {
+  const shopControl = useSourceRowAction('shop', shop.id, shopAction);
   return (
     <li className={styles.box}>
       <div className={styles.shop}>
@@ -51,25 +93,14 @@ export function ShopGroup({ shop, shopAction, feedAction }: ShopGroupProps) {
           paused={false}
           labels={shop.labels}
           extras={shop.extras}
-          action={shopAction}
+          control={shopControl}
         />
       </div>
       {shop.feeds.length > 0 ? (
         <ul className={styles.feeds}>
           {shop.feeds.map((feed) => (
             <li key={feed.id} className={styles.feed}>
-              <SourceRow
-                kind="feed"
-                id={feed.id}
-                title={feed.title}
-                meta={feed.meta}
-                note={feed.note}
-                approved={feed.approved}
-                paused={feed.paused}
-                labels={feed.labels}
-                extras={feed.extras}
-                action={feedAction}
-              />
+              <FeedRow feed={feed} feedAction={feedAction} shopResult={shopControl.state} />
             </li>
           ))}
         </ul>
