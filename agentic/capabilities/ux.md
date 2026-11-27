@@ -140,6 +140,9 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | product with one offer | `/producto/demo-filtro-de-aire-bosch-af-2287` |
 | product with a long title | `/producto/demo-filtro-de-habitaculo-de-carbon-activo-con-triple-capa-para-varios-modelos-d` (Referencia FH-4000, no EAN) |
 | product with EAN only, two offers | `/producto/demo-aceite-shell-10w-40-mineral-5-l` (tag on row 1) |
+| product, five attributes (S15.3) | `/producto/demo-aceite-shell-10w-40-mineral-5-l` (EAN only in the hero, 2 approvals); also `demo-aceite-castrol-5w-30-sintetico-4-l` (card plus Vehículos compatibles) and `demo-aceite-repsol-5w-30-sintetico-5-l` |
+| product, four attributes, no approvals row; no card (S15.3) | four attributes, no approvals row: `/producto/demo-aceite-mobil-5w-30-sintetico-4-l`; no card: `demo-aceite-castrol-0w-40-sintetico-4-l` (oil) and `demo-filtro-de-aceite-oc-1234` (filter); only 4 of 16 demo oil products hold attributes |
+| product, approvals above 8, decimal-comma volume (S15.3) | not producible on the demo; report not checked, or synthetic by DOM injection (clone the VehicleList details from `/producto/demo-filtro-de-aceite-bosch-of-3306`), labelled synthetic |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
 | category, one brand | `/categoria/filtros-de-aire?marca=bosch` (2 cards) |
 | category, no match (200) | `/categoria/filtros-de-aire?marca=no-existe` |
