@@ -1519,3 +1519,121 @@ describe('seams (guardrail 5, #398 theme choice)', () => {
     expect(named.map(({ file }) => file)).toEqual([]);
   });
 });
+
+// S15.3 (US-15.3, D-1, D13 of the design). The stored engine-oil attributes (`products.attr_*`) are the
+// importer's alone: the row that creates a product writes them and a later eligible row fills an absent one
+// once. No admin screen, action or route enters, edits or clears one (AC 41, guardrails 1 and 3), no seed,
+// script or public route writes one, and only the page reader reads them, through aliases (D13). In the
+// pattern of the pin that only the import writes `fitments` (S5.6, AC 20).
+describe('seams (guardrails 1, 2 and 3, S15.3 attribute store)', () => {
+  const codeOf = (file: string) => sources().find((entry) => entry.file === file)?.code ?? '';
+  const planted = (
+    files: { file: string; code: string }[],
+    test: (code: string) => boolean,
+    allowed: (file: string) => boolean,
+  ): string[] => files.filter(({ file, code }) => test(code) && !allowed(file)).map(({ file }) => file);
+
+  const IMPORTER = 'src/server/importer/index.ts';
+  const PAGE_READER = 'src/server/catalogue/product-page.ts';
+  const ATTRIBUTE_PROPERTIES = 'Viscosity|VolumeMl|Acea|OilType|Approvals';
+  const ATTRIBUTE_COLUMNS = 'viscosity|volume_ml|acea|oil_type|approvals';
+
+  // The store, by its TypeScript property or its SQL column name.
+  const namesStore = new RegExp(`\\battr(?:${ATTRIBUTE_PROPERTIES})\\b|\\battr_(?:${ATTRIBUTE_COLUMNS})\\b`);
+  const mayNameStore = (file: string): boolean => file.startsWith('src/db/') || file === IMPORTER || file === PAGE_READER;
+
+  // A write: an object key (a `.values({...})` or `.set({...})`), or raw SQL that updates or inserts.
+  const writesStoreKey = new RegExp(`\\battr(?:${ATTRIBUTE_PROPERTIES})\\s*:`);
+  const writesStoreSql = new RegExp(`\\b(?:update|insert\\s+into)\\b[^;\`]*?\\battr_(?:${ATTRIBUTE_COLUMNS})\\b`, 'i');
+  const writesStore = (code: string): boolean => writesStoreKey.test(code) || writesStoreSql.test(code);
+  const mayWriteStore = (file: string): boolean => file.startsWith('src/db/') || file === IMPORTER;
+
+  it('finds the files it scans, so the rules below are not vacuous', () => {
+    const files = sources().map(({ file }) => file);
+    expect(files).toEqual(expect.arrayContaining([IMPORTER, PAGE_READER, 'src/db/schema/catalogue.ts', 'src/server/admin/products.ts']));
+    expect(codeOf('src/db/schema/catalogue.ts')).toMatch(namesStore);
+  });
+
+  it('names the stored attribute columns only in the schema and migrations, the importer and the page reader (AC 41)', () => {
+    expect(offenders(namesStore, mayNameStore)).toEqual([]);
+  });
+
+  it('writes the stored attributes only in the schema and the importer: no admin action, writer, route, seed or script (AC 41)', () => {
+    expect(offenders(writesStoreKey, mayWriteStore)).toEqual([]);
+    expect(offenders(writesStoreSql, mayWriteStore)).toEqual([]);
+    expect(offenders(/\.execute\(\s*sql`[^`]*\battr_/i, () => false)).toEqual([]);
+  });
+
+  it('keeps the admin area, the seed, the CLI and the public routes away from the attribute modules and the store (AC 41)', () => {
+    const admin = (file: string) =>
+      file.startsWith('src/app/admin/') || file.startsWith('src/components/admin/') || file.startsWith('src/server/admin/');
+    const modules = /category-attributes|importer\/attribute-fill/;
+    expect(offenders(modules, (file) => !admin(file) && !file.startsWith('src/server/seed') && !file.startsWith('src/cli/'))).toEqual([]);
+    for (const { file, code } of sources().filter((entry) => admin(entry.file))) {
+      expect(code, file).not.toMatch(namesStore);
+      expect(code, file).not.toMatch(/\b(?:readViscosity|readVolume|readAcea|readOilType|readApprovals|decideAttributeFill)\b/);
+    }
+    expect(sources().filter((entry) => admin(entry.file)).length).toBeGreaterThan(10);
+  });
+
+  it('keeps the importer\'s two writes in the two places the design names: the creating insert and the guarded fill update', () => {
+    const importer = codeOf(IMPORTER);
+    const create = importer.match(/async function createProduct\([\s\S]*?\r?\n\}/)?.[0] ?? '';
+    expect(create).toMatch(/\.insert\(\s*products\s*\)/);
+    for (const property of ['attrViscosity', 'attrVolumeMl', 'attrAcea', 'attrOilType', 'attrApprovals']) {
+      expect(create, property).toMatch(new RegExp(`\\b${property}\\s*:`));
+    }
+    const fill = importer.match(/async function fillAttributes\([\s\S]*?\r?\n\}/)?.[0] ?? '';
+    expect(fill).toMatch(/\.update\(\s*products\s*\)/);
+    expect(fill).toMatch(/coalesce\(/);
+    expect(fill).toMatch(/isHidden/);
+    // Nowhere else in the importer does a statement name the store as a written key.
+    const outside = importer.replace(create, '').replace(fill, '');
+    expect(outside).not.toMatch(writesStoreKey);
+    expect(outside).not.toMatch(/\bset\.attr/);
+  });
+
+  it('keeps the page reader read-only: it names the columns through non-attr aliases and writes nothing (D13)', () => {
+    const reader = codeOf(PAGE_READER);
+    expect(reader).toMatch(namesStore);
+    expect(reader).not.toMatch(writesStoreKey);
+    expect(reader).not.toMatch(/\.(insert|update|delete)\(/);
+    expect(reader).toMatch(/viscosity:\s*products\.attrViscosity/);
+  });
+
+  it('keeps the attribute modules free of the database and of the server-only marker, so the CLI build can load them', () => {
+    for (const file of ['src/server/category-attributes.ts', 'src/server/importer/attribute-fill.ts']) {
+      const code = codeOf(file);
+      expect(code.length, file).toBeGreaterThan(0);
+      expect(code, file).not.toMatch(/server-only|from\s+['"]@\/|drizzle-orm|\.(insert|update|delete)\(|\bfetch\(|node:fs/);
+    }
+  });
+
+  it('keeps the store rules able to fail: the patterns catch each way of naming and writing it, and a planted admin file is reported (AC 41)', () => {
+    expect(namesStore.test('products.attrViscosity')).toBe(true);
+    expect(namesStore.test('p.attr_oil_type')).toBe(true);
+    expect(namesStore.test('row.attributes.viscosity')).toBe(false);
+    expect(namesStore.test('const attrViscosityLabel = 1')).toBe(false);
+    for (const property of ATTRIBUTE_PROPERTIES.split('|')) {
+      expect(writesStoreKey.test(`.set({ attr${property}: null })`), property).toBe(true);
+      expect(writesStoreKey.test(`.values({ attr${property} : x })`), property).toBe(true);
+    }
+    expect(writesStoreKey.test('viscosity: products.attrViscosity')).toBe(false);
+    expect(writesStoreSql.test('update products set attr_acea = null')).toBe(true);
+    expect(writesStoreSql.test('UPDATE "products" SET "attr_approvals" = NULL')).toBe(true);
+    expect(writesStoreSql.test('insert into products (slug, attr_viscosity) values (1, 2)')).toBe(true);
+    expect(writesStoreSql.test('select attr_viscosity from products')).toBe(false);
+    const found = planted(
+      [
+        { file: 'src/app/admin/(shell)/productos/actions.ts', code: 'tx.update(products).set({ attrViscosity: null })' },
+        { file: 'src/server/admin/products.ts', code: 'sql`update products set attr_acea = null`' },
+        { file: 'src/server/seed/index.ts', code: '.values({ attrOilType: "mineral" })' },
+        { file: IMPORTER, code: '.values({ attrViscosity: row.attributes.viscosity })' },
+        { file: 'src/db/schema/catalogue.ts', code: 'attrViscosity: text()' },
+      ],
+      writesStore,
+      mayWriteStore,
+    );
+    expect(found).toEqual(['src/app/admin/(shell)/productos/actions.ts', 'src/server/admin/products.ts', 'src/server/seed/index.ts']);
+  });
+});

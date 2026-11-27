@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { eq } from 'drizzle-orm';
 
 import { closeDb, getDb } from '@/db/client';
-import { categories } from '@/db/schema';
+import { categories, products } from '@/db/schema';
 import { importFeeds } from '@/server/importer';
 import { getPublicProductBySlug, type PublicProductPage } from '@/server/catalogue/product-page';
 
@@ -18,9 +18,11 @@ import {
   insertShop,
   productBySlug,
 } from '../support/catalogue';
+import { fiveTargets } from '../support/categories';
 import { resetDatabase } from '../support/db';
 import { fixtureDeps } from '../support/feeds';
 import { stubNetworkOff } from '../support/network-off';
+import { pgErrorOf } from '../support/pg-error';
 
 beforeEach(async () => {
   await resetDatabase();
@@ -402,5 +404,157 @@ describe('getPublicProductBySlug ordering (C-11)', () => {
       ['Tienda Demo Dos', 1149],
       ['Tienda Demo Uno', 1299],
     ]);
+  });
+});
+
+// S15.3 (US-15.3) ACs 31, 36, 37, 39 and the three database checks of the store: the page reader answers the
+// engine-oil attributes only for a product in aceite-de-motor, as written forms, and null when none is held;
+// the store refuses a volume outside 100..220000 ml and an empty set. How the import fills them is
+// importer-attributes.test.ts; the rendered card is unit/product-attributes.test.ts. Every value is invented.
+describe('getPublicProductBySlug attributes (S15.3, AC 36, 37, 39)', () => {
+  const HELD = {
+    attrViscosity: '10W-40',
+    attrVolumeMl: 1500,
+    attrAcea: ['A3/B4', 'C2'],
+    attrOilType: 'semi-synthetic',
+    attrApprovals: ['VW 504 00', 'MB 229.51'],
+  } satisfies Partial<typeof products.$inferInsert>;
+
+  /** A public product (one visible offer) in the category with the given slug, holding `held`. */
+  async function inCategory(
+    categorySlug: string | null,
+    held: Partial<typeof products.$inferInsert>,
+    o: { slug?: string; hidden?: boolean; shopApproved?: boolean } = {},
+  ) {
+    const targets = await fiveTargets();
+    const category = targets.find((target) => target.slug === categorySlug);
+    const shop = await insertShop({ isApproved: o.shopApproved });
+    const feedId = await insertFeed(shop.id);
+    const product = await insertProduct({
+      slug: o.slug ?? 'aceite-prueba',
+      categoryId: categorySlug === null ? null : category?.id,
+      isHidden: o.hidden ?? false,
+      ...held,
+    });
+    await insertOffer({ productId: product.id, feedId, priceCents: 1999 });
+    return product;
+  }
+
+  it('AC 36: an engine-oil product holding all five returns them as written forms: litres with a decimal comma, ACEA and approvals as held, the family as its key', async () => {
+    await inCategory('aceite-de-motor', HELD);
+
+    const page = await getPublicProductBySlug('aceite-prueba');
+
+    expect(page?.attributes).toEqual({
+      viscosity: '10W-40',
+      volume: '1,5 l',
+      acea: ['A3/B4', 'C2'],
+      oilType: 'semi-synthetic',
+      approvals: ['VW 504 00', 'MB 229.51'],
+    });
+  });
+
+  it('AC 37: an attribute the product does not hold is null, and each of the five can be the only one held', async () => {
+    const one: [string, Partial<typeof products.$inferInsert>, Record<string, unknown>][] = [
+      ['viscosity', { attrViscosity: '0W-20' }, { viscosity: '0W-20' }],
+      ['volume', { attrVolumeMl: 100 }, { volume: '0,1 l' }],
+      ['acea', { attrAcea: ['C5'] }, { acea: ['C5'] }],
+      ['oil type', { attrOilType: 'mineral' }, { oilType: 'mineral' }],
+      ['approvals', { attrApprovals: ['VW 504 00'] }, { approvals: ['VW 504 00'] }],
+    ];
+    for (const [name, held, expected] of one) {
+      await resetDatabase();
+      await inCategory('aceite-de-motor', held);
+      const page = await getPublicProductBySlug('aceite-prueba');
+      expect(page?.attributes, name).toEqual({ viscosity: null, volume: null, acea: null, oilType: null, approvals: null, ...expected });
+    }
+  });
+
+  it('AC 37: an engine-oil product that holds none has attributes null, not an object of nulls', async () => {
+    await inCategory('aceite-de-motor', {});
+
+    expect((await getPublicProductBySlug('aceite-prueba'))?.attributes).toBeNull();
+  });
+
+  it('AC 39: a product outside aceite-de-motor returns null attributes whatever is stored, in each of the four filter categories', async () => {
+    for (const slug of ['filtros-de-aceite', 'filtros-de-aire', 'filtros-de-combustible', 'filtros-de-habitaculo']) {
+      await resetDatabase();
+      const product = await inCategory(slug, HELD);
+      expect(JSON.stringify(await productBySlug(product.slug)).includes('10W-40'), slug).toBe(true); // stored
+      expect((await getPublicProductBySlug('aceite-prueba'))?.attributes, slug).toBeNull();
+    }
+  });
+
+  it('AC 39: a product in no category is not public at all, so it has no attribute to show', async () => {
+    await inCategory(null, HELD);
+
+    expect(await getPublicProductBySlug('aceite-prueba')).toBeNull();
+  });
+
+  it('AC 31: a hidden product and a product whose only offers are from an unapproved shop have no page, and so no attribute', async () => {
+    await inCategory('aceite-de-motor', HELD, { slug: 'oculto', hidden: true });
+    await inCategory('aceite-de-motor', HELD, { slug: 'sin-aprobar', shopApproved: false });
+
+    expect(await getPublicProductBySlug('oculto')).toBeNull();
+    expect(await getPublicProductBySlug('sin-aprobar')).toBeNull();
+  });
+
+  it('AC 31: a product with an approved offer and an unapproved one shows its attributes and only the approved offer', async () => {
+    const product = await inCategory('aceite-de-motor', HELD);
+    const unapproved = await insertShop({ name: 'Tienda Sin Aprobar', isApproved: false });
+    await insertOffer({ productId: product.id, feedId: await insertFeed(unapproved.id), priceCents: 500 });
+
+    const page = await getPublicProductBySlug('aceite-prueba');
+
+    expect(page?.attributes).toMatchObject({ viscosity: '10W-40' });
+    expect(page?.offers.map((offer) => offer.priceCents)).toEqual([1999]);
+  });
+
+  it('AC 40: the rest of the answer is the same with and without attributes: the same keys but `attributes`', async () => {
+    await inCategory('aceite-de-motor', {}, { slug: 'sin-datos' });
+    await inCategory('aceite-de-motor', HELD, { slug: 'con-datos' });
+
+    const without = await getPublicProductBySlug('sin-datos');
+    const withHeld = await getPublicProductBySlug('con-datos');
+
+    expect(Object.keys(withHeld ?? {}).sort()).toEqual(Object.keys(without ?? {}).sort());
+    expect(Object.keys(withHeld?.attributes ?? {}).sort()).toEqual(['acea', 'approvals', 'oilType', 'viscosity', 'volume']);
+  });
+});
+
+describe('the store of the attributes: its three structural checks (S15.3, C4)', () => {
+  const insertWith = (held: Partial<typeof products.$inferInsert>) => insertProduct({ slug: 'comprobacion', ...held });
+
+  it.each([100, 220000, 1005])('accepts a volume of %i ml', async (ml) => {
+    await insertWith({ attrVolumeMl: ml });
+    expect((await productBySlug('comprobacion')).attrVolumeMl).toBe(ml);
+  });
+
+  it.each([99, 220001, 0, -5])('refuses a volume of %i ml with the range check', async (ml) => {
+    const error = await pgErrorOf(insertWith({ attrVolumeMl: ml }));
+    expect(error).toEqual({ code: '23514', constraint: 'products_attr_volume_ml_range' });
+  });
+
+  it('refuses an empty ACEA set and an empty approvals list, each with its own check', async () => {
+    expect(await pgErrorOf(insertWith({ attrAcea: [] }))).toEqual({ code: '23514', constraint: 'products_attr_acea_nonempty' });
+    expect(await pgErrorOf(insertWith({ attrApprovals: [] }))).toEqual({ code: '23514', constraint: 'products_attr_approvals_nonempty' });
+  });
+
+  it('accepts absent (null) for all five, and a set of one item', async () => {
+    await insertWith({});
+    await resetDatabase();
+    await insertWith({ attrAcea: ['C2'], attrApprovals: ['VW 504 00'] });
+    expect(await productBySlug('comprobacion')).toMatchObject({
+      attrViscosity: null,
+      attrVolumeMl: null,
+      attrOilType: null,
+      attrAcea: ['C2'],
+      attrApprovals: ['VW 504 00'],
+    });
+  });
+
+  it('does not repeat the closed sets: a value outside a set is the importer\'s to refuse, not the database\'s (rule 1: the code is their one home)', async () => {
+    await insertWith({ attrViscosity: '99W-999', attrOilType: 'otro', attrAcea: ['Z9'] });
+    expect((await productBySlug('comprobacion')).attrViscosity).toBe('99W-999');
   });
 });

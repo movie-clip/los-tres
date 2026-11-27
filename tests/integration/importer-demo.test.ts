@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDb, getDb } from '@/db/client';
-import { feeds, fitments, offers, products } from '@/db/schema';
+import { categories, feeds, fitments, offers, products } from '@/db/schema';
 import { formatImportReport, importExitCode, importFeeds } from '@/server/importer';
 import { readFitStates, readProductVehicles } from '@/server/catalogue/fit-state';
 import { getPublicProductBySlug } from '@/server/catalogue/product-page';
@@ -18,6 +18,7 @@ import {
   DEMO_SHARED,
   DEMO_WRENCHES,
 } from '../fixtures/demo';
+import { NO_HELD, heldOf } from '../support/attributes';
 import { allOffers, allProducts, vehicleIdBySlug } from '../support/catalogue';
 import { resetDatabase } from '../support/db';
 import { stubNetworkOff } from '../support/network-off';
@@ -279,5 +280,68 @@ describe('fitments of the shipped demo data (S5.6)', () => {
     await importFeeds(getDb(), { deps: { now: () => new Date('2026-10-02T09:00:00Z') } });
 
     expect(await fitmentRows()).toEqual(before);
+  });
+});
+
+// S15.3 (US-15.3) ACs 42 and 43: the demo feeds carry the attribute entry for the demo engine-oil products and the
+// first import holds them, with no second import. The demo values are the shipped files' own (D14 of the design:
+// invented, "Homologación demo N"); the readers' forms are unit/category-attributes.test.ts, and the unit
+// demo-feeds.test.ts pins what the files say. Which products carry values is the shipped data's: this reads the
+// four rows of tienda-demo-cuatro that carry an entry, and asserts nothing about the rows that do not.
+describe('the demo attributes (S15.3, AC 42, 43)', () => {
+  const DEMO_ATTRIBUTES = [
+    {
+      ean: '2000000100050',
+      page: { viscosity: '5W-30', volume: '4 l', acea: ['C3'], oilType: 'synthetic', approvals: ['Homologación demo 501', 'Homologación demo 502'] },
+    },
+    {
+      ean: '2000000100067',
+      page: { viscosity: '5W-30', volume: '4 l', acea: ['C3'], oilType: 'synthetic', approvals: null },
+    },
+    {
+      ean: '2000000100104',
+      page: { viscosity: '5W-30', volume: '5 l', acea: ['C3'], oilType: 'synthetic', approvals: ['Homologación demo 503'] },
+    },
+    {
+      ean: '2000000100142',
+      page: { viscosity: '10W-40', volume: '5 l', acea: ['A3/B4'], oilType: 'mineral', approvals: ['Homologación demo 504', 'Homologación demo 505'] },
+    },
+  ] as const;
+
+  it('AC 42: after the first import the demo engine-oil products with an entry show their attributes on the product page, with no second import', async () => {
+    await seedDemoData(getDb());
+    await importFeeds(getDb());
+    const stored = await allProducts();
+
+    for (const { ean, page } of DEMO_ATTRIBUTES) {
+      const product = stored.find((candidate) => candidate.ean === ean);
+      expect(product, ean).toBeDefined();
+      expect((await getPublicProductBySlug(product?.slug ?? ''))?.attributes, ean).toEqual(page);
+    }
+  });
+
+  it('AC 42: a demo product outside aceite-de-motor holds no attribute, and the page shows none for a product that holds none', async () => {
+    await seedDemoData(getDb());
+    await importFeeds(getDb());
+    const [engineOil] = await getDb().select({ id: categories.id }).from(categories).where(eq(categories.slug, 'aceite-de-motor'));
+
+    const outside = (await allProducts()).filter((product) => product.categoryId !== engineOil.id);
+
+    expect(outside.length).toBeGreaterThan(0);
+    for (const product of outside) expect(heldOf(product), product.slug).toEqual(NO_HELD);
+    const filter = await getPublicProductBySlug(DEMO_SHARED.slug);
+    expect(filter?.attributes).toBeNull();
+  });
+
+  it('AC 43: the first and the second import print no attribute line, so every demo value reads; the second changes no product row', async () => {
+    await seedDemoData(getDb());
+    const first = await importFeeds(getDb());
+    const productsBefore = await allProducts();
+
+    const second = await importFeeds(getDb());
+
+    for (const report of [first, second]) expect(formatImportReport(report)).not.toMatch(/attributes/);
+    expect(await allProducts()).toEqual(productsBefore);
+    expect(productsBefore.some((product) => heldOf(product).viscosity !== null)).toBe(true);
   });
 });

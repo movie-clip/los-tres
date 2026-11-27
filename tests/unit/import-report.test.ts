@@ -475,3 +475,100 @@ describe('formatImportReport, filled EANs (S7.6, AC 17, 18, 19)', () => {
     expect(lines({ eanFilled: 2 }).join('\n')).not.toMatch(/https?:|demo-feed:|\.example/);
   });
 });
+
+describe('formatImportReport, unparsed attributes (S15.3, AC 19 to 22)', () => {
+  const ZERO = { viscosity: 0, volume: 0, acea: 0, oilType: 0, approvals: 0 };
+  const lines = (overrides: Partial<FeedImportReport>) =>
+    formatImportReport({ startedAt, feeds: [feed({ rows: 3, productsCreated: 1, offersCreated: 3, ...overrides })] }).split('\n');
+  const attributeLines = (out: string[]) => out.filter((line) => line.startsWith('  attributes:'));
+
+  it('prints one line with the feed column of each attribute that has a count, in the spec order, and no other', () => {
+    const out = lines({ attributesUnparsed: { viscosity: 2, volume: 1, acea: 0, oilType: 0, approvals: 1 } });
+    expect(attributeLines(out)).toEqual(['  attributes: unparsed viscosity=2 volume_l=1 approvals=1']);
+  });
+
+  it('names the feed columns, not the keys: volume is volume_l and oilType is oil_type', () => {
+    const out = lines({ attributesUnparsed: { ...ZERO, volume: 4, oilType: 7 } });
+    expect(attributeLines(out)).toEqual(['  attributes: unparsed volume_l=4 oil_type=7']);
+  });
+
+  it('lists all five, in the order viscosity, volume_l, acea, oil_type, approvals, when all have a count', () => {
+    const out = lines({ attributesUnparsed: { viscosity: 5, volume: 4, acea: 3, oilType: 2, approvals: 1 } });
+    expect(attributeLines(out)).toEqual(['  attributes: unparsed viscosity=5 volume_l=4 acea=3 oil_type=2 approvals=1']);
+  });
+
+  it('prints nothing for a feed whose counts are all zero: the exact lines of a feed with no entry', () => {
+    const base = feed({ rows: 3, productsCreated: 1, offersCreated: 3 });
+    const text = (f: FeedImportReport) => formatImportReport({ startedAt, feeds: [f] });
+    expect(text(base)).not.toContain('attributes');
+    expect(text(base)).toBe(
+      [
+        'feed 1 "Tienda Demo Uno": imported rows=3 products_created=1 offers_created=3 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+        'total: feeds=1 imported=1 skipped=0 failed=0',
+      ].join('\n'),
+    );
+  });
+
+  it('sits after the fitment lines and before the removal line, the last indented lines of the feed (S3.3 keeps removal last)', () => {
+    const out = lines({
+      rejected: [{ record: 4, code: 'invalid_ean', field: 'ean' }],
+      ownProducts: [{ record: 2, reason: 'ean_brand_conflict' }],
+      eanFilled: 1,
+      unknownVehicles: 3,
+      unknownVehicleSlugs: [{ slug: 'coche-x', rows: 2 }],
+      unknownVehiclesNotShown: 1,
+      attributesUnparsed: { ...ZERO, acea: 2 },
+      removalSkipped: { reason: 'small_import', missing: 10, current: 19 },
+    });
+    const kinds = out.slice(1, -1).map((line) => line.trim().split(' ').slice(0, 2).join(' '));
+    expect(kinds).toEqual([
+      'record 4:',
+      'record 2:',
+      'ean: filled=1',
+      'fitment: unknown',
+      'fitment: unknown',
+      'attributes: unparsed',
+      'removal: skipped',
+    ]);
+  });
+
+  it('prints no row text, raw value, record number, product or link', () => {
+    const text = lines({ attributesUnparsed: { viscosity: 1, volume: 1, acea: 1, oilType: 1, approvals: 1 } }).join('\n');
+    expect(attributeLines(text.split('\n'))[0]).toMatch(/^ {2}attributes: unparsed( [a-z_]+=\d+)+$/);
+    expect(text).not.toMatch(/https?:|demo-feed:|\.example|record \d/);
+  });
+
+  it('counts per feed: another feed of the same run with no unparsed value prints no line', () => {
+    const report: ImportReport = {
+      startedAt,
+      feeds: [
+        feed({ feedId: 1, shopName: 'Uno', rows: 1, attributesUnparsed: { ...ZERO, viscosity: 1 } }),
+        feed({ feedId: 2, shopName: 'Dos', rows: 1 }),
+      ],
+    };
+    expect(formatImportReport(report).split('\n')).toEqual([
+      'feed 1 "Uno": imported rows=1 products_created=0 offers_created=0 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+      '  attributes: unparsed viscosity=1',
+      'feed 2 "Dos": imported rows=1 products_created=0 offers_created=0 offers_updated=0 offers_removed=0 rejected=0 unknown_vehicles=0',
+      'total: feeds=2 imported=2 skipped=0 failed=0',
+    ]);
+  });
+
+  it('a skipped or failed feed has its line only, whatever count it carries', () => {
+    const counts = { ...ZERO, viscosity: 3 };
+    const report: ImportReport = {
+      startedAt,
+      feeds: [
+        feed({ feedId: 3, shopName: 'Tres', outcome: 'skipped', skipReason: 'not_approved', attributesUnparsed: counts }),
+        feed({ feedId: 4, shopName: 'Cuatro', outcome: 'failed', failure: 'database_error', attributesUnparsed: counts }),
+      ],
+    };
+    expect(formatImportReport(report)).not.toContain('attributes');
+  });
+
+  it('does not change the exit code: a count never fails a run, and a failed feed still does (AC 22)', () => {
+    const counted = feed({ attributesUnparsed: { ...ZERO, acea: 9 } });
+    expect(importExitCode({ startedAt, feeds: [counted] })).toBe(0);
+    expect(importExitCode({ startedAt, feeds: [counted, feed({ feedId: 2, outcome: 'failed', failure: 'database_error' })] })).toBe(1);
+  });
+});

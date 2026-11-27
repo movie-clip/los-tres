@@ -53,21 +53,35 @@ export function textDeps(byFeedId: Record<number, string | Uint8Array | Error>):
   };
 }
 
+/**
+ * The five engine-oil attribute columns of S15.3, in the importer's order, after `fitment`. A generator
+ * writes one only when some row defines it, so a caller that never sets them keeps a byte-identical file
+ * (AC 2).
+ */
+export const ATTRIBUTE_COLUMNS = ['viscosity', 'volume_l', 'acea', 'oil_type', 'approvals'] as const;
+
 /** One feed row for the generators below; every key is a canonical column. */
 export type FeedRow = Partial<
-  Record<'id' | 'title' | 'price' | 'url' | 'brand' | 'ean' | 'currency' | 'fitment', string>
+  Record<
+    'id' | 'title' | 'price' | 'url' | 'brand' | 'ean' | 'currency' | 'fitment' | (typeof ATTRIBUTE_COLUMNS)[number],
+    string
+  >
 >;
 
 const ROW_COLUMNS = ['id', 'title', 'price', 'url', 'brand', 'ean', 'currency'] as const;
-const ROW_COLUMNS_WITH_FITMENT = [...ROW_COLUMNS, 'fitment'] as const;
+const OPTIONAL_ROW_COLUMNS = ['fitment', ...ATTRIBUTE_COLUMNS] as const;
+const ROW_COLUMNS_WITH_FITMENT = [...ROW_COLUMNS, ...OPTIONAL_ROW_COLUMNS] as const;
 
 /**
- * The rows as CSV text (header first). Values must not need quoting. The
- * `fitment` column is written only when some row defines `fitment`, so a caller
- * that never sets it keeps a feed with no fitment column (S5.6, AC 6, 7).
+ * The rows as CSV text (header first). Values must not need quoting. The `fitment` column and each
+ * attribute column are written only when some row defines it, so a caller that never sets them keeps a
+ * feed without those columns (S5.6, AC 6, 7; S15.3, AC 2).
  */
 export function csvOf(rows: FeedRow[]): string {
-  const columns = rows.some((row) => row.fitment !== undefined) ? ROW_COLUMNS_WITH_FITMENT : ROW_COLUMNS;
+  const columns = [
+    ...ROW_COLUMNS,
+    ...OPTIONAL_ROW_COLUMNS.filter((column) => rows.some((row) => row[column] !== undefined)),
+  ];
   const lines = rows.map((row) => columns.map((column) => row[column] ?? '').join(','));
   return `${columns.join(',')}\n${lines.join('\n')}\n`;
 }
