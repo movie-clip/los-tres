@@ -4,6 +4,12 @@
   composes: home from '../../components/CategoryEmpty.module.css';
 }
 
+/* The page title size of every public page, not the browser's h1 size (issue 399). */
 .heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
   overflow-wrap: anywhere;
 }

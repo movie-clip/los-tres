@@ -1,17 +1,13 @@
-/* One column on a phone. From 40rem the grid reflows by width, with 16rem as
-   the narrowest a card may get: two columns at 768, three at 1280. 40rem is the
-   breakpoint the home tiles and the product card already use. */
+/* One bordered container of rows at every width, never a grid of cards: the rows
+   draw the hairlines between them (issue 399). The container clips the rows' hover
+   fill to its rounded corners. */
 .grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--grid-gap);
+  display: block;
   margin: 0;
   padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
   list-style: none;
-}
-
-@media (min-width: 40rem) {
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
-  }
+  overflow: hidden;
 }

@@ -1,36 +1,44 @@
+/* A list row inside the ProductGrid container: no box of its own, a hairline above
+   every row but the first. The row is a grid of its two wrappers: on a phone `.head`
+   (box and text) over `.footer` (price group and chip); from 40rem `.head` beside a
+   fixed-width `.footer`, so the chip and the price sit in the same x columns on every
+   row (issue 399). DOM order stays price, then chip. */
 .card {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--space-1);
   min-width: 0;
-  padding: var(--card-padding);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg);
+  padding: var(--space-1) var(--space-2);
   font-size: var(--text-md);
   line-height: var(--leading-snug);
 }
 
-/* Same 1px width, so nothing shifts: only the colour changes. */
+.card + .card {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Hover and pressed fill the row with the canvas; no border changes, nothing moves. */
 .card:hover {
-  border-color: var(--color-ink);
+  background: var(--color-canvas);
   cursor: pointer;
 }
 
-/* Phone: a row. The category tile is a 4rem box on the left of the text. It is
-   always present, empty for an unknown category, so a list of cards never
-   shifts. 4rem and 6rem are this component's own sizes, not global tokens. */
+/* The category box sits on the left of the text. It is always present, empty for an
+   unknown category, so a list of rows never shifts. 3.25rem and 3.5rem are this
+   component's own sizes, not global tokens. */
 .head {
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr);
+  grid-template-columns: 3.25rem minmax(0, 1fr);
   gap: var(--space-2);
   align-items: start;
+  min-width: 0;
 }
 
 .tile {
   display: block;
-  width: 4rem;
-  height: 4rem;
+  width: 3.25rem;
+  height: 3.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-chip-bg);
@@ -62,8 +70,8 @@
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .link {
@@ -71,13 +79,12 @@
   text-decoration: none;
 }
 
-/* The one link covers the whole card. The title is not positioned, so the
-   stretched box is sized by .card and is not clipped by the title's clamp. */
+/* The one link covers the whole row. The title is not positioned, so the stretched
+   box is sized by .card and is not clipped by the title's clamp. */
 .link::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: var(--radius-lg);
 }
 
 .card:hover .link,
@@ -85,10 +92,9 @@
   text-decoration: underline;
 }
 
-/* Pressed is read on the card: the stretched link sits inside it, so the card
-   matches while the link is pressed. Same 1px border, so nothing shifts. */
+/* Pressed is read on the row: the stretched link sits inside it, so the row matches
+   while the link is pressed. */
 .card:active {
-  border-color: var(--color-ink);
   background: var(--color-canvas);
 }
 
@@ -96,41 +102,43 @@
   text-decoration: underline;
 }
 
-/* The focus ring is drawn around the whole card, on the stretched box. */
+/* The focus ring is drawn around the whole row, on the stretched box, inside the row,
+   so the container's clipping never cuts it. */
 .link:focus-visible {
   outline: none;
 }
 
 .link:focus-visible::after {
   outline: var(--focus-ring);
-  outline-offset: var(--focus-offset);
+  outline-offset: -3px;
 }
 
+/* The part number is mono and wraps by character; it never widens the row. */
 .spec {
   display: block;
-  overflow: hidden;
   color: var(--color-muted);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-/* The footer spans the whole card under the head, pinned to the bottom, so the
-   price sits at the same x on every card and on one line across a row. */
+/* Phone: the price group at the left, the chip at the right, on one line under the
+   head. */
 .footer {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
   align-items: flex-end;
   justify-content: space-between;
-  margin-top: auto;
-  padding-top: var(--space-2);
+  min-width: 0;
 }
 
-/* The label sits on its own line above the price; it is absent for one shop. */
+/* Phone: the label sits on the price's baseline, left of it; it is absent for one
+   shop. */
 .priceGroup {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: var(--space-1);
   white-space: nowrap;
 }
 
@@ -139,16 +147,19 @@
   font-size: var(--text-sm);
 }
 
+/* 1.375rem is this component's own price size, not the price token (issue 399). */
 .price {
   color: var(--color-price);
-  font-size: var(--text-price);
+  font-size: 1.375rem;
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   line-height: var(--leading-tight);
+  text-align: right;
+  white-space: nowrap;
 }
 
-/* The shop count is a static chip: a pill carrying one fact. */
+/* The shop count is a static chip: a tag carrying one fact. */
 .shops {
   padding: 0.125rem 0.625rem;
   border-radius: var(--radius-pill);
@@ -159,31 +170,60 @@
 }
 
 /* Below 14rem (a 390 phone at 200% zoom): the row has no room for the box and
-   the text side by side. The box stacks above the text, left aligned. */
+   the text side by side. The box stacks above the text, and the price group and
+   the chip stack under it, left aligned. */
 @media (max-width: 14rem) {
   .head {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-1);
   }
+
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
-/* From 40rem: a vertical card. A 6rem band across the top holds the 4rem
-   drawing, centred; the text follows under it. */
+/* From 40rem: one line per row. The head (3.5rem box, text) takes the room; the footer
+   is a fixed 6.5rem chip column and an 8rem price column, both right aligned, so every
+   chip and every price lines up down the list. 6.5rem and 8rem are this component's
+   own sizes. */
 @media (min-width: 40rem) {
+  .card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-2);
+    align-items: center;
+  }
+
   .head {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    align-items: center;
   }
 
   .tile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 6rem;
+    width: 3.5rem;
+    height: 3.5rem;
   }
 
-  .tile svg {
-    width: 4rem;
-    height: 4rem;
+  .footer {
+    display: grid;
+    grid-template-columns: 6.5rem 8rem;
+    column-gap: var(--space-2);
+    align-items: center;
+  }
+
+  .shops {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .priceGroup {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    justify-self: end;
   }
 }
