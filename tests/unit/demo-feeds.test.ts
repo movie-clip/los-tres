@@ -283,8 +283,8 @@ describe('the demo attributes (S15.3, AC 42, 43)', () => {
     expect(allRows.flatMap((row) => row.unparsed.map((key) => `${row.externalId}:${key}`))).toEqual([]);
   });
 
-  it('carries values on engine-oil rows only: a filter, a drill and a wrench row leave all five cells empty', () => {
-    expect(withAttributes.length).toBeGreaterThan(0);
+  it('carries values on exactly the four engine-oil rows of tienda-demo-cuatro (AC 42 as narrowed, D-30) and on no other row: a filter, a drill and a wrench row leave all five cells empty', () => {
+    expect(withAttributes.map((row) => row.externalId)).toEqual(['CUATRO-201', 'CUATRO-202', 'CUATRO-203', 'CUATRO-204']);
     for (const row of withAttributes) expect(row.leaf, row.externalId).toBe(ENGINE_OIL);
     for (const row of allRows.filter((candidate) => candidate.leaf !== ENGINE_OIL)) {
       expect(row.attributes, row.externalId).toEqual({ viscosity: null, volumeMl: null, acea: null, oilType: null, approvals: null });

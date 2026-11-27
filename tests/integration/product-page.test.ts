@@ -476,6 +476,23 @@ describe('getPublicProductBySlug attributes (S15.3, AC 36, 37, 39)', () => {
     expect((await getPublicProductBySlug('aceite-prueba'))?.attributes).toBeNull();
   });
 
+  it('AC 37 (D-4): a stored value outside its closed set is absent on the page: viscosity, ACEA and oil type alike', async () => {
+    // Only a viscosity that merely looks like a grade: nothing else is held, so there is no card at all.
+    await inCategory('aceite-de-motor', { attrViscosity: '99W-999' });
+    expect((await getPublicProductBySlug('aceite-prueba'))?.attributes).toBeNull();
+
+    // Every off-set value drops out on its own; what is in its set (the volume, the C2 of the ACEA list, the approvals) stays.
+    await resetDatabase();
+    await inCategory('aceite-de-motor', { ...HELD, attrViscosity: '10w-40', attrAcea: ['Z9', 'C2'], attrOilType: 'otro' });
+    expect((await getPublicProductBySlug('aceite-prueba'))?.attributes).toEqual({
+      viscosity: null,
+      volume: '1,5 l',
+      acea: ['C2'],
+      oilType: null,
+      approvals: ['VW 504 00', 'MB 229.51'],
+    });
+  });
+
   it('AC 39: a product outside aceite-de-motor returns null attributes whatever is stored, in each of the four filter categories', async () => {
     for (const slug of ['filtros-de-aceite', 'filtros-de-aire', 'filtros-de-combustible', 'filtros-de-habitaculo']) {
       await resetDatabase();
