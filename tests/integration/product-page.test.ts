@@ -77,6 +77,7 @@ describe('getPublicProductBySlug shape (C-11)', () => {
       categoryTrail: [{ slug: 'categoria-de-prueba', name: 'Categoría de prueba' }],
       demoOnly: false,
       indexable: true,
+      attributes: null,
     } satisfies PublicProductPage);
     expect(page?.offers[0].priceUpdatedAt).toBeInstanceOf(Date);
     expect(Number.isInteger(page?.offers[0].priceCents)).toBe(true);

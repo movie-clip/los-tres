@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ATTRIBUTES } from '@/server/category-attributes';
 import {
   CANONICAL_COLUMNS,
   parseFitment,
@@ -245,8 +246,11 @@ describe('the optional fitment column (S5.6, AC 1, 6, 7)', () => {
     return result.row;
   };
 
-  it('is the last canonical column, so the XML cell order grows by one at the end', () => {
-    expect(CANONICAL_COLUMNS.at(-1)).toBe('fitment');
+  it('is followed only by the five attribute columns, in ATTRIBUTES order (S15.3)', () => {
+    expect(CANONICAL_COLUMNS.slice(CANONICAL_COLUMNS.indexOf('fitment'))).toEqual([
+      'fitment',
+      ...ATTRIBUTES.map((attribute) => attribute.column),
+    ]);
     expect(new Set(CANONICAL_COLUMNS).size).toBe(CANONICAL_COLUMNS.length);
   });
 

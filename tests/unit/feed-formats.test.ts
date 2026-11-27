@@ -2,6 +2,7 @@ import { createGzip } from 'node:zlib';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { ATTRIBUTES } from '@/server/category-attributes';
 import { decodeFeed } from '@/server/importer/decode';
 import { openRecords } from '@/server/importer/records';
 import { SourceError } from '@/server/importer/source';
@@ -346,8 +347,11 @@ describe('XML record rule (D4)', () => {
       return result.records.map((r) => r.cells[at]);
     };
 
-    it('puts fitment last in the cell order, after every older column', () => {
-      expect(CANONICAL_COLUMNS.at(-1)).toBe('fitment');
+    it('puts fitment after every older column, followed only by the five attribute columns (S15.3)', () => {
+      expect(CANONICAL_COLUMNS.slice(CANONICAL_COLUMNS.indexOf('fitment'))).toEqual([
+        'fitment',
+        ...ATTRIBUTES.map((attribute) => attribute.column),
+      ]);
     });
 
     it('reads the text of the element, trimmed, with the | kept for the row validator', async () => {

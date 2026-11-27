@@ -26,6 +26,7 @@ const product = (o: Partial<PublicProductPage> = {}): PublicProductPage => ({
   ],
   demoOnly: false,
   indexable: true,
+  attributes: null,
   ...o,
 });
 

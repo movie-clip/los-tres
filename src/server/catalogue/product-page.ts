@@ -4,6 +4,14 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { getDb } from '../../db/client';
 import { categories, feeds, offers, products, shops } from '../../db/schema';
+import {
+  ACEA_SEQUENCES,
+  ENGINE_OIL_CATEGORY,
+  formatVolumeMl,
+  OIL_TYPES,
+  type AceaSequence,
+  type OilType,
+} from '../category-attributes';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
 import { bestPriceFlags } from './best-price';
@@ -26,6 +34,23 @@ export type PublicOffer = {
   priceUpdatedAt: Date;
   /** bestPriceFlags (best-price.ts) over the visible offers' priceCents. */
   isBestPrice: boolean;
+};
+
+/**
+ * The engine-oil attributes as the page shows them (S15.3, 06-ux § Data needs).
+ * Null = the product holds none for that attribute; an array is never empty.
+ */
+export type ProductAttributes = {
+  /** Written form, '10W-40'. */
+  viscosity: string | null;
+  /** Written form from formatVolumeMl, '1,5 l' (plain space). */
+  volume: string | null;
+  /** Closed-set order, as held. */
+  acea: readonly AceaSequence[] | null;
+  /** Family key, never a Spanish word; the page maps it to its message. */
+  oilType: OilType | null;
+  /** As held, feed order. Plain text: the page must render each as text, never as HTML. */
+  approvals: readonly string[] | null;
 };
 
 export type PublicProductPage = {
@@ -55,10 +80,55 @@ export type PublicProductPage = {
    * the demo notice only.
    */
   indexable: boolean;
+  /**
+   * Null when categorySlug is not ENGINE_OIL_CATEGORY, or when the product
+   * holds none of the five. When non-null, at least one field is non-null.
+   * Decided here, once; the page draws what it receives (S15.3, D-26).
+   */
+  attributes: ProductAttributes | null;
 };
 
 function nonBlank(value: string | null): string | null {
   return value?.trim() || null;
+}
+
+type HeldAttributes = {
+  viscosity: string | null;
+  volumeMl: number | null;
+  acea: string[] | null;
+  oilType: string | null;
+  approvals: string[] | null;
+};
+
+const ACEA_TOKENS: readonly string[] = ACEA_SEQUENCES.map((sequence) => sequence.token);
+
+function isAceaSequence(value: string): value is AceaSequence {
+  return ACEA_TOKENS.includes(value);
+}
+
+function isOilType(value: string): value is OilType {
+  return (OIL_TYPES as readonly string[]).includes(value);
+}
+
+function nonEmpty<T>(values: readonly T[] | null): readonly T[] | null {
+  return values && values.length > 0 ? values : null;
+}
+
+/**
+ * The page's attributes: only in aceite-de-motor, and null when none is held.
+ * A stored value outside its closed set (only the importer writes them, from
+ * the readers) is treated as absent rather than shown.
+ */
+function pageAttributes(categorySlug: string, held: HeldAttributes): ProductAttributes | null {
+  if (categorySlug !== ENGINE_OIL_CATEGORY) return null;
+  const attributes: ProductAttributes = {
+    viscosity: nonBlank(held.viscosity),
+    volume: held.volumeMl === null ? null : formatVolumeMl(held.volumeMl),
+    acea: nonEmpty(held.acea?.filter(isAceaSequence) ?? null),
+    oilType: held.oilType !== null && isOilType(held.oilType) ? held.oilType : null,
+    approvals: nonEmpty(held.approvals),
+  };
+  return Object.values(attributes).some((value) => value !== null) ? attributes : null;
 }
 
 /**
@@ -85,6 +155,12 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       priceUpdatedAt: offers.priceUpdatedAt,
       isDemo: feeds.isDemo,
       indexable: sql<boolean>`${indexableProductWhere()}`,
+      // Aliased to non-attr keys: only the importer may write an attr key (D13).
+      viscosity: products.attrViscosity,
+      volumeMl: products.attrVolumeMl,
+      acea: products.attrAcea,
+      oilType: products.attrOilType,
+      approvals: products.attrApprovals,
     })
     .from(offers)
     .innerJoin(products, eq(offers.productId, products.id))
@@ -118,5 +194,6 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
     })),
     demoOnly: rows.every((row) => row.isDemo),
     indexable: first.indexable,
+    attributes: pageAttributes(first.categorySlug, first),
   };
 }
