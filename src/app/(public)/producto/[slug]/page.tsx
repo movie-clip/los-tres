@@ -10,6 +10,11 @@ import { DemoNotice } from '@/components/DemoNotice';
 import { FitBanner } from '@/components/FitBanner';
 import { JsonLd } from '@/components/JsonLd';
 import { OfferList } from '@/components/OfferList';
+import {
+  APPROVALS_VISIBLE,
+  ProductAttributes,
+  type ProductAttributeRow,
+} from '@/components/ProductAttributes';
 import { ProductDescription } from '@/components/ProductDescription';
 import { ProductHero, type ProductDetail } from '@/components/ProductHero';
 import { VehicleList } from '@/components/VehicleList';
@@ -113,6 +118,57 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
   if (product.ean !== null) details.push({ label: t('ean'), value: product.ean });
 
+  // The attribute rows, finished here, in the spec's order; an absent attribute draws
+  // no row. The reader returns null outside aceite-de-motor and when none is held,
+  // and then the page draws no card.
+  const attributes = product.attributes;
+  const attributeRows: ProductAttributeRow[] = [];
+  if (attributes !== null) {
+    if (attributes.viscosity !== null) {
+      attributeRows.push({
+        key: 'viscosity',
+        kind: 'value',
+        label: t('attributeLabel.viscosity'),
+        value: attributes.viscosity,
+      });
+    }
+    if (attributes.volume !== null) {
+      attributeRows.push({
+        key: 'volume',
+        kind: 'value',
+        label: t('attributeLabel.volume'),
+        value: attributes.volume,
+      });
+    }
+    if (attributes.acea !== null) {
+      attributeRows.push({
+        key: 'acea',
+        kind: 'tokens',
+        label: t('attributeLabel.acea'),
+        tokens: attributes.acea,
+      });
+    }
+    if (attributes.oilType !== null) {
+      attributeRows.push({
+        key: 'oilType',
+        kind: 'value',
+        label: t('attributeLabel.oilType'),
+        value: t(`oilType.${attributes.oilType}`),
+      });
+    }
+    if (attributes.approvals !== null) {
+      const hiddenApprovals = attributes.approvals.length - APPROVALS_VISIBLE;
+      attributeRows.push({
+        key: 'approvals',
+        kind: 'list',
+        label: t('attributeLabel.approvals'),
+        items: attributes.approvals,
+        moreLabel: hiddenApprovals > 0 ? t('approvalsMore', { count: hiddenApprovals }) : null,
+        fewerLabel: t('approvalsFewer'),
+      });
+    }
+  }
+
   // The product's own leaf: an unknown or root slug keeps the plain square.
   const illustration = toIllustrationKey(product.categorySlug);
   const imageLabel = illustration
@@ -176,6 +232,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
               isBestPrice: offer.isBestPrice,
             }))}
           />
+          {attributeRows.length > 0 && (
+            <ProductAttributes heading={t('attributesHeading')} rows={attributeRows} />
+          )}
           {vehicleRows.length > 0 && (
             <VehicleList
               heading={tProductFit('listHeading')}
