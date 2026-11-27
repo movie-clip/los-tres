@@ -42,7 +42,7 @@ job is to cut, not to collect.
   loop is a candidate for "later". Put it in an explicit *out of MVP* list
   rather than leaving it unmentioned.
 - **`mvp.md` § Out of MVP is settled.** A request for something on that list
-  (ads, accounts, shipping costs, fitment, shop uploads, scheduled imports) is
+  (ads, accounts, shipping costs, shop uploads, scheduled imports) is
   a scope change for the owner, not a gap.
 - **Name the owner's open calls as questions, not answers.** Each one goes in
   `risks` with what it blocks.

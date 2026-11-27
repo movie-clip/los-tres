@@ -237,8 +237,9 @@ that, the three needs of the bar apply, plus a feed entry path.
 
 ## About the report counts
 
-The owner's local report (S15.1, #400) read 10 pages: 5 engine oil, 2 oil
-filters and 0 for each of the other three categories, from 5 shop folders. It
+The owner's local report (S15.1, #400) read 10 pages: 7 in the five categories
+(5 engine oil, 2 oil filters and 0 for each of the other three) and 3 outside
+them, from 5 shop folders. It
 is collected data, kept local and not in this repository (decision 0017). Any
 count taken from it is an anecdote about those pages. It is not a coverage
 measure and says nothing about coverage in the feeds the site will import. This
