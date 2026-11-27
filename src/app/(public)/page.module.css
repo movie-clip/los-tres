@@ -18,8 +18,9 @@
   margin-bottom: var(--space-2);
 }
 
-/* Class and attribute: the notice's own bottom margin gives way to the wrapper's. */
-.notice > [role='note'] {
+/* The wrapper's one child: its own bottom margin gives way to the wrapper's. Class plus
+   pseudo-class outranks the single-class margin the child composes (issue 399). */
+.notice > :only-child {
   margin-bottom: 0;
 }
 
