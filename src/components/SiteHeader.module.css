@@ -42,7 +42,9 @@
 /* The trailing group of row 1: the car control (with no car selected), then the theme
    switch. It is the last item of row 1, against the right edge of the column, and wraps as
    one unit. It keeps its own size; below 22rem the car control is wide (words showing)
-   and the group wraps onto its own row, left aligned, capped at the column. */
+   and the group wraps onto its own row, left aligned, capped at the column. Below 40rem
+   the gap between the car control and the switch is --space-0, so row 1 holds at 390 px
+   (issue 399). */
 .trailing {
   display: flex;
   flex: none;
@@ -61,6 +63,10 @@
 @media (max-width: 39.99rem) {
   .inner {
     column-gap: var(--space-1);
+  }
+
+  .trailing {
+    column-gap: var(--space-0);
   }
 }
 
@@ -130,13 +136,14 @@
   text-decoration: none;
 }
 
-/* The amber square before the name: an empty box, no text. */
+/* The amber square before the name: an empty box, no text, a quarter step from the
+   name at every width (issue 399). */
 .name::before {
   content: '';
   flex: none;
   width: 0.625rem;
   height: 0.625rem;
-  margin-right: var(--space-1);
+  margin-right: var(--space-0);
   background: var(--color-accent);
 }
 
