@@ -9,8 +9,10 @@ import {
   ENGINE_OIL_CATEGORY,
   formatVolumeMl,
   OIL_TYPES,
+  VISCOSITY_GRADES,
   type AceaSequence,
   type OilType,
+  type ViscosityGrade,
 } from '../category-attributes';
 import { isWellFormedSlug } from '../slug';
 import { visibleOfferWhere, visibleProductWhere } from '../visibility';
@@ -42,7 +44,7 @@ export type PublicOffer = {
  */
 export type ProductAttributes = {
   /** Written form, '10W-40'. */
-  viscosity: string | null;
+  viscosity: ViscosityGrade | null;
   /** Written form from formatVolumeMl, '1,5 l' (plain space). */
   volume: string | null;
   /** Closed-set order, as held. */
@@ -110,6 +112,10 @@ function isOilType(value: string): value is OilType {
   return (OIL_TYPES as readonly string[]).includes(value);
 }
 
+function isViscosityGrade(value: string): value is ViscosityGrade {
+  return (VISCOSITY_GRADES as readonly string[]).includes(value);
+}
+
 function nonEmpty<T>(values: readonly T[] | null): readonly T[] | null {
   return values && values.length > 0 ? values : null;
 }
@@ -122,7 +128,7 @@ function nonEmpty<T>(values: readonly T[] | null): readonly T[] | null {
 function pageAttributes(categorySlug: string, held: HeldAttributes): ProductAttributes | null {
   if (categorySlug !== ENGINE_OIL_CATEGORY) return null;
   const attributes: ProductAttributes = {
-    viscosity: nonBlank(held.viscosity),
+    viscosity: held.viscosity !== null && isViscosityGrade(held.viscosity) ? held.viscosity : null,
     volume: held.volumeMl === null ? null : formatVolumeMl(held.volumeMl),
     acea: nonEmpty(held.acea?.filter(isAceaSequence) ?? null),
     oilType: held.oilType !== null && isOilType(held.oilType) ? held.oilType : null,

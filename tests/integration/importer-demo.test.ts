@@ -300,11 +300,22 @@ describe('the demo attributes (S15.3, AC 42, 43)', () => {
     },
     {
       ean: '2000000100104',
-      page: { viscosity: '5W-30', volume: '5 l', acea: ['C3'], oilType: 'synthetic', approvals: ['Homologación demo 503'] },
+      page: { viscosity: '5W-30', volume: '4,5 l', acea: ['C3'], oilType: 'synthetic', approvals: ['Homologación demo 503'] },
     },
     {
       ean: '2000000100142',
-      page: { viscosity: '10W-40', volume: '5 l', acea: ['A3/B4'], oilType: 'mineral', approvals: ['Homologación demo 504', 'Homologación demo 505'] },
+      page: { viscosity: '10W-40', volume: '5 l', acea: ['A3/B4'], oilType: 'mineral', approvals: [
+        'Homologación demo 504',
+        'Homologación demo 505',
+        'Homologación demo 506',
+        'Homologación demo 507',
+        'Homologación demo 508',
+        'Homologación demo 509',
+        'Homologación demo 510',
+        'Homologación demo 511',
+        'Homologación demo 512',
+        'Homologación demo 513',
+      ] },
     },
   ] as const;
 

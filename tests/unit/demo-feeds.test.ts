@@ -303,7 +303,7 @@ describe('the demo attributes (S15.3, AC 42, 43)', () => {
     expect(byId.get('CUATRO-202')).toEqual({ viscosity: '5W-30', volumeMl: 4000, acea: ['C3'], oilType: 'synthetic', approvals: null });
     expect(byId.get('CUATRO-203')).toEqual({
       viscosity: '5W-30',
-      volumeMl: 5000,
+      volumeMl: 4500,
       acea: ['C3'],
       oilType: 'synthetic',
       approvals: ['Homologación demo 503'],
@@ -313,7 +313,18 @@ describe('the demo attributes (S15.3, AC 42, 43)', () => {
       volumeMl: 5000,
       acea: ['A3/B4'],
       oilType: 'mineral',
-      approvals: ['Homologación demo 504', 'Homologación demo 505'],
+      approvals: [
+        'Homologación demo 504',
+        'Homologación demo 505',
+        'Homologación demo 506',
+        'Homologación demo 507',
+        'Homologación demo 508',
+        'Homologación demo 509',
+        'Homologación demo 510',
+        'Homologación demo 511',
+        'Homologación demo 512',
+        'Homologación demo 513',
+      ],
     });
   });
 
