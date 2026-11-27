@@ -19,6 +19,7 @@ function feed(overrides: Partial<FeedImportReport>): FeedImportReport {
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
+    attributesUnparsed: { viscosity: 0, volume: 0, acea: 0, oilType: 0, approvals: 0 },
     ...overrides,
   };
 }

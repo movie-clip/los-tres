@@ -22,15 +22,42 @@ export type EanFillFacts = {
   product: { ean: string | null; eanNormalised: string | null; isHidden: boolean; marked: boolean };
 };
 
-export type EanFillSkip =
-  | 'no_ean' // the row carries none (an invalid one never reaches here: invalid_ean)
-  | 'product_has_ean' // either EAN column of the product is non-null (AC 15, DT-4)
+/**
+ * The S7.6 eligibility of a row for a later fill onto a stored product: the one
+ * statement of the gate, shared by the EAN fill and the attribute fill (S15.3,
+ * D-2). A subset of the facts each fill reads.
+ */
+export type FillGateFacts = {
+  markedRow: boolean;
+  shopApproved: boolean;
+  feedApproved: boolean;
+  offer: { isHidden: boolean; inReview: boolean };
+  product: { isHidden: boolean; marked: boolean };
+};
+
+export type FillGateSkip =
   | 'other_side' // the product's marker differs from the row's (D-3, ACs 9, 10, DT-8)
   | 'feed_not_approved'
   | 'shop_not_approved'
   | 'offer_hidden'
   | 'offer_in_review'
   | 'product_hidden'; // D-13
+
+/** The first gate condition that holds, in the order of `FillGateSkip`, or null when the row is eligible. */
+export function fillGate(facts: FillGateFacts): FillGateSkip | null {
+  if (facts.product.marked !== facts.markedRow) return 'other_side';
+  if (!facts.feedApproved) return 'feed_not_approved';
+  if (!facts.shopApproved) return 'shop_not_approved';
+  if (facts.offer.isHidden) return 'offer_hidden';
+  if (facts.offer.inReview) return 'offer_in_review';
+  if (facts.product.isHidden) return 'product_hidden';
+  return null;
+}
+
+export type EanFillSkip =
+  | 'no_ean' // the row carries none (an invalid one never reaches here: invalid_ean)
+  | 'product_has_ean' // either EAN column of the product is non-null (AC 15, DT-4)
+  | FillGateSkip;
 
 export type EanFillDecision =
   | { kind: 'skip'; reason: EanFillSkip }
@@ -43,14 +70,10 @@ export type EanFillDecision =
  */
 export function decideEanFill(facts: EanFillFacts): EanFillDecision {
   const skip = (reason: EanFillSkip): EanFillDecision => ({ kind: 'skip', reason });
-  const { row, product, offer } = facts;
+  const { row, product } = facts;
   if (row.ean === null || row.eanNormalised === null) return skip('no_ean');
   if (product.ean !== null || product.eanNormalised !== null) return skip('product_has_ean');
-  if (product.marked !== facts.markedRow) return skip('other_side');
-  if (!facts.feedApproved) return skip('feed_not_approved');
-  if (!facts.shopApproved) return skip('shop_not_approved');
-  if (offer.isHidden) return skip('offer_hidden');
-  if (offer.inReview) return skip('offer_in_review');
-  if (product.isHidden) return skip('product_hidden');
+  const gate = fillGate(facts);
+  if (gate !== null) return skip(gate);
   return { kind: 'try', ean: row.ean, eanNormalised: row.eanNormalised };
 }

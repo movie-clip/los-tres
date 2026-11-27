@@ -1,11 +1,18 @@
 import 'server-only';
 
-import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 
 import type { Database, Executor } from '../../db/client';
 import { feedCategoryMappings, feeds, offers, products, shops } from '../../db/schema';
 import { matchProduct, normalizeBrand, normalizePartNumber, selectByEan, type MatchScope } from '../matching';
+import type { AttributeKey } from '../category-attributes';
 import { slugify, uniqueSlug } from '../slug';
+import {
+  decideAttributeFill,
+  readsAnyAttribute,
+  type AttributeFillDecision,
+  type AttributeFillFacts,
+} from './attribute-fill';
 import { decideEanFill, type EanFillDecision, type EanFillFacts } from './ean-fill';
 import { FeedFitments, loadVehicleIds, replaceFeedFitments } from './fitments';
 import { openRecords, type FeedRecords } from './records';
@@ -32,7 +39,11 @@ import { readHeader, validateRow, type ColumnIndex, type ValidRow } from './vali
 // are absent from an import that passed the removal guard (./removal.ts), and
 // cleared on every accepted row.
 // Product text is written once (TD-23), except an empty EAN, which
-// `fillEmptyEan` may set once (S7.6). `products.category_id` is the one
+// `fillEmptyEan` may set once (S7.6). The engine-oil attributes (S15.3,
+// `products.attr_*`) are written by the row that creates the product, whatever
+// its category or approvals (D-16), and an absent one is filled once by a later
+// eligible row (`fillAttributes`, the S7.6 gate, ./attribute-fill.ts); a held
+// one is never changed or cleared. `products.category_id` is the one
 // product column it may set later, and only from null: the first mapped feed
 // category wins and nothing is ever cleared or overwritten (D-3). The admin
 // mapping writer (src/server/admin/category-mappings.ts, S4.2) is the second
@@ -121,6 +132,7 @@ function emptyReport(feed: FeedRow): FeedImportReport {
     unknownVehicles: 0,
     unknownVehicleSlugs: [],
     unknownVehiclesNotShown: 0,
+    attributesUnparsed: { viscosity: 0, volume: 0, acea: 0, oilType: 0, approvals: 0 },
   };
 }
 
@@ -215,6 +227,8 @@ async function importRecords(
       continue;
     }
     seenIds.add(row.externalId);
+    // Every accepted row counts, known or new, whatever its category or marker (S15.3, AC 21).
+    for (const key of row.unparsed) report.attributesUnparsed[key] += 1;
 
     const known = await findOffer(tx, feed.id, row.externalId);
     if (known) {
@@ -222,6 +236,11 @@ async function importRecords(
       await assignCategory(tx, known.productId, mappedCategory(mappings, row), { markedRow });
       const fill = decideEanFill(fillFacts(feed, row, markedRow, known.offer, known.product));
       if (await fillEmptyEan(tx, known.productId, fill, { markedRow })) report.eanFilled += 1;
+      await fillAttributes(
+        tx,
+        known.productId,
+        decideAttributeFill(attributeFillFacts(feed, row, markedRow, known.offer, known.product)),
+      );
       fitmentsOfFeed.add(known.productId, row.fitment);
       report.offersUpdated += 1;
       continue;
@@ -245,12 +264,18 @@ async function importRecords(
     }
     await writeOffer(tx, feed.id, productId, row, startedAt);
     await assignCategory(tx, productId, mappedCategory(mappings, row), { markedRow });
-    // A created product already carries the row's EAN, or the row had none: only an attach may fill.
-    if (match.kind === 'attach' && row.eanNormalised !== null) {
+    // A created product already carries the row's EAN and attributes (D-16), or the row had
+    // none: only an attach may fill, and the product is read only when the row has something to give.
+    if (match.kind === 'attach' && (row.eanNormalised !== null || readsAnyAttribute(row.attributes))) {
       const target = await readFillTarget(tx, productId);
       if (target) {
         const fill = decideEanFill(fillFacts(feed, row, markedRow, NEW_OFFER, target));
         if (await fillEmptyEan(tx, productId, fill, { markedRow })) report.eanFilled += 1;
+        await fillAttributes(
+          tx,
+          productId,
+          decideAttributeFill(attributeFillFacts(feed, row, markedRow, NEW_OFFER, target)),
+        );
       }
     }
     fitmentsOfFeed.add(productId, row.fitment);
@@ -364,19 +389,53 @@ async function removeMissingOffers(
   }
 }
 
-type FillTarget = EanFillFacts['product'];
+/** The product as both fills read it: the EAN fill's facts, and which attributes it holds (S15.3). */
+type FillTarget = EanFillFacts['product'] & { held: Record<AttributeKey, boolean> };
 type FillOffer = EanFillFacts['offer'];
 
 /** A new offer's states: the insert sets neither, and the schema defaults both to false. */
 const NEW_OFFER: FillOffer = { isHidden: false, inReview: false };
 
-/** The four product columns the EAN fill decides on (S7.6), by product id. */
+/**
+ * The product columns the fills decide on, by product id: the four of the EAN
+ * fill (S7.6), and whether each attribute is held (S15.3), read in the same
+ * statement so a known offer costs no extra read.
+ */
 const fillTargetColumns = {
   ean: products.ean,
   eanNormalised: products.eanNormalised,
   isHidden: products.isHidden,
   marked: products.isCollected,
+  heldViscosity: isNotNull(products.attrViscosity).mapWith(Boolean),
+  heldVolume: isNotNull(products.attrVolumeMl).mapWith(Boolean),
+  heldAcea: isNotNull(products.attrAcea).mapWith(Boolean),
+  heldOilType: isNotNull(products.attrOilType).mapWith(Boolean),
+  heldApprovals: isNotNull(products.attrApprovals).mapWith(Boolean),
 };
+
+type FillTargetRow = Omit<FillTarget, 'held'> & {
+  heldViscosity: boolean;
+  heldVolume: boolean;
+  heldAcea: boolean;
+  heldOilType: boolean;
+  heldApprovals: boolean;
+};
+
+function fillTargetOf(found: FillTargetRow): FillTarget {
+  return {
+    ean: found.ean,
+    eanNormalised: found.eanNormalised,
+    isHidden: found.isHidden,
+    marked: found.marked,
+    held: {
+      viscosity: found.heldViscosity,
+      volume: found.heldVolume,
+      acea: found.heldAcea,
+      oilType: found.heldOilType,
+      approvals: found.heldApprovals,
+    },
+  };
+}
 
 /**
  * This feed's stored offer for the external id, with its own states and the
@@ -402,19 +461,14 @@ async function findOffer(
   return {
     productId: found.productId,
     offer: { isHidden: found.offerHidden, inReview: found.offerInReview },
-    product: {
-      ean: found.ean,
-      eanNormalised: found.eanNormalised,
-      isHidden: found.isHidden,
-      marked: found.marked,
-    },
+    product: fillTargetOf(found),
   };
 }
 
-/** The product a new offer attached to, as the EAN fill reads it (S7.6). */
+/** The product a new offer attached to, as the fills read it (S7.6, S15.3). */
 async function readFillTarget(tx: Executor, productId: number): Promise<FillTarget | undefined> {
   const [found] = await tx.select(fillTargetColumns).from(products).where(eq(products.id, productId)).limit(1);
-  return found;
+  return found ? fillTargetOf(found) : undefined;
 }
 
 /** The facts of one accepted row for `decideEanFill` (S7.6). */
@@ -433,6 +487,50 @@ function fillFacts(
     offer,
     product,
   };
+}
+
+/** The facts of one accepted row for `decideAttributeFill` (S15.3): the S7.6 gate's, and the row's values. */
+function attributeFillFacts(
+  feed: FeedRow,
+  row: ValidRow,
+  markedRow: boolean,
+  offer: FillOffer,
+  product: FillTarget,
+): AttributeFillFacts {
+  return {
+    row: row.attributes,
+    markedRow,
+    shopApproved: feed.shopApproved,
+    feedApproved: feed.isApproved,
+    offer,
+    product: { isHidden: product.isHidden, marked: product.marked, held: product.held },
+  };
+}
+
+/**
+ * Fills the product's absent attributes once (S15.3): each column the decision
+ * names is set to `coalesce(column, value)`, so a held value stays, even under
+ * a concurrent import. Never another column. The update repeats the not-hidden
+ * guard of the EAN fill (DT-5); the marker never changes after creation, and
+ * the decision already applied `other_side`.
+ */
+async function fillAttributes(tx: Executor, productId: number, decision: AttributeFillDecision): Promise<void> {
+  if (decision.kind === 'skip') return;
+  const { viscosity, volumeMl, acea, oilType, approvals } = decision.values;
+  const set: { attrViscosity?: SQL; attrVolumeMl?: SQL; attrAcea?: SQL; attrOilType?: SQL; attrApprovals?: SQL } =
+    {};
+  if (viscosity) set.attrViscosity = sql`coalesce(${products.attrViscosity}, ${viscosity})`;
+  if (typeof volumeMl === 'number') set.attrVolumeMl = sql`coalesce(${products.attrVolumeMl}, ${volumeMl})`;
+  if (acea) set.attrAcea = sql`coalesce(${products.attrAcea}, ${sql.param([...acea], products.attrAcea)})`;
+  if (oilType) set.attrOilType = sql`coalesce(${products.attrOilType}, ${oilType})`;
+  if (approvals) {
+    set.attrApprovals = sql`coalesce(${products.attrApprovals}, ${sql.param([...approvals], products.attrApprovals)})`;
+  }
+  if (Object.keys(set).length === 0) return;
+  await tx
+    .update(products)
+    .set(set)
+    .where(and(eq(products.id, productId), eq(products.isHidden, false)));
 }
 
 /**
@@ -468,7 +566,9 @@ async function fillEmptyEan(
 /**
  * Product text is written here only, once, and never updated (TD-23), except
  * an empty EAN, which `fillEmptyEan` may set once (S7.6). So is the collected
- * marker (S12.2): `markedRow` is true for a row of a collected feed.
+ * marker (S12.2): `markedRow` is true for a row of a collected feed. The row's
+ * readable attributes are written here too, whatever its category or its shop's
+ * and feed's approval, as title and EAN are (S15.3, D-16, D-26).
  */
 async function createProduct(
   tx: Executor,
@@ -498,6 +598,11 @@ async function createProduct(
       eanNormalised: row.eanNormalised,
       description: row.description,
       isCollected: markedRow,
+      attrViscosity: row.attributes.viscosity,
+      attrVolumeMl: row.attributes.volumeMl,
+      attrAcea: row.attributes.acea === null ? null : [...row.attributes.acea],
+      attrOilType: row.attributes.oilType,
+      attrApprovals: row.attributes.approvals === null ? null : [...row.attributes.approvals],
     })
     .returning({ id: products.id });
   return created.id;

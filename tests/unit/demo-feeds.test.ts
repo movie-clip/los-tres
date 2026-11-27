@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
+import { ATTRIBUTES } from '@/server/category-attributes';
 import { parseEan } from '@/server/matching';
 import { parseCsv } from '@/server/importer/csv';
 import { readHeader, validateRow, type ValidRow } from '@/server/importer/validate';
@@ -16,7 +17,8 @@ import { DEMO_BOSCH, DEMO_CATEGORY_COUNTS, DEMO_COUNTS, DEMO_FEED_ROWS } from '.
 // fixtures in tests/fixtures/demo.ts and the e2e rely on. No database, no network.
 
 const FEED_DIR = path.resolve(import.meta.dirname, '../../demo/feeds');
-const HEADER = 'id,title,brand,part_number,ean,price,currency,url,description,category,fitment';
+const HEADER =
+  'id,title,brand,part_number,ean,price,currency,url,description,category,fitment,viscosity,volume_l,acea,oil_type,approvals';
 const PAGE_SIZE = 24;
 
 type DemoRow = ValidRow & { feedFile: string; leaf: string | null };
@@ -175,8 +177,14 @@ describe('fitment in the shipped demo feeds (S5.6)', () => {
     return list.has(slug) ? 'fits' : 'no-fit';
   };
 
-  it('puts fitment last in the header of every demo file', () => {
-    for (const feed of feeds) expect(feed.header.split(',').at(-1)).toBe('fitment');
+  it('puts fitment in the header of every demo file, followed only by the five attribute columns (S15.3)', () => {
+    for (const feed of feeds) {
+      const header = feed.header.split(',');
+      expect(header.slice(header.indexOf('fitment'))).toEqual([
+        'fitment',
+        ...ATTRIBUTES.map((attribute) => attribute.column),
+      ]);
+    }
   });
 
   it('names only slugs of the vehicle list, so the first import prints 0 unknown slugs (AC 29)', () => {

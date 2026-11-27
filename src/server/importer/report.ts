@@ -1,8 +1,18 @@
 // The CLI's stdout for an import (C-16). Pure. Prints ids, shop names, counts
 // and codes; never a URL and never the content of a row, except the slug-shaped
-// unknown vehicle slugs of the fitment field (bounded by fitments.ts).
+// unknown vehicle slugs of the fitment field (bounded by fitments.ts). The
+// unparsed-attribute line names feed columns and counts only (S15.3, AC 19).
 
+import { ATTRIBUTES } from '../category-attributes';
 import type { FeedImportReport, ImportReport } from './types';
+
+/** `  attributes: unparsed <column>=<n> ...`, keys above 0 only, in ATTRIBUTES order; none when all are 0. */
+function attributeLines(feed: FeedImportReport): string[] {
+  const counts = ATTRIBUTES.filter(({ key }) => feed.attributesUnparsed[key] > 0).map(
+    ({ key, column }) => `${column}=${feed.attributesUnparsed[key]}`,
+  );
+  return counts.length > 0 ? [`  attributes: unparsed ${counts.join(' ')}`] : [];
+}
 
 function feedLines(feed: FeedImportReport): string[] {
   const head = `feed ${feed.feedId} "${feed.shopName}":`;
@@ -23,6 +33,7 @@ function feedLines(feed: FeedImportReport): string[] {
     ...(feed.unknownVehiclesNotShown > 0
       ? [`  fitment: unknown vehicle values not shown rows=${feed.unknownVehiclesNotShown}`]
       : []),
+    ...attributeLines(feed),
     ...(feed.removalSkipped
       ? [
           `  removal: skipped ${feed.removalSkipped.reason} ` +
@@ -36,7 +47,9 @@ function feedLines(feed: FeedImportReport): string[] {
  * One line per feed, then a total line. Under an imported feed's line, indented
  * and in this order: its rejected rows, its own-product rows (`own_product
  * <reason>`), the filled-EAN count (`ean: filled=<n>`, S7.6, only when n > 0),
- * its unknown fitment vehicles, the not-shown fitment count, then
+ * its unknown fitment vehicles, the not-shown fitment count, the unparsed
+ * attribute counts (`attributes: unparsed <column>=<n> ...`, S15.3, only the
+ * columns whose count is above 0, and no line when none is), then
  * last the skipped removal (`removal: skipped <reason> missing=<n>
  * current=<n>`, S3.3), only when the guard skipped it. A skipped or failed
  * feed has its line only: a failed feed rolled back, removal included.
