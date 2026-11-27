@@ -1,8 +1,9 @@
-/* A small square thumbnail: there are no product images yet. */
+/* A small square thumbnail: there are no product images yet. It is capped at the
+   8rem drawing box of the hero (issue 399). */
 .placeholder {
   grid-column: 1;
   grid-row: 1;
-  width: clamp(5rem, 22vw, 11rem);
+  width: clamp(5rem, 22vw, 8rem);
   aspect-ratio: 1 / 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

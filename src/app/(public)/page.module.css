@@ -1,7 +1,6 @@
 /* Full-bleed ink band under the header: a normal full-width block, no viewport
-   units. The hairline separates it from the header; the inner column matches `.page`. */
+   units. The header's own hairline separates the two; the inner column matches `.page`. */
 .panel {
-  border-top: 1px solid var(--color-on-frame-line);
   background: var(--color-frame);
   color: var(--color-on-frame);
 }
@@ -12,9 +11,53 @@
   padding: clamp(2rem, 1.2rem + 3vw, 3.5rem) var(--gutter);
 }
 
-/* The unknown-car notice, first in the column: the same 36rem measure as the title. */
+/* The unknown-car notice, first in the column: the same 36rem measure as the title,
+   a step above the title. */
 .notice {
   max-width: 36rem;
+  margin-bottom: var(--space-2);
+}
+
+/* The wrapper's one child: its own bottom margin gives way to the wrapper's. Class plus
+   pseudo-class outranks the single-class margin the child composes (issue 399). */
+.notice > :only-child {
+  margin-bottom: 0;
+}
+
+/* From 52rem, with a search form, the masthead is two columns: the headline and tagline
+   at the left, the 22rem search panel at the right spanning both rows. DOM order is
+   unchanged. Without a form (no category) it stays one column (issue 399). */
+@media (min-width: 52rem) {
+  .panelInner:has(> form) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'notice notice'
+      'title search'
+      'tagline search';
+    column-gap: var(--space-4);
+    row-gap: 0;
+  }
+
+  .panelInner > .notice {
+    grid-area: notice;
+  }
+
+  .panelInner > .title {
+    grid-area: title;
+    align-self: start;
+  }
+
+  .panelInner > .tagline {
+    grid-area: tagline;
+    align-self: start;
+  }
+
+  .panelInner > form {
+    grid-area: search;
+    align-self: start;
+  }
 }
 
 .title {

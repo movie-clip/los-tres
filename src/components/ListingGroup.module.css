@@ -4,8 +4,7 @@
   margin-top: var(--space-4);
 }
 
-/* From 40rem the grid has several columns and a group's last row can leave cells empty:
-   a hairline marks where one group ends and the next begins. */
+/* From 40rem a hairline marks where one group's list ends and the next begins. */
 @media (min-width: 40rem) {
   .group + .group {
     margin-top: var(--space-3);

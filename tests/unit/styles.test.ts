@@ -385,7 +385,8 @@ describe('#398 the three token blocks of globals.css', () => {
     const aliases = readSet(sets.light[0])
       .declarations.filter(([, value]) => value.includes('var(--color-'))
       .map(([name]) => name);
-    expect(aliases.length).toBeGreaterThanOrEqual(5);
+    // issue 399 retires --color-on-ink-line; 4 remain (--color-link, --color-focus, --focus-ring, --focus-ring-on-ink).
+    expect(aliases.length).toBeGreaterThanOrEqual(4);
     const dark = readSet(sets.dark[0]).declarations.map(([name]) => name);
     expect(aliases.filter((name) => !dark.includes(name))).toEqual([]);
   });

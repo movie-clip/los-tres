@@ -1,8 +1,11 @@
-/* The ink bar runs edge to edge with an amber rule on its top edge; the content
-   sits in the same column as `.page`. */
+/* The ink bar runs edge to edge with a 3px amber rule on its top edge and a hairline
+   under it on every page; the content sits in the same column as `.page`. The row
+   between the two lines is 52 px: the 44 px controls and a quarter step above and
+   below (issue 399). */
 .header {
-  padding: var(--space-1) 0;
-  border-top: var(--space-0) solid var(--color-accent);
+  padding: 0;
+  border-top: 3px solid var(--color-accent);
+  border-bottom: 1px solid var(--color-on-frame-line);
   background: var(--color-frame);
 }
 
@@ -16,15 +19,15 @@
   gap: var(--space-0) var(--space-2);
   max-width: var(--content-width);
   margin: 0 auto;
-  padding: 0 var(--gutter);
+  padding: var(--space-0) var(--gutter);
 }
 
-/* Row 2: the car control, in the same column as row 1 (same width and gutter), a quarter
-   step under it. */
+/* Row 2: the car control, in the same column as row 1 (same width and gutter), with a
+   quarter step under it before the hairline. */
 .carRow {
   max-width: var(--content-width);
-  margin: var(--space-0) auto 0;
-  padding: 0 var(--gutter);
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--space-0);
 }
 
 /* The box takes the room beside the name, from 10rem (phones) or 14rem up to
@@ -39,7 +42,9 @@
 /* The trailing group of row 1: the car control (with no car selected), then the theme
    switch. It is the last item of row 1, against the right edge of the column, and wraps as
    one unit. It keeps its own size; below 22rem the car control is wide (words showing)
-   and the group wraps onto its own row, left aligned, capped at the column. */
+   and the group wraps onto its own row, left aligned, capped at the column. Below 40rem
+   the gap between the car control and the switch is --space-0, so row 1 holds at 390 px
+   (issue 399). */
 .trailing {
   display: flex;
   flex: none;
@@ -58,6 +63,10 @@
 @media (max-width: 39.99rem) {
   .inner {
     column-gap: var(--space-1);
+  }
+
+  .trailing {
+    column-gap: var(--space-0);
   }
 }
 
@@ -121,9 +130,21 @@
   min-height: var(--tap-target);
   color: var(--color-on-frame);
   font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
+  /* 800 is a constant of this element, not a weight token (issue 399). */
+  font-weight: 800;
   overflow-wrap: anywhere;
   text-decoration: none;
+}
+
+/* The amber square before the name: an empty box, no text, a quarter step from the
+   name at every width (issue 399). */
+.name::before {
+  content: '';
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-right: var(--space-0);
+  background: var(--color-accent);
 }
 
 .name:hover,

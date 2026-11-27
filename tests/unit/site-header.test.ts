@@ -137,9 +137,10 @@ describe('SiteHeader theme switch rules (#398)', () => {
   });
 });
 
-// #398 review fixes (CR-1, CR-2): the header holds one 64 px row from 390 px and two rows, 112 px, from 352 to
-// 389 px with no car. A height is a layout fact a unit test cannot measure (0006 rule 11), so these pin the rules
-// the measurement rests on; the order and nesting of the markup they select is tests/unit/theme.test.ts.
+// #398 review fixes (CR-1, CR-2): the header holds one 56 px row from 390 px and two rows, 104 px, from 352 to
+// 389 px with no car (the figures are issue 399's header: 3 px rule, 52 px row, 1 px hairline). A height is a layout
+// fact a unit test cannot measure (0006 rule 11), so these pin the rules the measurement rests on; the order and
+// nesting of the markup they select is tests/unit/theme.test.ts.
 describe('SiteHeader wrap rules of the review fixes (#398 CR-1, CR-2)', () => {
   it('CR-1: gives the header search field a 4.625rem (74 px) basis, the width that keeps the button on the field row at 390', () => {
     const css = read('src/components/SearchForm.module.css');

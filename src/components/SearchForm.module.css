@@ -1,7 +1,8 @@
 /* One search form, three presentations chosen by a class on the form:
    hero (home band, on ink), page (the /buscar panel, on white) and header (the
    site header, on ink). Sizes here are this component's own, not global tokens:
-   40rem the hero and page row width, 3.5rem their field and button height,
+   40rem the hero and page row width, 3rem their field and button height,
+   22rem the home panel the hero becomes from 52rem (issue 399),
    14rem and 26rem the header form basis and maximum, 4.625rem its field basis. */
 .form {
   margin: 0;
@@ -75,17 +76,30 @@
   margin-top: var(--space-3);
 }
 
+/* From 52rem the hero is the masthead panel at the right of the headline: a hairline
+   edge with a 3px amber top edge, on the frame fill. The page module places it. */
+@media (min-width: 52rem) {
+  .hero {
+    max-width: none;
+    margin-top: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--color-on-frame-line);
+    border-top: 3px solid var(--color-accent);
+    border-radius: var(--radius-lg);
+  }
+}
+
 .hero .label {
   color: var(--color-on-frame);
 }
 
 .hero .input,
 .hero .button {
-  height: 3.5rem;
+  height: 3rem;
 }
 
 .hero .input {
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
 }
 
 .hero .input:focus-visible,
@@ -110,7 +124,7 @@
 
 .page .input,
 .page .button {
-  height: 3.5rem;
+  height: 3rem;
 }
 
 .page .input {

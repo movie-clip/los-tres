@@ -1,5 +1,5 @@
-/* One column on a phone. From 40rem the tiles wrap by width: auto-fit drops
-   empty tracks, so four tiles fill the row in four equal columns. */
+/* Rows at every width, never a vertical card: one column on a phone, two from
+   40rem, four from 64rem (issue 399). */
 .tiles {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -13,19 +13,19 @@
   min-width: 0;
 }
 
-/* Phone: a row. Drawing on the left, name over count in the middle, chevron on
-   the right. 4rem and 5rem are this component's own sizes, not global tokens. */
+/* A row: drawing on the left, name over count in the middle, chevron on the
+   right. 3.25rem and 4.25rem are this component's own sizes, not global tokens. */
 .link {
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   align-content: center;
   align-items: center;
   column-gap: var(--space-2);
   box-sizing: border-box;
-  min-height: 5rem;
+  min-height: 4.25rem;
   height: 100%;
-  padding: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg);
@@ -39,8 +39,8 @@
   display: block;
   grid-column: 1;
   grid-row: 1 / span 2;
-  width: 4rem;
-  height: 4rem;
+  width: 3.25rem;
+  height: 3.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-chip-bg);
@@ -50,7 +50,7 @@
   grid-column: 2;
   grid-row: 1;
   align-self: end;
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-bold);
   overflow-wrap: anywhere;
 }
 
@@ -127,47 +127,24 @@
   }
 }
 
-/* From 40rem: a vertical card. Drawing on top, the name (it may take two
-   lines), then the count and chevron on one pinned bottom row. */
+/* From 40rem two columns of rows. */
 @media (min-width: 40rem) {
   .tiles {
-    grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .tile {
-    max-width: 22rem;
+/* From 64rem four columns; the row drops its chevron and its third column. */
+@media (min-width: 64rem) {
+  .tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .link {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto 1fr auto;
-    align-content: stretch;
-    align-items: start;
-    row-gap: var(--space-1);
-    padding: var(--card-padding);
-  }
-
-  .art {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    width: 5rem;
-    height: 5rem;
-  }
-
-  .name {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    align-self: start;
-  }
-
-  .count {
-    grid-column: 1;
-    grid-row: 3;
-    align-self: center;
+    grid-template-columns: 3.25rem minmax(0, 1fr);
   }
 
   .link::after {
-    grid-column: 2;
-    grid-row: 3;
+    display: none;
   }
 }

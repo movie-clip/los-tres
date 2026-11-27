@@ -1,17 +1,21 @@
 /* A white panel. Rows are separated by a top border; the first row's border
    also closes the heading. Source order in a row is shop, price, date, button
    at every width; the grid areas place them. 9rem and 12rem are this
-   component's own column sizes, not global tokens. */
+   component's own column sizes, not global tokens. The panel has no padding of
+   its own, so a row's fill reaches its edges; the heading and rows carry the
+   inset (issue 399). */
 .offers {
   min-width: 0;
-  padding: var(--card-padding);
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg);
 }
 
 .heading {
-  margin: 0 0 var(--space-2);
+  margin: 0;
+  padding: var(--card-padding) var(--card-padding) var(--space-1);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
@@ -34,8 +38,14 @@
     'go go';
   gap: var(--space-1) var(--space-2);
   align-items: center;
-  padding: var(--space-2) 0;
+  padding: var(--space-1) var(--card-padding);
   border-top: 1px solid var(--color-border);
+}
+
+/* The best-price band: the row that carries the tag is filled with the canvas, edge
+   to edge. It follows the tag itself, so the band and the tag never disagree. */
+.row:has(.tag) {
+  background: var(--color-canvas);
 }
 
 .shopCell {
