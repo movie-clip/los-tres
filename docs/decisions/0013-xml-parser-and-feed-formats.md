@@ -45,7 +45,13 @@ and not objected to.
   canonical columns are kept: required `id`, `title`, `price`, `url`, then
   optional `brand`, `part_number`, `description`, `ean`, `currency`, `category`,
   `fitment` (a `|`-separated list of vehicle slugs, S5.6; an absent or empty
-  element is an empty list, the same as an empty CSV cell). The first of a duplicated child wins; unknown children and all attributes are
+  element is an empty list, the same as an empty CSV cell), then the five
+  engine-oil attribute columns `viscosity`, `volume_l` (litres), `acea`,
+  `oil_type` and `approvals` (S15.3; sixteen canonical columns in all, one
+  element each: an approvals list is one element holding `;` or `,` separators,
+  never repeated elements, since the first of a duplicated child wins; an absent
+  or empty element is a blank cell, the same as an empty CSV cell, and no cell
+  ever rejects the row). The first of a duplicated child wins; unknown children and all attributes are
   ignored. No record element anywhere is `invalid_xml`. This rule is narrow on
   purpose: field mapping (S3.5) will replace the canonical-name assumption, and
   an Atom-style feed (a `feed` element with a direct `id` child) would pick

@@ -6,10 +6,15 @@ the stories that store, show and filter by category attributes (#402, #403 and
 file disagrees with it, this file wins until the owner amends it. The scope
 line is in `docs/product/mvp.md`, *Category attributes*.
 
-Nothing here is built yet. Stored key names, the feed column or entry path, the
-URL parameter names and the filter's screen and copy are not decided here: the
-later stories' design passes decide them (#402 storage and feed format, #403
-the collector, #404 filters).
+**Status.** S15.3 (#402) built the storage half for `aceite-de-motor`: the five
+attributes fixed in code with their closed sets, the five feed columns, the
+strict readers, the stored values on the product, the first-value-stays fill, the
+count of what did not parse in the import output, and the "Características" card
+on the engine-oil product page (see *As built in S15.3*). Not built: the
+category-page filters, their URL parameter names, screen and copy (#404), and
+the collector emitting the five columns (#403). The amendments below marked D-n
+are the owner's rulings in run `2026-11-27-402-attribute-storage`; they are
+written in place and this file carries the amended sets.
 
 ## What the visitor gets
 
@@ -41,11 +46,17 @@ four categories keep the brand filter and sort and gain nothing.
    completes or converts a value it does not recognise.
 4. **Unparsed means absent.** The raw text is neither stored nor shown. The
    product stays in its category and in search, and is left out of an active
-   filter on that attribute (see *Under an active filter*).
+   filter on that attribute (see *Under an active filter*). A blank cell is
+   also absent, but it is not unparsed: it says nothing and is never counted
+   (D-7).
 5. **First value stays.** When two feeds give a matched product different
    values, the first stays, as product text does (`mvp.md`, *Product and
    offers*). An absent attribute may be filled once by a later row that parses;
-   a value once set is never changed or cleared.
+   a value once set is never changed or cleared. A set value (ACEA, approvals)
+   fills as a whole: a later row never adds, drops or reorders an item (D-12).
+   Built as the row that creates a product writing what it reads, then an
+   eligible later row filling what is still absent (the S7.6 gate, decision
+   0008).
 6. **Collected values stay behind the wall.** A value from a collected feed
    lives only on collected products, which never merge with other products. It
    follows decision 0017 with no new rule.
@@ -60,7 +71,10 @@ four categories keep the brand filter and sort and gain nothing.
    existing canonical rule drops it. The parameter names and the parser belong
    to #404.
 10. **The import counts what did not parse**, per attribute, with no row text,
-    as `unknown_vehicles` does for fitment. The line's shape belongs to #402.
+    as `unknown_vehicles` does for fitment. A blank cell is not counted (D-7).
+    The line is one indented line per feed, `  attributes: unparsed
+    <column>=<n> ...`, listing only the columns with a count above 0 (see *As
+    built in S15.3*).
 
 ## Attributes by category
 
@@ -104,15 +118,22 @@ from any feed or from the report.
 - **Written form:** `<winter>W-<hot>`, upper-case W, one hyphen, no spaces, no
   SAE prefix. Illustrative: `10W-40`.
 - **Closed set:** winter grade 0W, 5W, 10W, 15W, 20W or 25W, joined to hot
-  grade 8, 12, 16, 20, 30, 40, 50 or 60. The filter lists only the grades
-  present on listed products.
+  grade 8, 12, 16, 20, 30, 40, 50 or 60, except 25W-8, 25W-12, 25W-16 and
+  25W-20: 44 pairings (D-5; those four cannot meet the J300 limits). The
+  filter lists only the grades present on listed products.
+- **Source of the set:** the J300 grade set rests on secondary sources, not on
+  a primary read of the standard, which is paywalled. The current revision is
+  SAE J300 revision 202405 (2024-05-09); the pairings and the four exclusions
+  come from published summaries of its limits (D-6). A change to the set is a
+  one-line code change and a story.
 - **Accepted raw forms:** case-insensitive and trimmed; an optional leading
   SAE; the two halves joined by a hyphen, an en dash, a slash, a space or
   nothing. Illustrative: `10w40`, `SAE 15W 40`, `0W/20`.
 - **Does not parse:** a winter half alone, a hot half alone, a pair outside the
-  closed set, two grades in one cell, any other text, blank. A single-grade
-  (monograde) oil therefore reads as unparsed; monograde grades can be added
-  later as a closed-set change.
+  closed set (the four excluded ones included), two grades in one cell, any
+  other text, a cell over 64 characters. A single-grade (monograde) oil
+  therefore reads as unparsed; monograde grades can be added later as a
+  closed-set change. A blank cell is absent and not counted (D-7).
 - **Why strict:** completing a half grade would be a guess.
 
 ### Volume
@@ -126,8 +147,9 @@ from any feed or from the report.
   a space before the unit. `ml` and `cl` are converted to litres:
   illustratively, `500 ml` is `0,5 l`.
 - **A bare number is litres.** The unit sits in the label on some shops and in
-  the value on others, so the unit of the feed column is fixed by the contract
-  (#402) and an explicit unit is also accepted.
+  the value on others, so the unit of the feed column is fixed: the column is
+  `volume_l`, in litres, and an explicit unit is also accepted. `ml` and `cl`
+  must make a whole number of millilitres: `500 ml` reads, `500,5 ml` does not.
 - **Separators:** a dot or a comma followed by one to three digits is the
   decimal separator. Thousands separators are not accepted, because no volume
   in range needs one: illustratively, `2.000` and `2,000` both read as `2 l`. A
@@ -137,7 +159,8 @@ from any feed or from the report.
   read as thousands.
 - **Does not parse:** a unit not in the list (a mass unit, a gallon, a ratio),
   a pack form such as a count times a size, a range or two values, any other
-  text, blank.
+  text, a cell over 64 characters. A blank cell is absent and not counted
+  (D-7).
 - **Filter:** exact match on the written value, never a range; options in
   ascending order.
 
@@ -146,19 +169,31 @@ from any feed or from the report.
 - **Written form:** the sequence as ACEA writes it, upper-case, one token per
   sequence. A product holds one or more tokens. Illustrative display:
   `A3/B4, C2`.
-- **Closed set (light-duty sequences):** A1/B1, A3/B3, A3/B4, A5/B5, A7/B7, C1,
-  C2, C3, C4, C5, C6. **This set is to confirm against the published ACEA
-  sequences** before #402 builds it. The A and B halves are one token and are
-  never split. The heavy-duty E sequences are not in the set.
-- **Accepted raw forms:** an optional leading ACEA; one or more sequences
+- **Closed set (light-duty sequences):** twelve tokens, A1/B1, A3/B3, A3/B4,
+  A5/B5, A7/B7, C1, C2, C3, C4, C5, C6 and C7 (D-3 adds C7). A1/B1, A3/B3 and
+  C1 are withdrawn by ACEA but stay readable, because older stock still
+  carries them (D-4); in code a withdrawn token is marked and reads exactly
+  like a current one. The A and B halves are one token and are never split:
+  `A3` alone and `B4` alone do not read. The heavy-duty E sequences are not in
+  the set.
+- **Source of the set:** the 2023 edition of the ACEA light-duty oil
+  sequences (Revision 0, September 2023), which adds C7 and lists A3/B4,
+  A5/B5, A7/B7 and C2 to C7 as current. The withdrawn tokens come from the
+  earlier editions.
+- **Accepted raw forms:** an optional leading ACEA, taken on each sequence of
+  the cell (`ACEA C2, ACEA C3` reads both, D-27); one or more sequences
   separated by a comma, a semicolon, a plus, the word y, or a slash between two
-  C sequences; any case; a year suffix after a sequence is ignored.
-  Illustrative: `ACEA C5`, `A3/B4 + C2`, `C3-21`.
+  C sequences; any case; a year suffix of the form `-NN` (two digits) after a
+  sequence is ignored. Any other form of the year (`C3-2021`, `C3 (2021)`)
+  drops that token. Illustrative: `ACEA C5`, `A3/B4 + C2`, `C3-21`.
+- **Written and shown order:** the closed-set order above, whatever order the
+  feed wrote, each token once, so two shops with one set hold one value.
 - **Partial cells:** unrecognised tokens are dropped and the recognised ones are
   kept. This differs from viscosity and volume only because ACEA is a set, and
   the product then states only what the rule could read.
-- **Does not parse:** no token in the cell is recognised, or the cell is blank.
-  The attribute is then absent.
+- **Does not parse:** no token in the cell is recognised. The attribute is then
+  absent and the cell is counted. A cell that held at least one recognised
+  token is not counted. A blank cell is absent and not counted (D-7).
 - **Filter:** a product matches a chosen sequence when its set holds it; the
   options are the sequences present on listed products.
 
@@ -166,12 +201,18 @@ from any feed or from the report.
 
 - **Written form:** one of synthetic, semi-synthetic or mineral, shown in
   Spanish on the product page, with copy from the message files.
-- **Accepted raw forms:** read after folding case and accents. A value naming
-  synthetic is synthetic, one naming semi-synthetic (with or without the hyphen
-  or a space) is semi-synthetic, one naming mineral is mineral. Semi-synthetic
-  is tested before synthetic. A leading `100%` or the word base is ignored.
-- **Does not parse:** a value that names more than one family, names none, or is
-  blank. The line is then absent, as every null detail on the product page is.
+- **Accepted raw forms:** read after folding case and accents, in Spanish and
+  English (D-15). The words are `sintético`, `sintética` and `synthetic` for
+  synthetic; `semisintético`, `semi sintético`, `semisintética`,
+  `semi sintética`, `semi-synthetic` and `semi synthetic` for semi-synthetic
+  (the feminine forms are D-22; a hyphen in place of the space also reads);
+  `mineral` for mineral. Semi-synthetic is tested before synthetic. A leading
+  `100%` and the word base are dropped first.
+- **Whole-value match:** after that, the whole remainder must be one of the
+  words (D-23). `aceite sintético` and `synthetic blend` do not read.
+- **Does not parse:** a value that names more than one family, names none, or
+  has any word beyond the list. The line is then absent, as every null detail
+  on the product page is. A blank cell is absent and not counted (D-7).
 
 ### Manufacturer approvals (display only)
 
@@ -182,9 +223,56 @@ from any feed or from the report.
 - **Cleaning only:** split on a comma or semicolon (a slash or a space stays
   inside an item, because codes use both), trim, collapse inner whitespace, drop
   blank items and case-insensitive duplicates, keep at most 20 items of at most
-  60 characters each; an item longer than that is dropped.
-- **Does not parse:** nothing fails beyond blank. A blank cell is absent and the
-  line is not shown.
+  60 characters each; an item longer than that is dropped, not cut. A dropped
+  item never uses one of the 20 places. The feed's separator is a semicolon by
+  recommendation; a comma also splits, so a CSV cell holding commas must be
+  quoted.
+- **Does not parse:** a blank cell is absent, not counted, and the line is not
+  shown (D-7). A non-blank cell that cleans to nothing, because every item was
+  over 60 characters, is counted as unparsed and nothing is stored (D-24). A
+  cell that loses only some items is not counted.
+
+## As built in S15.3
+
+Decided by the design pass of #402 within the rules above; the code is the home
+of the sets (`src/server/category-attributes.ts`).
+
+- **Feed entry:** five optional columns, appended after `fitment` in the
+  canonical layout (sixteen in all): `viscosity`, `volume_l` (litres),
+  `acea`, `oil_type` and `approvals`. In XML each is a direct leaf child, as
+  every canonical column. A feed with none of them imports as before; a column
+  it carries that is not one of the five is ignored. These are the names the
+  collector (#403) is to emit.
+- **Never a rejection.** A cell, whatever it holds, never rejects the row. The
+  five are read for every accepted row, whatever its category.
+- **Stored form:** five nullable columns on `products`, null meaning absent:
+  `attr_viscosity` (`10W-40`), `attr_volume_ml` (integer millilitres, 100 to
+  220000), `attr_acea` and `attr_approvals` (text arrays, never empty) and
+  `attr_oil_type` (`synthetic`, `semi-synthetic` or `mineral`). The importer is
+  their only writer; there is no admin edit (D-1).
+- **Store by the entry, show by the category (D-26).** The import stores what a
+  row reads whatever the product's category, so no second import is needed
+  after the owner maps categories. The product page draws the attributes only
+  for a product in `aceite-de-motor`; the filters of #404 are to gate on the
+  category too.
+- **Write and fill.** The row that creates a product writes the attributes it
+  reads, as it writes the title and the EAN, whatever its shop's or feed's
+  approval (D-16). A later row fills an attribute the product does not hold,
+  one attribute at a time, only when it passes the S7.6 eligibility (shop and
+  feed approved, offer not hidden and not in review, product not hidden, same
+  side of the collected wall). The local flag never decides a fill.
+- **The count line (rule 10).** After the `fitment:` lines of a feed and before
+  its `removal: skipped` line, one line:
+  `  attributes: unparsed viscosity=2 volume_l=1`. It names feed columns, lists
+  only those above 0, in the order viscosity, volume_l, acea, oil_type,
+  approvals, and prints no row text, value, product or record number. It counts
+  accepted rows only, new or known offers, collected or not, whether or not the
+  product already holds the attribute. No line when nothing is counted.
+- **The page.** A "Características" card under the offers shows each held
+  attribute as a labelled line: Viscosidad SAE, Volumen, Norma ACEA, Tipo de
+  aceite and Homologaciones, in that order, with the oil type in its Spanish
+  word. A product that holds none, or is outside `aceite-de-motor`, draws no
+  card.
 
 ## Under an active filter
 
@@ -264,8 +352,9 @@ hand-written feeds, never from collected data (guardrail 2).
 - The six engine-oil report attributes not in the list.
 - Filtering by manufacturer approval.
 - An admin editor for the list.
-- Stored key names, the feed column or entry path, URL parameter names and the
-  filter's screen and copy: #402, #403 and #404.
+- URL parameter names and the filter's screen and copy (#404), and the
+  collector emitting the five feed columns (#403). The stored key names and the
+  feed columns are fixed by S15.3 (see *As built in S15.3*).
 
 The search fold of viscosity forms (migration 0005) is a search aid over titles,
 not a stored attribute, and is unchanged. `docs/product/vehicle-fitment.md`
