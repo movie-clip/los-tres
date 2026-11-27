@@ -7,6 +7,7 @@ Amended again on 2026-10-22: the goal is now a working **prototype** (owner
 ruling, see *Prototype phase*).
 Amended on 2026-11-19 (owner ruling, decision 0017): data sources, the
 prototype's done line, feed offer links and outgoing clicks.
+Amended on 2026-11-27 (owner ruling, S15.2, #401): category attributes and the engine-oil filters (see *Category attributes*).
 This is the approved MVP scope: what is in, what is out, and the owner calls
 already settled. A change to anything here is the owner's call.
 
@@ -92,14 +93,23 @@ system setting. The approved system is `docs/design/system.md`; its build is
   out through our redirect (see *Outgoing clicks*). The row at the lowest price
   carries a "Mejor precio" tag when at least two distinct prices exist.
 - **Products with a single offer are shown.** The page says "1 shop".
-- **Product text** (title, brand, part number, EAN, description, attributes)
+- **Product text** (title, brand, part number, EAN, description and the attributes of *Category attributes*)
   comes from the feeds. When feeds disagree, the first feed's text stays (no
   shop ranking in the MVP). On the product page a blank or whitespace-only
   brand, part number, EAN or description counts as absent (read as null) and
   its line is not shown.
 - **Deferred until after the prototype** (owner ruling, 2026-10-26): product
   images uploaded by the admin, the price history chart, keeping a product page
-  when it loses all its offers, and feed attributes on the product page.
+  when it loses all its offers, and feed attributes on the product page other than the engine-oil attributes of *Category attributes*.
+
+## Category attributes
+
+Owner ruling, 2026-11-27 (S15.2, #401). Each category has a fixed list of attributes, defined in code like the category tree (S4.0), with no admin editor; changing it is a code change. The list, with each attribute's unit or closed set and its rule for a value that does not parse, is `docs/product/category-attributes.md`.
+
+- Attributes come from feeds only; nothing is read from a title, a description or a shop page.
+- Engine oil stores five attributes, all shown on the product page. Viscosity grade, volume and ACEA norm are also category-page filters. Oil type and manufacturer approvals are shown only and are not filters.
+- Oil filters, air filters, fuel filters and cabin filters store no attribute and have no attribute filter.
+- A value that does not parse is stored as absent and shown nowhere. Its product stays in the category and is left out of an active filter on that attribute, and the page says how many were left out.
 
 ## Matching
 
@@ -115,7 +125,7 @@ Decision 0008 holds the detail.
 - Free-text search in PostgreSQL that also matches EAN and part numbers.
 - With a car selected, category pages and search results are filtered by fit
   (decision 0016).
-- Category pages list products as a card grid with sort (price ascending, price descending, name) and a brand filter; price and shop filters are deferred.
+- Category pages list products as a card grid with sort (price ascending, price descending, name) and a brand filter. The engine-oil category also has three attribute filters, viscosity grade, volume and ACEA norm (owner ruling, S15.2, #401); no other category has an attribute filter. Price and shop filters are deferred.
 - Product pages are server-rendered with schema.org `Product` / `AggregateOffer`
   structured data, so Google can show prices in its results.
 
@@ -289,7 +299,7 @@ TOTP second factor (S2.2), Search Console, payee registration and network
 review requirements. Also deferred on 2026-10-26: the admin import button
 and reports (S3.2), per-shop link patterns (S3.6), the matching review queue
 (S7.2), brand aliases (S7.3), price and shop filters (S5.3; brand filter and sort shipped in S11.4), product images (S8.1),
-price history (S8.3), the no-offers page (S8.4), feed attributes (S8.6) and
+price history (S8.3), the no-offers page (S8.4), feed attributes beyond engine oil (S8.6) and
 click counts (S1.3).
 
 ## Before going live
