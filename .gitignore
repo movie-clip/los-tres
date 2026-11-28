@@ -25,6 +25,7 @@ next-env.d.ts
 playwright-report/
 test-results/
 timing-results/
+.vitest/
 
 # Written at the repo root by next build and next dev; never commit it
 AGENTS.md

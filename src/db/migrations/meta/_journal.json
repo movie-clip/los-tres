@@ -78,6 +78,13 @@
       "when": 1795451509031,
       "tag": "0010_collected_file_source",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795798108321,
+      "tag": "0011_product_attributes",
+      "breakpoints": true
     }
   ]
 }

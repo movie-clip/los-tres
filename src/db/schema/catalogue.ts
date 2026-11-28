@@ -56,6 +56,17 @@ export const products = pgTable(
     // S12.2: the product was created from a row of a collected feed (a marked product). Written once
     // by the importer's createProduct, never updated.
     isCollected: boolean('is_collected').notNull().default(false),
+    // S15.3: the engine-oil attributes, in the stored forms of
+    // src/server/category-attributes.ts (the closed sets live there only). Null
+    // = absent; an array is never empty. Written by the importer only: at
+    // creation, or filled once from null; never changed or cleared. Stored
+    // whatever the category; the product page shows them in aceite-de-motor only.
+    attrViscosity: text('attr_viscosity'),
+    // Integer millilitres, never a float.
+    attrVolumeMl: integer('attr_volume_ml'),
+    attrAcea: text('attr_acea').array(),
+    attrOilType: text('attr_oil_type'),
+    attrApprovals: text('attr_approvals').array(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Searchable text (S5.4), generated and stored by PostgreSQL so the importer
     // never writes it and every insert or update refreshes it. The title is
@@ -73,6 +84,9 @@ export const products = pgTable(
     index('products_search_vector_idx').using('gin', table.searchVector),
     index('products_category_id_idx').on(table.categoryId),
     check('products_slug_format', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+    check('products_attr_volume_ml_range', sql`${table.attrVolumeMl} BETWEEN 100 AND 220000`),
+    check('products_attr_acea_nonempty', sql`cardinality(${table.attrAcea}) >= 1`),
+    check('products_attr_approvals_nonempty', sql`cardinality(${table.attrApprovals}) >= 1`),
   ],
 );
 

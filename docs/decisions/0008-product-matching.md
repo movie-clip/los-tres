@@ -69,6 +69,20 @@ the product changes. The limits:
 - A fill creates, approves, hides, unhides and maps nothing, and publishes
   nothing: approvals, hiding and category mapping are unchanged (guardrail 1).
 
+The same shape holds for the engine-oil attributes (S15.3, run
+`2026-11-27-402-attribute-storage`; category-attributes spec). The row that
+creates a product writes the attributes it reads, as it writes the title and the
+EAN, whatever the approval of its shop or feed. An attribute a stored product
+does not hold is filled once, one attribute at a time, by an eligible row of its
+own, a new row that joins it or a known offer already on it, through the very
+gate of the EAN fill above (shop and feed approved, offer not hidden and not in
+review, product not hidden, same side of the collected wall; the local flag never
+decides). A held attribute is never changed or cleared, and a set value (ACEA,
+approvals) fills as a whole, never gaining or losing an item. A fill writes only
+the attributes and publishes nothing. Attributes play no part in matching: no
+attribute enters the EAN step or the brand and part-number step, no offer is
+re-matched and no product is merged.
+
 Matching decides which product an offer belongs to and publishes nothing:
 approvals, hiding and category mapping are unchanged (guardrail 1).
 
@@ -97,7 +111,10 @@ approvals, hiding and category mapping are unchanged (guardrail 1).
 - The first feed's text wins: a product's title, brand, part number and
   description are written once, when it is created. The EAN is written then too,
   except that an empty one may be filled once by an eligible row (S7.6) and is
-  never changed or cleared after.
+  never changed or cleared after. An engine-oil attribute follows the same rule
+  (S15.3): written at creation, filled once from absent, never changed or
+  cleared, so a later feed's different value never replaces the first, and
+  disabling a feed or shop never clears one.
 - The lookup in step 2 is served by the existing index on the normalised part
   number; no uniqueness is enforced on any of brand, part number or EAN.
 - Two `import-feeds` processes run at once can each create a product for one

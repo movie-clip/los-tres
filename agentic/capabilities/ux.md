@@ -140,6 +140,9 @@ The CLI cannot press Tab, so keyboard focus is not visible in a screenshot. A sh
 | product with one offer | `/producto/demo-filtro-de-aire-bosch-af-2287` |
 | product with a long title | `/producto/demo-filtro-de-habitaculo-de-carbon-activo-con-triple-capa-para-varios-modelos-d` (Referencia FH-4000, no EAN) |
 | product with EAN only, two offers | `/producto/demo-aceite-shell-10w-40-mineral-5-l` (tag on row 1) |
+| product, five attributes (S15.3) | `/producto/demo-aceite-shell-10w-40-mineral-5-l` (EAN only in the hero, 10 approvals: 8 shown, "Mostrar 2 más"); also `demo-aceite-castrol-5w-30-sintetico-4-l` (card plus Vehículos compatibles) and `demo-aceite-repsol-5w-30-sintetico-5-l` (Volumen "4,5 l") |
+| product, four attributes, no approvals row; no card (S15.3) | four attributes, no approvals row: `/producto/demo-aceite-mobil-5w-30-sintetico-4-l`; no card: `demo-aceite-castrol-0w-40-sintetico-4-l` (oil) and `demo-filtro-de-aceite-oc-1234` (filter); only 4 of 16 demo oil products hold attributes |
+| product, approvals above 8, decimal-comma volume (S15.3) | producible on the demo: approvals above 8 on `/producto/demo-aceite-shell-10w-40-mineral-5-l` (10, "Mostrar 2 más"); decimal-comma volume on `/producto/demo-aceite-repsol-5w-30-sintetico-5-l` ("4,5 l"). A dev database imported before 2dfaf31 keeps the old values (2 approvals, "5 l"), because a held attribute is never rewritten: use a fresh database |
 | category, empty (200) | `/categoria/filtros-de-combustible` |
 | category, one brand | `/categoria/filtros-de-aire?marca=bosch` (2 cards) |
 | category, no match (200) | `/categoria/filtros-de-aire?marca=no-existe` |

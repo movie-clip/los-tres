@@ -103,6 +103,21 @@
     "vatIncluded": "Precios con IVA incluido.",
     "bestPrice": "Mejor precio",
     "descriptionHeading": "Descripción",
+    "attributesHeading": "Características",
+    "attributeLabel": {
+      "viscosity": "Viscosidad SAE",
+      "volume": "Volumen",
+      "acea": "Norma ACEA",
+      "oilType": "Tipo de aceite",
+      "approvals": "Homologaciones"
+    },
+    "oilType": {
+      "synthetic": "Sintético",
+      "semi-synthetic": "Semisintético",
+      "mineral": "Mineral"
+    },
+    "approvalsMore": "Mostrar {count} más",
+    "approvalsFewer": "Mostrar menos",
     "priceUpdatedOn": "Actualizado el {date, date, medium}",
     "goToShopShort": "Ir a la tienda",
     "goToShop": "Ir a la tienda de {shopName}",

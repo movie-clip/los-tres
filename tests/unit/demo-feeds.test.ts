@@ -4,6 +4,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { VEHICLE_CATALOGUE } from '@/db/vehicle-catalogue';
+import { ATTRIBUTES } from '@/server/category-attributes';
+import { readsAnyAttribute } from '@/server/importer/attribute-fill';
 import { parseEan } from '@/server/matching';
 import { parseCsv } from '@/server/importer/csv';
 import { readHeader, validateRow, type ValidRow } from '@/server/importer/validate';
@@ -16,7 +18,8 @@ import { DEMO_BOSCH, DEMO_CATEGORY_COUNTS, DEMO_COUNTS, DEMO_FEED_ROWS } from '.
 // fixtures in tests/fixtures/demo.ts and the e2e rely on. No database, no network.
 
 const FEED_DIR = path.resolve(import.meta.dirname, '../../demo/feeds');
-const HEADER = 'id,title,brand,part_number,ean,price,currency,url,description,category,fitment';
+const HEADER =
+  'id,title,brand,part_number,ean,price,currency,url,description,category,fitment,viscosity,volume_l,acea,oil_type,approvals';
 const PAGE_SIZE = 24;
 
 type DemoRow = ValidRow & { feedFile: string; leaf: string | null };
@@ -175,8 +178,14 @@ describe('fitment in the shipped demo feeds (S5.6)', () => {
     return list.has(slug) ? 'fits' : 'no-fit';
   };
 
-  it('puts fitment last in the header of every demo file', () => {
-    for (const feed of feeds) expect(feed.header.split(',').at(-1)).toBe('fitment');
+  it('puts fitment in the header of every demo file, followed only by the five attribute columns (S15.3)', () => {
+    for (const feed of feeds) {
+      const header = feed.header.split(',');
+      expect(header.slice(header.indexOf('fitment'))).toEqual([
+        'fitment',
+        ...ATTRIBUTES.map((attribute) => attribute.column),
+      ]);
+    }
   });
 
   it('names only slugs of the vehicle list, so the first import prints 0 unknown slugs (AC 29)', () => {
@@ -263,5 +272,72 @@ describe('fitment in the shipped demo feeds (S5.6)', () => {
     const unmapped = allRows.filter((row) => row.leaf === null);
     expect(unmapped.length).toBeGreaterThan(0);
     for (const row of unmapped) expect(row.fitment, row.externalId).toEqual([]);
+  });
+});
+
+describe('the demo attributes (S15.3, AC 42, 43)', () => {
+  const ENGINE_OIL = 'aceite-de-motor';
+  const withAttributes = allRows.filter((row) => readsAnyAttribute(row.attributes));
+
+  it('gives every demo row an entry that reads: no demo row has an unparsed value, so the second import prints no attribute line (AC 43)', () => {
+    expect(allRows.flatMap((row) => row.unparsed.map((key) => `${row.externalId}:${key}`))).toEqual([]);
+  });
+
+  it('carries values on exactly the four engine-oil rows of tienda-demo-cuatro (AC 42 as narrowed, D-30) and on no other row: a filter, a drill and a wrench row leave all five cells empty', () => {
+    expect(withAttributes.map((row) => row.externalId)).toEqual(['CUATRO-201', 'CUATRO-202', 'CUATRO-203', 'CUATRO-204']);
+    for (const row of withAttributes) expect(row.leaf, row.externalId).toBe(ENGINE_OIL);
+    for (const row of allRows.filter((candidate) => candidate.leaf !== ENGINE_OIL)) {
+      expect(row.attributes, row.externalId).toEqual({ viscosity: null, volumeMl: null, acea: null, oilType: null, approvals: null });
+    }
+  });
+
+  it('holds, for the four rows of tienda-demo-cuatro that carry an entry, the stored forms the shop wrote in other spellings', () => {
+    const byId = new Map(allRows.map((row) => [row.externalId, row.attributes]));
+    expect(byId.get('CUATRO-201')).toEqual({
+      viscosity: '5W-30',
+      volumeMl: 4000,
+      acea: ['C3'],
+      oilType: 'synthetic',
+      approvals: ['Homologación demo 501', 'Homologación demo 502'],
+    });
+    expect(byId.get('CUATRO-202')).toEqual({ viscosity: '5W-30', volumeMl: 4000, acea: ['C3'], oilType: 'synthetic', approvals: null });
+    expect(byId.get('CUATRO-203')).toEqual({
+      viscosity: '5W-30',
+      volumeMl: 4500,
+      acea: ['C3'],
+      oilType: 'synthetic',
+      approvals: ['Homologación demo 503'],
+    });
+    expect(byId.get('CUATRO-204')).toEqual({
+      viscosity: '10W-40',
+      volumeMl: 5000,
+      acea: ['A3/B4'],
+      oilType: 'mineral',
+      approvals: [
+        'Homologación demo 504',
+        'Homologación demo 505',
+        'Homologación demo 506',
+        'Homologación demo 507',
+        'Homologación demo 508',
+        'Homologación demo 509',
+        'Homologación demo 510',
+        'Homologación demo 511',
+        'Homologación demo 512',
+        'Homologación demo 513',
+      ],
+    });
+  });
+
+  it('writes the entry in the cells, not in the description: the four rows would hold nothing if the entry cells were blank (AC 42: not mined)', () => {
+    for (const id of ['CUATRO-201', 'CUATRO-202', 'CUATRO-203', 'CUATRO-204']) {
+      const row = allRows.find((candidate) => candidate.externalId === id);
+      expect(row, id).toBeDefined();
+      // The description names the grade and the norm, as a shop's text does; the import never reads it.
+      expect(row?.description ?? '', id).toMatch(/\d+W-\d+/);
+    }
+  });
+
+  it('keeps the invented approvals invented: every item says demo', () => {
+    for (const row of allRows) for (const item of row.attributes.approvals ?? []) expect(item).toMatch(/demo/i);
   });
 });

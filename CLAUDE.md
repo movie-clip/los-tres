@@ -64,6 +64,7 @@ line here is the owner's call: propose it and stop.
   (0008, S7.6)
 - **Vehicle fitment:** own vehicle list in code, fitment from feeds only (the `fitment` field, `|`-separated slugs; the import is its only writer),
   selected car in `?coche=` and `localStorage`, never stored on the server (0016)
+- **Category attributes:** the five engine-oil attributes (viscosity, volume, ACEA, oil type, approvals) are fixed in code with their closed sets (`src/server/category-attributes.ts`), come from five optional feed columns only (`viscosity`, `volume_l` in litres, `acea`, `oil_type`, `approvals`), and the import is their only writer. The row that creates a product writes them. An absent one is filled once by an eligible row (the S7.6 gate), and a held one is never changed or cleared. They are shown on the `aceite-de-motor` product page only, and there is no admin edit (S15.3)
 - **Clicks and analytics:** `/go/<offer>` click log without personal data;
   no ads (0009); no traffic analytics for now (0014)
 - **Admin sign-in:** Better Auth 1.7.12 used as a library, server-stored
@@ -168,8 +169,9 @@ development database gets no e2e admin. **S2.1 is password-only: do not
 deploy the admin area before S2.2 adds a second factor** (0012).
 
 **Catalogue file (S3.7).** The owner can add real products from a CSV or XML
-file he writes (plain or gzip, the canonical layout `import-feeds` already
-reads). The full guide, with the columns, the file-name rule and the failure
+file he writes (plain or gzip, the sixteen-column canonical layout `import-feeds`
+already reads: four required columns, seven optional product columns and, from
+S15.3, five optional engine-oil attribute columns). The full guide, with the columns, the file-name rule and the failure
 codes, is `docs/feeds/catalogue-file.md`. In short:
 
 - **Folder:** `catalogue-files/` at the repo root, the only folder a catalogue
@@ -206,11 +208,13 @@ codes, is `docs/feeds/catalogue-file.md`. In short:
   restores them if a later import has the row again; it never writes hide.
 - **Not done:** no brand alias
   (`Bosch` and `Robert Bosch` stay two products, S7.3) and no re-matching of
-  rows already stored; the one thing a join writes to a stored product is an
+  rows already stored; what a join writes to a stored product is an
   empty EAN, filled once from an eligible row (S7.6, US-7.6: approved shop and
   feed, offer and product not hidden, offer not in review, same side of the
   collected wall, no other product holding the EAN, first row wins, never
-  changed or cleared; no command, and no admin way to edit an EAN). Two shops converge on a shared valid `ean`, or on the
+  changed or cleared; no command, and no admin way to edit an EAN), and an
+  absent engine-oil attribute, filled once by the same gate (S15.3; a held
+  attribute is never changed or cleared, no admin way to edit one). Two shops converge on a shared valid `ean`, or on the
   same normalised brand and part number (S7.1). Hide and unhide of a
   product or offer exist (S2.4): an admin finds a product at `/admin/productos`
   and hides or unhides it and its offers; hidden items stay hidden through
@@ -240,7 +244,10 @@ goes in its own folder, never in `catalogue-files/`. The full guide is the
   counted click, flag on or off, and their `fitment` never counts. A hand-written
   row never merges into a collected product. A collected row never fills an
   unmarked product's empty EAN (S7.6, US-12.2 AC 29 unchanged); it fills only a
-  collected product, and the flag never decides whether a fill happens.
+  collected product, and the flag never decides whether a fill happens. The same
+  holds for the engine-oil attributes (S15.3): a collected row's attributes go
+  only on collected products and never fill an unmarked one, and the flag never
+  decides a fill.
 - **Refusal (exit 78):** with the flag on and `SITE_URL` not a loopback origin
   (`localhost`, `127.x.x.x`, `[::1]`; unset or unparsable counts as not loopback),
   the container `server` verb, `npm run dev`, `next start` and `node server.js`
@@ -291,7 +298,7 @@ deploy it must be the public https origin**, or all of them point at
 | timing tests | `npm run test:timing` (`vitest run --config vitest.timing.config.mts`: the files `tests/timing/**/*.timing.test.ts`, one worker, one file at a time; writes its tables to `timing-results/`, git- and docker-ignored; no gate step runs it) | `npm run db:up`; not beside another Vitest run, its setup drops every integration database and the next integration run rebuilds them |
 | migrate | `npm run db:migrate` (applies `src/db/migrations` to the database in `.env`, then upserts the fixed category tree from `src/db/category-tree.ts` and the vehicle list from `src/db/vehicle-catalogue.ts`; every migrate path does both, whatever `SEED_DEMO_DATA` says; 0015) | `npm run db:up`, `.env` |
 | seed | `npm run db:seed` (demo network, shops, feeds and feed-category mappings; creates no category and no products, and fails if the fixed tree is missing, so migrate first; prints `seed: networks=N shops=N feeds=N categoryMappings=N`; always seeds, whatever `SEED_DEMO_DATA` says) | `npm run db:up`, migrated database, `.env` |
-| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line reads `... offers_created=<n> offers_updated=<n> offers_removed=<n> rejected=<n> unknown_vehicles=<n>` and ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; a row that became its own product because of an EAN or brand + part number conflict or ambiguity prints `  record <n>: own_product <reason>` (S7.1; one of `ean_brand_conflict`, `ambiguous_ean`, `brand_part_number_ean_conflict`, `ambiguous_brand_part_number`; after the rejected lines, no row text, never fails the run); when the import filled the empty EAN of products (S7.6) the feed prints `  ean: filled=<n>`, only when n is above 0, after the `own_product` lines and before the `fitment:` lines, with no row text or EAN, and it never changes the exit code; when the removal guard skips removal (S3.3, decision 0018) the last indented line of that feed is `  removal: skipped <reason> missing=<n> current=<n>`, `<reason>` being `empty_import` or `small_import`, and the skip does not change the exit code (exit 1 still means a feed failed); `npm run import-feeds -- --feed <id>` imports one, and `npm run import-feeds -- --feed <id> --allow-large-removal` also lifts `small_import` for that feed (any other argument form prints `usage: import-feeds [--feed <id> [--allow-large-removal]]` and exits 2); a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
+| import feeds | `npm run import-feeds` (imports every approved feed, CSV or XML, plain or gzip, detected from the bytes, and prints counts and rejected rows; each imported feed line reads `... offers_created=<n> offers_updated=<n> offers_removed=<n> rejected=<n> unknown_vehicles=<n>` and ends `unknown_vehicles=<n>`, followed by `  fitment: unknown vehicle <slug> rows=<n>` lines, at most 20 per feed, and one `  fitment: unknown vehicle values not shown rows=<n>` line when some are not listed; a row that became its own product because of an EAN or brand + part number conflict or ambiguity prints `  record <n>: own_product <reason>` (S7.1; one of `ean_brand_conflict`, `ambiguous_ean`, `brand_part_number_ean_conflict`, `ambiguous_brand_part_number`; after the rejected lines, no row text, never fails the run); when the import filled the empty EAN of products (S7.6) the feed prints `  ean: filled=<n>`, only when n is above 0, after the `own_product` lines and before the `fitment:` lines, with no row text or EAN, and it never changes the exit code; when accepted rows carried a value of the five engine-oil attributes that did not read (S15.3; a blank is not counted) the feed prints `  attributes: unparsed <column>=<n> ...`, only the columns above 0, in the order `viscosity`, `volume_l`, `acea`, `oil_type`, `approvals`, after the `fitment:` lines and before the `removal:` line, with no row text, value or record number, and it never changes the exit code; when the removal guard skips removal (S3.3, decision 0018) the last indented line of that feed is `  removal: skipped <reason> missing=<n> current=<n>`, `<reason>` being `empty_import` or `small_import`, and the skip does not change the exit code (exit 1 still means a feed failed); `npm run import-feeds -- --feed <id>` imports one, and `npm run import-feeds -- --feed <id> --allow-large-removal` also lifts `small_import` for that feed (any other argument form prints `usage: import-feeds [--feed <id> [--allow-large-removal]]` and exits 2); a catalogue-file feed (S3.7) is read from `catalogue-files/`, see the Catalogue file paragraph of § Commands) | `npm run db:up`, migrated and seeded database, `.env`; for a catalogue-file feed also the file in `catalogue-files/` |
 | new migration | `npm run db:generate -- --name <name>` (`drizzle-kit generate`, writes SQL from `src/db/schema` to `src/db/migrations`; commit it) | nothing, no database |
 | build CLI | `npm run cli:build` (`tsc -p tsconfig.cli.json`, output in `dist/`, git-ignored) | nothing; the three verbs above run it first |
 | create admin | `npm run create-admin` (email, then password, on stdin; no arguments; prints `created` or `updated, sessions ended`) | `npm run db:up`, migrated database, `.env` with `AUTH_SECRET` |

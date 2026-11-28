@@ -1,5 +1,6 @@
 // Import report and dependency types (C-16). Pure.
 
+import type { AttributeKey } from '../category-attributes';
 import type { OwnProductReason } from '../matching';
 
 export type RejectCode =
@@ -65,6 +66,12 @@ export type FeedImportReport = {
   unknownVehicleSlugs: UnknownVehicleSlug[];
   /** Occurrences not in the list: not slug-shaped, or past the 20th distinct slug. */
   unknownVehiclesNotShown: number;
+  /**
+   * Accepted rows whose cell for the attribute was non-blank and did not read
+   * (S15.3, AC 19 to 21): one per row per key, whatever the category, the
+   * marker or what the product holds. All zero when skipped or failed.
+   */
+  attributesUnparsed: Record<AttributeKey, number>;
 };
 
 export type ImportReport = { startedAt: Date; feeds: FeedImportReport[] };

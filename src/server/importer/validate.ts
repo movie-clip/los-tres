@@ -1,6 +1,16 @@
 // Header and row validation for the canonical feed CSV layout (C-15). Pure:
 // no database, no network.
 
+import {
+  readAcea,
+  readApprovals,
+  readOilType,
+  readViscosity,
+  readVolume,
+  type AttributeKey,
+  type AttributeReading,
+  type AttributeValues,
+} from '../category-attributes';
 import { parseEan } from '../matching';
 import { parseDecimalToCents } from '../money';
 import type { RejectedRow } from './types';
@@ -14,6 +24,12 @@ const OPTIONAL_COLUMNS = [
   'currency',
   'category',
   'fitment',
+  // S15.3: the engine-oil attributes, in ATTRIBUTES order (category-attributes.ts).
+  'viscosity',
+  'volume_l',
+  'acea',
+  'oil_type',
+  'approvals',
 ] as const;
 
 /**
@@ -63,6 +79,10 @@ export type ValidRow = {
   feedCategory: string | null;
   /** Vehicle slugs from the fitment field, trimmed, de-duplicated; [] when absent or empty. Never rejects a row. */
   fitment: readonly string[];
+  /** S15.3: the value of each attribute cell that read, else null. Read whatever the category. Never rejects a row. */
+  attributes: AttributeValues;
+  /** S15.3: keys whose cell was non-blank and did not read, in ATTRIBUTES order. */
+  unparsed: readonly AttributeKey[];
 };
 
 export type RowResult = { ok: true; row: ValidRow } | { ok: false; reject: RejectedRow };
@@ -93,6 +113,7 @@ export function validateRow(cells: string[], columns: ColumnIndex, record: numbe
   if (!isHttpUrl(url)) return reject('invalid_url', 'url');
   const ean = parseEan(cell('ean'));
   if (ean.kind === 'invalid') return reject('invalid_ean', 'ean');
+  const { attributes, unparsed } = readAttributes(cell);
 
   return {
     ok: true,
@@ -108,6 +129,8 @@ export function validateRow(cells: string[], columns: ColumnIndex, record: numbe
       url,
       feedCategory: optional('category'),
       fitment: parseFitment(cell('fitment')),
+      attributes,
+      unparsed,
     },
   };
 }
@@ -124,6 +147,30 @@ export function parseFitment(text: string): string[] {
     if (slug !== '' && !slugs.includes(slug)) slugs.push(slug);
   }
   return slugs;
+}
+
+/**
+ * The five attribute cells of one row, each through its strict reader. A cell
+ * that does not read is absent and its key listed in `unparsed`; a blank is
+ * absent and not listed (D-7). Keys are pushed in ATTRIBUTES order.
+ */
+function readAttributes(cell: (name: ColumnName) => string): {
+  attributes: AttributeValues;
+  unparsed: AttributeKey[];
+} {
+  const unparsed: AttributeKey[] = [];
+  const take = <T>(key: AttributeKey, reading: AttributeReading<T>): T | null => {
+    if (reading.kind === 'unparsed') unparsed.push(key);
+    return reading.kind === 'value' ? reading.value : null;
+  };
+  const attributes: AttributeValues = {
+    viscosity: take('viscosity', readViscosity(cell('viscosity'))),
+    volumeMl: take('volume', readVolume(cell('volume_l'))),
+    acea: take('acea', readAcea(cell('acea'))),
+    oilType: take('oilType', readOilType(cell('oil_type'))),
+    approvals: take('approvals', readApprovals(cell('approvals'))),
+  };
+  return { attributes, unparsed };
 }
 
 function isHttpUrl(value: string): boolean {

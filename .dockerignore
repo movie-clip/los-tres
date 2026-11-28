@@ -13,6 +13,7 @@ next-env.d.ts
 playwright-report
 test-results
 timing-results
+.vitest
 docs
 tests
 Dockerfile

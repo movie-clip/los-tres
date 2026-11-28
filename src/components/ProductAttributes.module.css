@@ -1,0 +1,136 @@
+/* The Product attributes card (S15.3): the Product description look, a white card
+   under the offers. The list is capped at the description's 42rem reading column;
+   the term column is the hero's 8rem. Both are this component's own sizes, not
+   global tokens. Rows are divided by a hairline above every row but the first. */
+.card {
+  min-width: 0;
+  padding: var(--card-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.list {
+  max-width: 42rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+  min-width: 0;
+  padding-block: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+
+.row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.term {
+  flex: 0 0 8rem;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.value {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* A short value, and each ACEA token with its comma, never breaks inside. */
+.nowrap {
+  white-space: nowrap;
+}
+
+/* The approvals are a reference list: regular weight, items a step apart so a
+   wrapped item is told from the next one. An unbroken item breaks by character. */
+.listValue {
+  font-weight: var(--weight-regular);
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The Vehicle list control, composed: the Secondary button look, the two labels
+   that swap on open and the two-shape chevron. */
+.more {
+  composes: more from './VehicleList.module.css';
+}
+
+.summary {
+  composes: summary from './VehicleList.module.css';
+}
+
+.moreLabel {
+  composes: moreLabel from './VehicleList.module.css';
+}
+
+.fewerLabel {
+  composes: fewerLabel from './VehicleList.module.css';
+}
+
+.chevron {
+  composes: chevron from './VehicleList.module.css';
+}
+
+/* Opened, the rest follow under the control, as in the Vehicle list. */
+.rest {
+  margin-top: var(--space-2);
+}
+
+/* Below 40rem the approvals row stacks: the term sits above the list, takes only
+   its own height, and the list gets the full width. */
+@media (max-width: 39.99rem) {
+  .stacks {
+    flex-direction: column;
+    gap: var(--space-0);
+  }
+
+  .stacks .term {
+    flex: none;
+  }
+}
+
+/* At 14rem and below (a 390 phone at 200% zoom) every row stacks. */
+@media (max-width: 14rem) {
+  .row {
+    flex-direction: column;
+    gap: var(--space-0);
+  }
+
+  .term {
+    flex: none;
+  }
+}
